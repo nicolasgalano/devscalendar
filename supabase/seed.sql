@@ -1,0 +1,8 @@
+-- Seed data for local development.
+-- Run with: `supabase db reset` (executes this file automatically after migrations).
+--
+-- Note: this file is intentionally empty for now. Seed real users via the
+-- Supabase Studio (http://localhost:54323) or via `supabase auth` commands,
+-- then set their role manually:
+--
+--   update public.profiles set role = 'admin' where email = 'you@example.com';
