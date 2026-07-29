@@ -8,7 +8,7 @@ Cada feature tiene un `spec.md` como stub. `plan.md` y `tasks.md` se crean cuand
 
 | # | Feature | Estado | Depende de | Ref. spec funcional |
 | :---- | :---- | :---- | :---- | :---- |
-| 001 | Auth & permissions | draft | — | §3, §12 (seguridad) |
+| 001 | Auth & permissions | done | — | §3, §12 (seguridad) |
 | 002 | Entities admin (users, clients, projects) | draft | 001 | §3, §10 |
 | 003 | Calendar UI (day/month/year + grouping + filters) | draft | 001, 002 | §4 |
 | 004 | Bookings CRUD | draft | 001, 002, 003 | §5, §9 |

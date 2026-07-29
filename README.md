@@ -2,7 +2,7 @@
 
 Plataforma de planificación de recursos para equipos de desarrollo. Los PMs reservan tiempo de desarrolladores sobre proyectos, con vista de calendario tipo Google Calendar, aprobación del dev, anti doble-booking, prioridad entre proyectos e integraciones con Google Calendar, Jira y Slack.
 
-**Estado:** en desarrollo · Feature `001-auth-and-permissions` scaffoldeada, esperando conexión a Supabase.
+**Estado:** en desarrollo · Feature `001-auth-and-permissions` conectada a Supabase local, con auth + RLS + tests funcionando.
 
 ## Stack
 
@@ -40,6 +40,19 @@ pnpm dev
 ```
 
 Scripts disponibles: ver la sección "Cómo correr localmente" de `CLAUDE.md`.
+
+## Tests
+
+```bash
+# Integration (Vitest, contra Supabase local — requiere `supabase start` corriendo
+# y .env.local con NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY)
+pnpm test
+
+# E2E (Playwright — levanta `pnpm dev` automáticamente si no está corriendo)
+pnpm test:e2e
+```
+
+Los tests de integración (`tests/integration/`) crean y borran usuarios de prueba vía `auth.admin` en cada corrida — no tocan tu sesión ni tus datos manuales.
 
 ## Requisitos
 

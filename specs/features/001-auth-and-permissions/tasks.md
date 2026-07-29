@@ -29,8 +29,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
   - [x] `current_user_role()` helper (SECURITY DEFINER).
   - [x] RLS policies on `profiles` (self read, admin read all, admin manage).
   - [x] `handle_new_user()` trigger on `auth.users`.
-- [ ] **T2.2** — When the user connects Supabase: run `pnpm supabase db push` (or apply migration in dashboard). _DoD: table + trigger + policies present._
-- [ ] **T2.3** — Generate types with `pnpm supabase gen types typescript --local > src/types/database.ts` (or `--linked` when connected to cloud).
+- [x] **T2.2** — When the user connects Supabase: run `pnpm supabase db push` (or apply migration in dashboard). _DoD: table + trigger + policies present._
+- [x] **T2.3** — Generate types with `pnpm supabase gen types typescript --local > src/types/database.ts` (or `--linked` when connected to cloud).
 
 ## Phase 3 — Auth UI + routes
 
@@ -43,15 +43,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Phase 4 — Tests
 
-- [ ] **T4.1** — Vitest + integration test setup pointing to a local Supabase (documented in a README). Blocked by T2.2.
-- [ ] **T4.2** — Test: create two auth users, insert profiles, assert that user A cannot read user B's profile (RLS).
-- [ ] **T4.3** — Test: inserting into `auth.users` fires the trigger and creates a `profiles` row.
-- [ ] **T4.4** — Playwright smoke test: unauth user visits `/`, is redirected to `/login`.
+- [x] **T4.1** — Vitest + integration test setup pointing to a local Supabase (documented in a README). Blocked by T2.2.
+- [x] **T4.2** — Test: create two auth users, insert profiles, assert that user A cannot read user B's profile (RLS).
+- [x] **T4.3** — Test: inserting into `auth.users` fires the trigger and creates a `profiles` row.
+- [x] **T4.4** — Playwright smoke test: unauth user visits `/`, is redirected to `/login`.
 
 ## Phase 5 — Docs & handoff
 
 - [x] **T5.1** — Update `CLAUDE.md` with code structure and local dev instructions.
-- [ ] **T5.2** — Update `specs/features/README.md`: mark 001 as `in-progress`, then `done` when tests pass.
+- [x] **T5.2** — Update `specs/features/README.md`: mark 001 as `in-progress`, then `done` when tests pass.
 - [ ] **T5.3** — Confirm open questions with the client before feature closes:
   - [ ] Q-5 (dev sees global calendar or only own) — impacts later `bookings` RLS but nice to have decided.
   - [ ] Q-6 (client role in Phase 1?) — currently deferred; the enum is extensible.
@@ -60,6 +60,6 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Blocked / follow-ups
 
-- [ ] **F1** — Configurar el proyecto Supabase (cloud o CLI local) y proveer credenciales en `.env.local`. Owner: usuario.
-- [ ] **F2** — Habilitar Google OAuth provider en Supabase con las redirect URIs correctas.
+- [x] **F1** — Configurar el proyecto Supabase (cloud o CLI local) y proveer credenciales en `.env.local`. Owner: usuario.
+- [x] **F2** — Habilitar Google OAuth provider en Supabase con las redirect URIs correctas.
 - [ ] **F3** — Instalar shadcn/ui cuando se necesite el primer componente reutilizable (probablemente al arrancar 003-calendar-ui).

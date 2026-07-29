@@ -61,6 +61,10 @@ grant execute on function public.current_user_role() to authenticated;
 -- ─────────────────────────────────────────────────────────────
 alter table public.profiles enable row level security;
 
+-- RLS policies only take effect once the role has the underlying table grant.
+grant select, insert, update, delete on public.profiles to authenticated;
+grant all on public.profiles to service_role;
+
 -- Any authenticated user can read their own profile.
 create policy "profiles: self read"
   on public.profiles for select
