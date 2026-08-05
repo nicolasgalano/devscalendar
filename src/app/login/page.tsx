@@ -24,10 +24,10 @@ export default async function LoginPage({
   const { next, error } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
+    <main className="mx-auto flex min-h-full max-w-80 flex-col justify-center gap-6 p-6">
       <div>
-        <h1 className="text-3xl font-semibold">DevsCalendar</h1>
-        <p className="mt-1 text-sm text-neutral-600">
+        <h1 className="text-title font-medium">DevsCalendar</h1>
+        <p className="mt-0.5 text-ui text-muted-foreground">
           Iniciá sesión con tu cuenta de Google.
         </p>
       </div>
@@ -35,8 +35,8 @@ export default async function LoginPage({
       <LoginButton next={next} />
 
       {error === "unauthorized" && (
-        <p className="text-sm text-red-600">
-          Tu cuenta no está autorizada. Contactá a un administrador.
+        <p role="alert" className="text-ui text-destructive">
+          Tu cuenta no está autorizada. Escribile a un administrador.
         </p>
       )}
     </main>

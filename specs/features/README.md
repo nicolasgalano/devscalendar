@@ -6,10 +6,12 @@
 
 Cada feature tiene un `spec.md` como stub. `plan.md` y `tasks.md` se crean cuando la feature entra en desarrollo.
 
+Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si quedan preguntas por confirmar con el cliente que no bloquean la implementación (porque hay un default razonable ya aplicado), se listan abajo y se arrastran hasta la feature que sí las necesita resuelta.
+
 | # | Feature | Estado | Depende de | Ref. spec funcional |
 | :---- | :---- | :---- | :---- | :---- |
 | 001 | Auth & permissions | done | — | §3, §12 (seguridad) |
-| 002 | Entities admin (users, clients, projects) | draft | 001 | §3, §10 |
+| 002 | Entities admin (users, clients, projects) | done | 001 | §3, §10 |
 | 003 | Calendar UI (day/month/year + grouping + filters) | draft | 001, 002 | §4 |
 | 004 | Bookings CRUD | draft | 001, 002, 003 | §5, §9 |
 | 005 | Approval flow (dev approve/reject) | draft | 004 | §6, §9 |
@@ -35,3 +37,18 @@ Basado en dependencias y valor incremental:
 10. **009-slack-integration** — última porque combina lo de notifications con la asociación de canales.
 
 Este orden se revisa cuando haya feedback del cliente o cambien las prioridades.
+
+---
+
+## Preguntas abiertas con el cliente
+
+Ninguna bloquea la implementación: todas tienen un default ya aplicado en el código. Se listan acá para que no se pierdan, con la feature que necesita la respuesta antes de avanzar.
+
+| # | Pregunta | Default aplicado | Dónde está en el código | Necesaria antes de |
+| :---- | :---- | :---- | :---- | :---- |
+| Q-A | ¿Un proyecto puede tener varios PMs? | Un PM primario obligatorio. Colaboradores quedan para Fase 2. | `projects.pm_id` (not null) | `006-priority-reallocation` |
+| Q-B | ¿Un dev puede trabajar para varios clientes a la vez? | Sí, el dev es transversal; la reserva lo asigna a un proyecto. | Sin restricción en el modelo | `004-bookings` |
+| Q-2 | ¿Dos niveles de prioridad o esquema numérico P0–P3? | Dos niveles (`común` / `prioritario`), como pidió el cliente. | `projects.priority` + tokens en `DESIGN.md` §3 | `006-priority-reallocation` |
+| Q-6 | ¿La realocación por prioridad saltea también la aprobación del dev? | Recomendación de la spec funcional §6: saltea al PM anterior, **no** al dev. | Todavía sin implementar | `005-approval-flow` |
+
+**Q-2 es la más urgente de las cuatro:** con solo dos niveles, dos proyectos prioritarios en conflicto no se resuelven solos (spec funcional §7.2), que es justamente el caso que `006` tiene que decidir. Cambiar la escala después es una migration simple (`priority` es un `check`, no un enum — ver `002/plan.md` §9), pero arrastra el sistema de color de `DESIGN.md`.

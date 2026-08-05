@@ -32,4 +32,7 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 | :---- | :---- | :---- |
 | 0001 | Tech stack: Next.js + Supabase + Vercel | accepted |
 | 0002 | Language conventions: español para docs, inglés para código | accepted |
-| 0003 | UI & tooling stack: pnpm + Tailwind + shadcn on demand + Vitest/Playwright | accepted |
+| 0003 | UI & tooling stack: pnpm + Tailwind + shadcn on demand + Vitest/Playwright | accepted (estilos y componentes reemplazados por 0006) |
+| 0004 | Invitación por email: el rol se pre-asigna y el trigger lo consume | accepted |
+| 0005 | `audit_log` mínimo en 002, extensible por 010 | accepted |
+| 0006 | Tailwind v4 (CSS-first), shadcn sobre Base UI, y DESIGN.md como autoridad | accepted |

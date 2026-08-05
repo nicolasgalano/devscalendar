@@ -2,7 +2,9 @@
 
 > Plataforma de planificación de recursos para equipos de desarrollo: los PMs reservan tiempo de devs sobre proyectos, con vista de calendario tipo Google Calendar, aprobación del dev, anti doble-booking, prioridad entre proyectos e integraciones con Google Calendar, Jira y Slack.
 
-**Estado:** en desarrollo — feature `001-auth-and-permissions` scaffoldeada.
+> Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
+
+**Estado:** en desarrollo — features `001-auth-and-permissions` y `002-entities-admin` terminadas.
 
 ---
 
@@ -10,8 +12,8 @@
 
 - **Framework:** Next.js 15 (App Router, TypeScript strict)
 - **Backend / DB / Auth:** Supabase (Postgres 15, Row Level Security, Auth con Google OAuth) vía `@supabase/ssr`
-- **Estilos:** Tailwind CSS 3
-- **Componentes:** shadcn/ui — se agregan on-demand (ADR 0003)
+- **Estilos:** Tailwind CSS 4 (CSS-first: sin `tailwind.config.ts`, theming vía `@theme` en `src/app/globals.css`)
+- **Componentes:** shadcn/ui (preset Nova, base Base UI) — se agregan on-demand (ADR 0003)
 - **Validación:** Zod
 - **Package manager:** pnpm
 - **Hosting:** Vercel
@@ -45,33 +47,54 @@ Ver `docs/adr/0002-language-conventions.md`.
 ```
 devscalendar/
 ├── CLAUDE.md
+├── DESIGN.md                         # sistema de diseño — leer antes de tocar una vista
 ├── devscalendar-specs.md             # spec funcional original (v0.1)
 ├── package.json                      # pnpm + Next.js
+├── components.json                   # config de shadcn/ui
 ├── next.config.mjs
 ├── tsconfig.json
-├── tailwind.config.ts
-├── postcss.config.mjs
+├── postcss.config.mjs                # Tailwind v4 (sin tailwind.config.ts)
+├── playwright.config.ts
+├── vitest.config.ts
 ├── .env.example                      # variables requeridas
 ├── src/
 │   ├── app/                          # rutas Next.js App Router
-│   │   ├── layout.tsx
-│   │   ├── page.tsx                  # home autenticada
-│   │   ├── globals.css
+│   │   ├── layout.tsx                # fuentes + ThemeProvider
+│   │   ├── globals.css               # tokens de diseño (@theme inline)
+│   │   ├── (app)/                    # route group: todo lo logueado, con shell
+│   │   │   ├── layout.tsx            # gate de sesión + AppShell
+│   │   │   ├── error.tsx             # error boundary de la app
+│   │   │   ├── page.tsx              # home autenticada
+│   │   │   └── admin/                # ABM de maestros (solo admin)
+│   │   │       ├── layout.tsx        # guard de rol
+│   │   │       ├── clients/          # page + loading + tabla (client)
+│   │   │       ├── projects/
+│   │   │       └── users/
+│   │   ├── api/                      # route handlers (clients/projects/users)
 │   │   ├── login/                    # login page + button (client)
 │   │   ├── pending-access/           # usuarios autenticados sin rol
 │   │   └── auth/
 │   │       ├── callback/route.ts     # OAuth exchange
 │   │       └── signout/route.ts
 │   ├── middleware.ts                 # protege rutas + refresh de sesión
+│   ├── components/
+│   │   ├── ui/                       # shadcn/ui, comiteado y ajustado a DESIGN.md
+│   │   └── *.tsx                     # app-shell, theme-toggle, status, etc.
 │   ├── lib/
 │   │   ├── env.ts                    # validación de env con Zod
+│   │   ├── utils.ts                  # cn()
+│   │   ├── api/                      # guards de route handlers (requireAdmin)
+│   │   ├── validation/               # schemas Zod por entidad
 │   │   └── supabase/                 # server/client/middleware helpers
 │   └── types/
-│       └── database.ts               # placeholder; regenerar con `pnpm db:types`
+│       └── database.ts               # generado; regenerar con `pnpm db:types`
 ├── supabase/
 │   ├── config.toml                   # `supabase start` local
 │   ├── migrations/                   # SQL versionado
 │   └── seed.sql
+├── tests/
+│   ├── integration/                  # Vitest contra el Supabase local (RLS, triggers)
+│   └── e2e/                          # Playwright
 ├── specs/                            # SDD harness (spec/plan/tasks por feature)
 └── docs/
     └── adr/                          # architecture decision records
@@ -99,8 +122,13 @@ Scripts útiles:
 - `pnpm typecheck` — `tsc --noEmit`.
 - `pnpm lint` — ESLint.
 - `pnpm format` — Prettier.
+- `pnpm test` — tests de integración (Vitest) contra el Supabase local.
+- `pnpm test:e2e` — E2E (Playwright); levanta `pnpm dev` solo si no hay uno corriendo.
 - `pnpm db:push` — aplica migrations al Supabase enlazado.
+- `pnpm db:reset` — recrea la DB local desde las migrations + `seed.sql`.
 - `pnpm db:types` — regenera `src/types/database.ts`.
+
+> **No corras `pnpm build` con `pnpm dev` levantado.** El build reescribe `.next/` y el dev server queda sirviendo un manifiesto viejo: los chunks dan 404, la página pierde los estilos y React no hidrata (los botones dejan de responder sin ningún error visible). Si pasa: parar el dev server, `rm -rf .next`, y volver a arrancar.
 
 ---
 
@@ -109,8 +137,26 @@ Scripts útiles:
 - **Server Components** por defecto. `"use client"` lo más profundo posible en el árbol.
 - **Cliente Supabase:** `@/lib/supabase/server` en Server Components / Route Handlers; `@/lib/supabase/client` en Client Components; `@/lib/supabase/middleware` solo dentro del middleware.
 - **Nunca** usar la `service_role` key desde código cliente. Solo en scripts server-side puntuales.
-- **RLS es obligatoria** en toda tabla nueva; la migration falla el review si no la incluye.
 - **Nombres:** `kebab-case.ts` para archivos, `PascalCase` para componentes y tipos, `camelCase` para variables/funciones.
+
+### Rutas y permisos
+
+- Todo lo que requiere sesión vive bajo el route group `src/app/(app)/`, que resuelve el gate de sesión y el shell una sola vez. El paréntesis no aparece en la URL. Las pantallas de auth (`login`, `pending-access`, `auth/*`) quedan afuera a propósito.
+- Los guards de rol se agregan como `layout.tsx` en el subárbol correspondiente (ver `(app)/admin/layout.tsx`), no repitiendo checks en cada page.
+- En route handlers, la autorización pasa por `requireAdmin()` de `@/lib/api/require-admin`, y el payload por un schema de `@/lib/validation/`.
+
+### Migrations
+
+- **RLS es obligatoria** en toda tabla nueva; la migration falla el review si no la incluye.
+- **Una policy sin `grant` de tabla no alcanza:** hay que otorgar los privilegios a `authenticated` / `service_role` explícitamente, o la policy deniega todo en silencio.
+- **`on delete` explícito en toda FK.** La convención del proyecto:
+  - Referencia **blanda** a `profiles` (PM primario, autor de una auditoría, quién invitó) → `on delete set null`. Dar de baja a un usuario nunca puede quedar bloqueado por estos vínculos.
+  - Referencia **dura** (un proyecto necesita su cliente y su PM) → `on delete restrict`. El camino correcto es desactivar, no borrar.
+
+### Vistas
+
+- Leer `DESIGN.md` antes de crear o modificar cualquier vista, y recorrer su checklist final antes de darla por terminada.
+- Los componentes de shadcn se ajustan a la escala de densidad **al instalarlos** (ver ADR 0006), no después.
 
 ---
 
@@ -118,4 +164,6 @@ Scripts útiles:
 
 Ver `specs/features/README.md` para el índice completo y estado.
 
-- **001-auth-and-permissions** — code scaffolded, esperando conexión a Supabase real. Ver `specs/features/001-auth-and-permissions/tasks.md`.
+- **001-auth-and-permissions** — done. Google OAuth, roles, RLS base.
+- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Quedan Q-A y Q-B por confirmar con el cliente antes de `006-priority-reallocation` — ver `specs/features/002-entities-admin/tasks.md`.
+- **Próxima:** `003-calendar-ui`. Define la paleta categórica del calendario y la rampa de densidad de ocupación, que `DESIGN.md` deja explícitamente pendientes.

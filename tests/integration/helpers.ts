@@ -37,3 +37,65 @@ export async function signInClient(
   if (error) throw error;
   return client;
 }
+
+type UserRole = Database["public"]["Enums"]["user_role"];
+
+/**
+ * Creates an auth user and promotes their auto-provisioned profile to `role`.
+ * The `handle_new_user` trigger creates the profile with a null role, so tests
+ * that need a specific role have to set it through the service-role client.
+ */
+export async function createUserWithRole(
+  email: string,
+  password: string,
+  role: UserRole,
+) {
+  const user = await createTestUser(email, password);
+  const { error } = await adminClient()
+    .from("profiles")
+    .update({ role })
+    .eq("id", user.id);
+  if (error) throw error;
+  return user;
+}
+
+export async function createClientRow(name: string) {
+  const { data, error } = await adminClient()
+    .from("clients")
+    .insert({ name })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function createProjectRow(input: {
+  name: string;
+  clientId: string;
+  pmId: string;
+  priority?: string;
+}) {
+  const { data, error } = await adminClient()
+    .from("projects")
+    .insert({
+      name: input.name,
+      client_id: input.clientId,
+      pm_id: input.pmId,
+      priority: input.priority ?? "normal",
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Removes rows created by a test, children first to respect the FKs. */
+export async function cleanupProject(projectId: string) {
+  const admin = adminClient();
+  await admin.from("audit_log").delete().eq("entity_id", projectId);
+  await admin.from("projects").delete().eq("id", projectId);
+}
+
+export async function cleanupClient(clientId: string) {
+  await adminClient().from("clients").delete().eq("id", clientId);
+}

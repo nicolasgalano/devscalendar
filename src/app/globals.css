@@ -1,12 +1,206 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — DESIGN.md §3 (color), §4 (tipografía), §5 (densidad).
+   Nunca hardcodear un hex en un componente: usar estos tokens.
+   ───────────────────────────────────────────────────────────── */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+
+  --background: #ffffff;
+  --foreground: #18181b;
+  --surface: #fafafa;
+  --surface-hover: #f4f4f5;
+  --surface-active: #eff4fe;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --secondary-foreground: #52525b;
+
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --input: #e4e4e7;
+
+  --primary: #2f6feb;
+  --primary-foreground: #ffffff;
+  --ring: #2f6feb;
+
+  /* Prioridad de proyecto — dos niveles (spec funcional §7). */
+  --priority-high: #ea580c;
+  --priority-high-bg: #fff7ed;
+  --priority-normal: #52525b;
+  --priority-normal-bg: #f4f4f5;
+
+  /* Reclama acción: reserva rechazada o desplazada. */
+  --attention: #a16207;
+  --attention-bg: #fefce8;
+
+  /* Bloqueo o daño: conflicto de reserva, acciones destructivas. */
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+
+  --radius: 4px;
+
+  /* Aliases que consumen los componentes de shadcn/Base UI.
+     Se derivan de los tokens de arriba — §3.4: cero color en superficies. */
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
+  --secondary: var(--surface);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--background);
 }
 
-html,
-body {
-  height: 100%;
+.dark {
+  color-scheme: dark;
+
+  --background: #0a0a0b;
+  --foreground: #fafafa;
+  --surface: #141416;
+  --surface-hover: #1c1c1f;
+  --surface-active: #16233d;
+
+  --muted: #1c1c1f;
+  --muted-foreground: #71717a;
+  --secondary-foreground: #a1a1aa;
+
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --input: #27272a;
+
+  --primary: #4b86f0;
+  --primary-foreground: #0a0a0b;
+  --ring: #4b86f0;
+
+  --priority-high: #fb923c;
+  --priority-high-bg: #291708;
+  --priority-normal: #a1a1aa;
+  --priority-normal-bg: #1c1c1f;
+
+  --attention: #facc15;
+  --attention-bg: #241d05;
+
+  --danger: #f87171;
+  --danger-bg: #2a1315;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-priority-high: var(--priority-high);
+  --color-priority-high-bg: var(--priority-high-bg);
+  --color-priority-normal: var(--priority-normal);
+  --color-priority-normal-bg: var(--priority-normal-bg);
+
+  --color-attention: var(--attention);
+  --color-attention-bg: var(--attention-bg);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+
+  /* La sidebar es neutra: reusa las superficies, no tiene paleta propia. */
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-accent: var(--surface-hover);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-ring: var(--ring);
+
+  /* Radios — §5: 4px controles, 6px cards/popovers, 0 en filas de tabla.
+     El mapeo hace que el `rounded-lg` de shadcn caiga en 4px y el
+     `rounded-xl` del dialog en 6px, sin tocar cada componente. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+
+  /* Tipografía — §4 */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-data: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --text-caption: 11px;
+  --text-caption--line-height: 16px;
+  --text-ui: 13px;
+  --text-ui--line-height: 18px;
+  --text-emphasis: 14px;
+  --text-emphasis--line-height: 20px;
+  --text-section: 16px;
+  --text-section--line-height: 24px;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-title--letter-spacing: -0.01em;
+
+  /* Movimiento — §10: 120ms para cambios de estado. */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@layer base {
+  .theme {
+    --font-heading: var(--font-sans);
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground text-ui;
+    height: 100%;
+    font-feature-settings: "cv05" 1;
+  }
+
+  /* §4: sin números tabulares las columnas bailan y la tabla se vuelve ilegible. */
+  .font-data {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* §10 / §12: respetar la preferencia de movimiento reducido. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

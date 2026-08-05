@@ -1,6 +1,6 @@
 # 0003 — UI & tooling stack: pnpm + Tailwind + shadcn on demand + Vitest/Playwright
 
-- **Estado:** accepted
+- **Estado:** accepted — la parte de **estilos y componentes** quedó reemplazada por [0006](./0006-tailwind-v4-base-ui-design-system.md) al implementarse `002`. El resto (pnpm, Zod, Vitest, Playwright) sigue vigente.
 - **Fecha:** 2026-07-06
 
 ## Contexto

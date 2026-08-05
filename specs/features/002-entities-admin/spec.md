@@ -77,3 +77,18 @@ El calendario y las reservas necesitan estos maestros como precondición. Sin pr
 ## 8. Métricas de éxito
 
 - Un admin puede dejar el sistema listo para operar (crear cliente + proyecto + PM + 3 devs) en <5 minutos.
+
+---
+
+## 9. Riesgos conocidos
+
+- **R-1** — AC-3.1 requiere que un usuario creado por email (sin login previo) ya tenga rol asignado la primera vez que hace login con Google. El trigger `handle_new_user` de `001-auth-and-permissions` hoy crea el `profile` con `role = null` siempre. **Mitigación:** agregar una tabla `profile_invites` (email → rol) que el trigger consulta al crear el profile; si hay match, hereda el rol y se consume la invitación; si no, cae al comportamiento actual (`role = null`, pantalla `/pending-access`). Ver `tasks.md` Fase 1.
+- **R-2** — AC-2.2 pide que el cambio de prioridad de un proyecto quede en `audit_log`, pero esa tabla es dueña de la feature `010-notifications-and-audit` (todavía no implementada, y depende de `004`/`005`/`006`, no de `002`). **Mitigación:** crear en esta feature una versión mínima de `audit_log` (solo lo necesario para registrar cambios de prioridad) que `010` pueda extender después sin migrar datos existentes.
+- **R-3** — `projects.pm_id` y `profiles.primary_pm_id` (PM primario de un dev) referencian `profiles(id)` sin restringir por rol a nivel de base — un Postgres `check` no puede validar el rol de otra fila. **Mitigación:** validar `role = 'pm'` en la capa de aplicación (Zod + query) al momento de asignar; documentarlo como límite conocido, no bloqueante para el MVP.
+
+---
+
+## 10. Notas
+
+- El mecanismo de invitación (R-1) es un complemento al trigger existente de `001`, no un sistema de invitaciones por email/magic link — el usuario invitado sigue logueándose con **Google OAuth** normalmente; lo único que cambia es que su `profile` nace con el rol ya asignado en vez de `null`.
+- Modelo de datos, superficie de API y estrategia de testing detallados en `plan.md`.

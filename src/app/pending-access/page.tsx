@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -15,19 +16,18 @@ export default async function PendingAccessPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-8">
-      <h1 className="text-2xl font-semibold">Acceso pendiente</h1>
-      <p className="text-sm text-neutral-600">
-        Tu cuenta ({user.email}) está autenticada pero todavía no tiene un rol asignado. Un
-        administrador debe activarla antes de que puedas continuar.
-      </p>
+    <main className="mx-auto flex min-h-full max-w-100 flex-col justify-center gap-4 p-6">
+      <div>
+        <h1 className="text-title font-medium">Acceso pendiente</h1>
+        <p className="mt-0.5 text-ui text-muted-foreground">
+          Tu cuenta ({user.email}) todavía no tiene un rol asignado. Un administrador
+          tiene que activarla para que puedas seguir.
+        </p>
+      </div>
       <form action="/auth/signout" method="post">
-        <button
-          type="submit"
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
-        >
+        <Button type="submit" variant="outline">
           Cerrar sesión
-        </button>
+        </Button>
       </form>
     </main>
   );
