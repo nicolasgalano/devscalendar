@@ -89,6 +89,42 @@ export async function createProjectRow(input: {
   return data;
 }
 
+/**
+ * Inserts bookings through `service_role`. There is no other way: feature 003
+ * ships the table read-only on purpose, and the write path belongs to 004.
+ */
+export async function createBookingRows(
+  rows: {
+    projectId: string;
+    devId: string;
+    createdBy?: string;
+    startsAt: string;
+    endsAt: string;
+    status?: string;
+  }[],
+) {
+  const { data, error } = await adminClient()
+    .from("bookings")
+    .insert(
+      rows.map((row) => ({
+        project_id: row.projectId,
+        dev_id: row.devId,
+        created_by: row.createdBy ?? null,
+        starts_at: row.startsAt,
+        ends_at: row.endsAt,
+        status: row.status ?? "approved",
+      })),
+    )
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+export async function cleanupBookings(projectIds: string[]) {
+  if (projectIds.length === 0) return;
+  await adminClient().from("bookings").delete().in("project_id", projectIds);
+}
+
 /** Removes rows created by a test, children first to respect the FKs. */
 export async function cleanupProject(projectId: string) {
   const admin = adminClient();

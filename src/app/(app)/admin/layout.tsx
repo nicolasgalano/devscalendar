@@ -1,28 +1,16 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Guard de rol. La sesión y el shell ya los resuelve `(app)/layout.tsx`;
- * acá solo se restringe el acceso a administradores.
+ * Guard de rol. La sesión y el shell ya los resuelve `(app)/layout.tsx`, y
+ * `getCurrentProfile()` está memorizada por request, así que este guard no
+ * cuesta ninguna llamada extra: reusa lo que ya resolvió el layout padre.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getCurrentProfile();
 
   if (profile?.role !== "admin") {
     redirect("/");

@@ -12,8 +12,8 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | :---- | :---- | :---- | :---- | :---- |
 | 001 | Auth & permissions | done | — | §3, §12 (seguridad) |
 | 002 | Entities admin (users, clients, projects) | done | 001 | §3, §10 |
-| 003 | Calendar UI (day/month/year + grouping + filters) | draft | 001, 002 | §4 |
-| 004 | Bookings CRUD | draft | 001, 002, 003 | §5, §9 |
+| 003 | Calendar UI (day/month/year + grouping + filters) | done | 001, 002 | §4 |
+| 004 | Bookings CRUD | planned — `plan.md` + `tasks.md` listos | 001, 002, 003 | §5, §9 |
 | 005 | Approval flow (dev approve/reject) | draft | 004 | §6, §9 |
 | 006 | Priority & reallocation | draft | 004, 005 | §7 |
 | 007 | Google Calendar push integration | draft | 005 | §8.1 |
@@ -50,5 +50,12 @@ Ninguna bloquea la implementación: todas tienen un default ya aplicado en el c�
 | Q-B | ¿Un dev puede trabajar para varios clientes a la vez? | Sí, el dev es transversal; la reserva lo asigna a un proyecto. | Sin restricción en el modelo | `004-bookings` |
 | Q-2 | ¿Dos niveles de prioridad o esquema numérico P0–P3? | Dos niveles (`común` / `prioritario`), como pidió el cliente. | `projects.priority` + tokens en `DESIGN.md` §3 | `006-priority-reallocation` |
 | Q-6 | ¿La realocación por prioridad saltea también la aprobación del dev? | Recomendación de la spec funcional §6: saltea al PM anterior, **no** al dev. | Todavía sin implementar | `005-approval-flow` |
+| Q-5 | ¿El desarrollador ve el calendario global o solo su propia agenda? | Global en modo lectura (spec funcional §11). | RLS de `bookings`: `select` para todo `authenticated` | `005-approval-flow` |
+| Q-10 | Multi-timezone: ¿el calendario se muestra en la TZ del viewer o en una fija? | TZ del navegador. En DB siempre `timestamptz` (UTC), que es correcto en cualquier caso. | `src/lib/calendar/range.ts` (único punto de conversión) | `007-google-calendar` |
+| Q-C | ¿Hace falta vista Semana además de día/mes/año? | No en el MVP; la spec funcional no la pide. | Sin implementar | Fase 2 |
+| ~~Q-F~~ | ~~¿Cuál es la jornada laboral y qué días no se trabaja?~~ | **Respondida el 2026-08-05: jornada fija 09:00–17:00; no se trabaja fines de semana ni feriados argentinos.** | `src/lib/calendar/workdays.ts` y `load.ts` | — cerrada |
+| ~~Q-G~~ | ~~Si un PM quiere reservar fuera de 09:00–17:00 o en un día no laborable, ¿se bloquea o se permite?~~ | **Respondida el 2026-08-05: solo advertencia, nunca bloqueo**, en ambos casos. | `004/spec.md` AC-1.4 | — cerrada |
+| ~~Q-E~~ | ~~¿Editar una reserva ya aprobada invalida la aprobación?~~ | **Respondida el 2026-08-06:** cambiar horario o desarrollador la devuelve a `pending`; nota y ticket no. | `004/plan.md` §4 | — cerrada |
+| Q-8 | ¿La unidad de reserva es franja libre o bloques fijos de X horas? | Franja libre (inicio–fin), como Google Calendar. Si cambia, afecta el formulario, no el modelo de datos. | `bookings.starts_at` / `ends_at` | `004-bookings` |
 
 **Q-2 es la más urgente de las cuatro:** con solo dos niveles, dos proyectos prioritarios en conflicto no se resuelven solos (spec funcional §7.2), que es justamente el caso que `006` tiene que decidir. Cambiar la escala después es una migration simple (`priority` es un `check`, no un enum — ver `002/plan.md` §9), pero arrastra el sistema de color de `DESIGN.md`.

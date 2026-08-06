@@ -16,6 +16,23 @@ Permitir a los PMs crear, editar y cancelar reservas (bloques) asignando un dev 
 
 Es el core transaccional del sistema. Todo lo demás (aprobación, prioridad, integraciones) se apoya en la existencia consistente de reservas sin conflictos.
 
+### 2.1 La tabla `bookings` ya existe — la crea `003`
+
+`003-calendar-ui` necesitaba renderizar reservas para poder cumplir sus propios acceptance criteria, así que la tabla nace ahí. El corte está documentado en `specs/features/003-calendar-ui/plan.md` §3.1:
+
+| Qué | Feature |
+| :---- | :---- |
+| Tabla `bookings`, RLS de **lectura**, índices de rango, seed | `003` (migration `00000000000004_bookings.sql`) |
+| Policies de escritura, `exclusion constraint` anti doble-booking, API de CRUD, máquina de estados | **`004` — esta feature** |
+
+Consecuencias concretas para quien la implemente:
+
+- **La tabla llega sin ninguna policy de escritura.** Hoy nadie puede insertar desde la app, ni un admin; solo `service_role` (seed y fixtures de test). La primera migration de `004` agrega las policies de `insert`/`update`/`delete` junto con el `exclusion constraint`. Esto es intencional, no un olvido: hay un test de integración en `003` que verifica que las escrituras fallan, y hay que actualizarlo acá.
+- **El schema base ya está fijado:** `project_id`, `dev_id`, `created_by`, `starts_at`, `ends_at`, `status` (`check` con los 5 estados de la spec funcional §5.2), `note`, `ticket_ref`. Ver `003/plan.md` §3.2 antes de agregar columnas — la ausencia de una `priority` propia en la reserva es deliberada (se resuelve por join con `projects`).
+- **El índice GiST sobre `tstzrange(starts_at, ends_at)`** no está creado: va junto al `exclusion constraint` de esta feature (AC-4.1).
+
+Antes de arrancar, verificar que el schema que quedó en la migration de `003` coincide con lo de arriba.
+
 ---
 
 ## 3. User stories
@@ -34,6 +51,10 @@ Es el core transaccional del sistema. Todo lo demás (aprobación, prioridad, in
 - **AC-1.1** — Given un PM, when crea una reserva con dev+proyecto+franja válida, then queda persistida en estado `pending`.
 - **AC-1.2** — Given un PM intenta reservar a un dev en una franja donde ya tiene una reserva aprobada, when guarda, then el sistema rechaza la operación indicando el conflicto (incluye link a la reserva conflictiva).
 - **AC-1.3** — Given un PM crea una reserva con `end <= start`, then falla con validación de negocio antes de tocar la DB.
+- **AC-1.4** — Given un PM crea una reserva en un día no laborable (fin de semana o feriado argentino) **o** fuera de la jornada de 09:00 a 17:00, when guarda, then el sistema **advierte y permite continuar** — nunca bloquea. La reserva queda igual de válida que cualquier otra. Confirmado con el cliente el 2026-08-05 (Q-F, Q-G).
+  - **Trabajar fuera de horario es excepcional, no habitual.** Esa es justamente la razón de advertir: si fuera rutina, el aviso sería ruido que se clickea sin leer; siendo raro, el aviso informa de verdad. Y es la razón de no bloquear: la excepción existe y el sistema no puede volverla imposible de registrar.
+  - **Advertencia inline en el formulario, visible antes de guardar** — junto al campo de fecha y hora, no un toast posterior ni un modal de confirmación. Que el caso sea raro implica que el PM no lo tiene incorporado: el aviso tiene que llegar mientras todavía está eligiendo el horario, no después de haberlo hecho. Un modal de confirmación sería defendible por lo poco frecuente, pero el cliente pidió explícitamente advertencia sin bloqueo, y frenar el flujo por algo que no es destructivo ni irreversible (la reserva se edita o se cancela) no lo amerita.
+  - La única validación dura sigue siendo la de AC-1.3 (`end > start`) y el anti doble-booking de US-4.
 
 ### US-2
 
@@ -56,8 +77,9 @@ Es el core transaccional del sistema. Todo lo demás (aprobación, prioridad, in
 ### Dentro
 
 - Crear / editar / cancelar reservas.
-- Constraint de exclusión en DB (probablemente `EXCLUDE USING gist` con `tstzrange` sobre `(developer_id, time_range)` filtrando por `status = 'approved'`).
-- Validaciones aplicativas (fechas coherentes, ticket válido si se linkea, etc.).
+- Policies de escritura de `bookings` (la tabla la crea `003` sin ellas — ver §2.1).
+- Constraint de exclusión en DB (probablemente `EXCLUDE USING gist` con `tstzrange` sobre `(dev_id, time_range)` filtrando por `status = 'approved'`).
+- Validaciones aplicativas (fechas coherentes, ticket válido si se linkea, jornada y días laborables — ver Q-G).
 - Asociación de ticket Jira/Slack (feature 008/009 lo profundiza; acá se guarda el ref).
 
 ### Fuera (explícito)
@@ -80,7 +102,8 @@ Es el core transaccional del sistema. Todo lo demás (aprobación, prioridad, in
 
 - **Q-8** (de spec §11) — Unidad de reserva: ¿franja libre o bloques fijos? **Recomendación por defecto:** franja libre (start/end), como Google Calendar.
 - **Q-10** (de spec §11) — Multi-timezone: fechas siempre en UTC en DB. **Bloquea:** confirmar TZ del proyecto para display si es multi-TZ.
-- **Q-E** — ¿La edición de una reserva `approved` invalida la aprobación o solo notifica? **Recomendación por defecto:** cambios de horario o dev invalidan (vuelve a `pending`); cambios de nota/ticket no.
+- **Q-E** — ~~¿La edición de una reserva `approved` invalida la aprobación o solo notifica?~~ **Respondida el 2026-08-06:** cambios de horario o de desarrollador la devuelven a `pending`; cambios de nota o ticket no la tocan. Ver `plan.md` §4 y AC-2.2.
+- **Q-G** — ~~(nueva, derivada de Q-F) ¿Qué hace el formulario si un PM quiere reservar fuera de 09:00–17:00 o en un día no laborable?~~ **Respondida por el cliente el 2026-08-05: solo advertencia, nunca bloqueo**, en los dos casos (día no laborable y horario fuera de la jornada). Ver AC-1.4.
 
 ---
 

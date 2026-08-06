@@ -83,7 +83,8 @@ Es la pantalla donde los PMs pasan la mayor parte del tiempo. La spec pide expl�
 - **Q-5** (de spec §11) — Determina si el dev ve el calendario global o solo el propio. **Impacta:** el default de filtros y la lógica de RLS del query.
 - **Q-10** (de spec §11) — Multi-timezone: si los equipos son distribuidos, ¿el calendario se muestra en la TZ del viewer o en una TZ fija del proyecto? **Recomendación por defecto:** TZ del viewer, con badge indicando la del dev asignado si difiere. **Bloquea:** almacenamiento de fechas (siempre en UTC en DB, sí).
 - **Q-C** — ¿Se necesita vista Semana? La spec funcional no la lista pero es el default de Google Calendar. **Recomendación por defecto:** no en MVP; agregar en Fase 2 si el cliente la pide.
-- **Q-D** — Elección de librería de calendario (FullCalendar, react-big-calendar, Schedule-X, custom). **Recomendación por defecto:** evaluar Schedule-X o custom sobre CSS grid. Documentar en ADR.
+- **Q-D** — ~~Elección de librería de calendario (FullCalendar, react-big-calendar, Schedule-X, custom).~~ **Resuelta en `plan.md` §9:** grilla propia sobre CSS grid; las alternativas con vista de recursos son de licencia paga y sus estilos pelean con `DESIGN.md`. Se documenta en ADR 0007.
+- **Q-F** — (nueva, surgida al planificar) ¿Cuál es la jornada laboral y qué días no se trabaja? **Impacta:** el cálculo de ocupación de las vistas Mes y Año, y el rango visible de la vista Día. **Respondida por el cliente el 2026-08-05:** jornada fija de 09:00 a 17:00; no se trabaja fines de semana ni feriados argentinos. Ver `plan.md` §6.2 y §6.3.
 
 ---
 

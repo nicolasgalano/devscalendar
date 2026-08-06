@@ -47,6 +47,70 @@ export type Database = {
           },
         ]
       }
+      bookings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dev_id: string
+          ends_at: string
+          id: string
+          note: string | null
+          project_id: string
+          starts_at: string
+          status: string
+          ticket_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dev_id: string
+          ends_at: string
+          id?: string
+          note?: string | null
+          project_id: string
+          starts_at: string
+          status?: string
+          ticket_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dev_id?: string
+          ends_at?: string
+          id?: string
+          note?: string | null
+          project_id?: string
+          starts_at?: string
+          status?: string
+          ticket_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_dev_id_fkey"
+            columns: ["dev_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean

@@ -36,3 +36,4 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 | 0004 | Invitación por email: el rol se pre-asigna y el trigger lo consume | accepted |
 | 0005 | `audit_log` mínimo en 002, extensible por 010 | accepted |
 | 0006 | Tailwind v4 (CSS-first), shadcn sobre Base UI, y DESIGN.md como autoridad | accepted |
+| 0007 | Calendario propio sobre CSS grid, en vez de una librería | accepted |

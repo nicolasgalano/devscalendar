@@ -57,7 +57,18 @@ test.describe("admin entity management", () => {
 
     await openDialog(page, "Crear cliente");
     await page.getByLabel("Nombre").fill(clientName);
-    await page.getByRole("dialog").getByRole("button", { name: "Crear cliente" }).click();
+    // Esperar la respuesta del POST antes de mirar la tabla. Sin esto, la
+    // aserción compite con el `router.refresh()` y con la compilación en frío
+    // del dev server, y el test falla de forma intermitente cuando corre en
+    // paralelo con otros.
+    const [created] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/clients") && response.request().method() === "POST",
+      ),
+      page.getByRole("dialog").getByRole("button", { name: "Crear cliente" }).click(),
+    ]);
+    expect(created.ok()).toBe(true);
 
     await expect(page.getByRole("cell", { name: clientName })).toBeVisible();
 
@@ -75,7 +86,14 @@ test.describe("admin entity management", () => {
     await dialog.getByText("Elegí un PM").click();
     await page.getByRole("option", { name: pm.fullName }).click();
 
-    await dialog.getByRole("button", { name: "Crear proyecto" }).click();
+    const [projectCreated] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/projects") && response.request().method() === "POST",
+      ),
+      dialog.getByRole("button", { name: "Crear proyecto" }).click(),
+    ]);
+    expect(projectCreated.ok()).toBe(true);
 
     await expect(page.getByRole("cell", { name: projectName })).toBeVisible();
     // El cliente y el PM elegidos aparecen en la fila del proyecto.
@@ -89,7 +107,14 @@ test.describe("admin entity management", () => {
 
     await openDialog(page, "Invitar usuario");
     await page.getByLabel("Email").fill(invitedEmail);
-    await page.getByRole("dialog").getByRole("button", { name: "Invitar usuario" }).click();
+    const [invited] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/users") && response.request().method() === "POST",
+      ),
+      page.getByRole("dialog").getByRole("button", { name: "Invitar usuario" }).click(),
+    ]);
+    expect(invited.ok()).toBe(true);
 
     // Nunca ingresó: queda como invitación pendiente, no como perfil.
     await expect(page.getByRole("heading", { name: "Invitaciones pendientes" })).toBeVisible();
@@ -116,7 +141,9 @@ test.describe("admin entity management", () => {
       await authenticate(context, developer);
       await page.goto("/admin/clients");
 
-      await expect(page).toHaveURL(/\/$/);
+      // `/` redirige al calendario desde `003`: es la pantalla principal del
+      // producto (spec funcional §4), no la home de bienvenida de `002`.
+      await expect(page).toHaveURL(/\/calendar/);
       // La sección de administración no existe en la nav de un dev.
       await expect(page.getByRole("link", { name: "Clientes" })).toHaveCount(0);
     } finally {

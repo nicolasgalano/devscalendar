@@ -43,7 +43,24 @@ La spec funcional (§4.2) pide que los bloques del calendario se coloreen **por 
 2. Los colores categóricos son de baja saturación y luminosidad pareja, para que las señales de atención (conflicto, desplazada, rechazada) se lean **por encima** de ellos y no compitan.
 3. El color categórico nunca es el único identificador del bloque: el bloque siempre muestra desarrollador y proyecto en texto.
 
-La paleta categórica concreta y la rampa de densidad de ocupación de la vista Mes se definen al construir `003-calendar-ui`, validando contraste en ambos temas. Hasta entonces no existen esos tokens: no inventar valores sueltos en un componente.
+### La paleta categórica
+
+Definida en `003-calendar-ui`. Ocho hues, dos tokens cada uno: `--cat-N-surface` (relleno del bloque) y `--cat-N-line` (barra izquierda de 2px). El texto del bloque va **siempre** en `--foreground`, nunca en un color derivado del hue.
+
+| # | Hue | | # | Hue |
+| --- | --- | --- | --- | --- |
+| 1 | pizarra | | 5 | verde azulado |
+| 2 | índigo | | 6 | verde |
+| 3 | azul | | 7 | violeta |
+| 4 | cian | | 8 | rosa |
+
+Tres reglas que no se negocian:
+
+1. **La paleta excluye ámbar, naranja y rojo.** Están reservados para `--priority-high`, `--attention` y `--danger`. Un bloque naranja "color por proyecto" sería indistinguible de uno que reclama acción, que es justo lo que prohíbe la condición 2 de arriba.
+2. **Las ocho superficies tienen la misma luminancia** (1.30:1 contra el fondo en claro, dispersión 0.0045). No es cosmético: si un hue pesa más que otro, la grilla sugiere una importancia que no existe.
+3. **La asignación es un hash determinístico del uuid** (`src/lib/calendar/palette.ts`), siguiendo el eje de agrupación activo. Dos entidades pueden compartir hue; es aceptable porque el bloque siempre muestra desarrollador y proyecto en texto.
+
+Cuando una reserva está **rechazada o desplazada**, la barra izquierda cambia de su color categórico a `--attention`. Así la señal de atención se lee por encima del color de identidad, en vez de competir con él.
 
 ## 3. Tokens de color
 
@@ -79,8 +96,9 @@ Definidos en `src/app/globals.css` y expuestos a Tailwind v4 con `@theme inline`
   --attention: #a16207;
   --attention-bg: #fefce8;
 
-  /* Bloqueo o daño: conflicto de reserva, acciones destructivas. */
-  --danger: #dc2626;
+  /* Bloqueo o daño: conflicto de reserva, acciones destructivas.
+     Ajustado en 003: #dc2626 daba 4.41:1 sobre --danger-bg, por debajo de AA. */
+  --danger: #cf2020;
   --danger-bg: #fef2f2;
 
   --radius: 4px;
@@ -185,7 +203,21 @@ Radios: `4px` en controles e inputs, `6px` en cards y popovers, `0` en filas de 
 
 Bordes: `1px solid var(--border)` siempre. La separación entre filas es un borde inferior, nunca un `gap` ni un `box-shadow`.
 
-La densidad de la grilla del calendario (alto de franja horaria, ancho de carril) se define en `003-calendar-ui` respetando esta escala.
+### Densidad de la grilla del calendario
+
+Definida en `003-calendar-ui`:
+
+| Elemento | Medida |
+| --- | --- |
+| Franja de 30 min (vista Día) | 24px de alto |
+| Carril (dev o proyecto) | 160px de ancho mínimo, con scroll horizontal |
+| Columna de horas | 56px |
+| Celda de día (vista Mes) | 96px de alto mínimo |
+| Celda de día (vista Año) | 12px |
+
+La vista Día muestra por defecto **09:00–17:00**, la jornada real (Q-F), y el rango se calcula siempre como `min(09:00, primer inicio) … max(17:00, último fin)`. Reservar fuera de horario es excepcional pero está permitido (Q-G), así que la grilla se estira: **nunca se recorta una reserva**. Las franjas fuera de la jornada van con fondo `--muted`.
+
+Encabezados y cuerpo comparten **un solo `grid-template-columns`**; la separación entre ambas filas se declara una vez con `row-gap`, no con un margen por columna.
 
 ## 6. Layout de la aplicación
 
@@ -270,6 +302,24 @@ Barra horizontal de 56×4px con radio 2px, acompañada de las horas en tipograf�
 
 **El color nunca es el único portador de información.** Las horas asignadas se muestran siempre en texto al lado de la barra.
 
+### Rampa de ocupación (vistas Mes y Año)
+
+Misma lógica aplicada a la celda de un día completo. Ocupación = horas reservadas / (desarrolladores considerados × 8 h), donde la jornada es 09:00–17:00 (Q-F).
+
+| Ocupación | Fondo |
+| --- | --- |
+| Día no laborable | `--muted`, número en `--secondary-foreground` |
+| 0% | `--load-0` (transparente) |
+| 1–33% | `--load-1` |
+| 34–66% | `--load-2` |
+| 67–99% | `--load-3` |
+| 100% | `--attention-bg` |
+| >100% | `--danger-bg` |
+
+Fines de semana y feriados argentinos tienen capacidad 0: no se les calcula porcentaje, y si tienen reservas se marcan como sobreasignados. Un sábado con reservas es raro y por eso tiene que saltar a la vista.
+
+**El número del día y el contador de reservas van en `--foreground`, nunca en `--muted-foreground`:** medido en `003`, ese token cae a 3.27:1 sobre `--load-3` y a 4.40:1 sobre `--muted`, ambos por debajo de AA. El contador está siempre en texto; la rampa es refuerzo.
+
 ### Desarrollador asignado
 
 Avatar circular de 20px con iniciales sobre `--muted` cuando no hay foto, seguido del nombre abreviado (`M. Rojas`). Sin asignar se muestra como avatar punteado con la palabra `Sin asignar` en `--muted-foreground`, y es un control clickeable, no texto muerto.
@@ -342,10 +392,17 @@ Aplicado en la feature `002-entities-admin`:
 - Componentes de shadcn ajustados a la escala de densidad.
 - Vistas `/`, `/login`, `/pending-access` y `/admin/*` con los cuatro estados de datos.
 
+Aplicado en la feature `003-calendar-ui`:
+
+- **Paleta categórica** (§2) y **rampa de ocupación** (§8), con contraste verificado en ambos temas.
+- **Densidad de la grilla** (§5): franjas, carriles y celdas de mes y año.
+- **Estados de reserva** (§8) — `BookingStatusTag`, usado en el bloque y en su detalle. `004`/`005` lo reusan.
+- **Estado "sin resultados de filtro"** (§9), que además nombra el filtro aplicado y ofrece limpiarlo.
+- Ajuste de `--danger` a `#cf2020`: el valor anterior no llegaba a AA sobre `--danger-bg`.
+
 Pendiente, por depender de features todavía no construidas:
 
-- **Paleta categórica del calendario y rampa de densidad de ocupación** (§2, §5) — se definen en `003-calendar-ui`.
-- **Estados de reserva y conflicto** (§8) — los componentes se construyen en `004-bookings` y `005-approval-flow`.
+- **Conflicto de reserva** (§8) — el componente llega con el anti doble-booking de `004-bookings`.
 - **Navegación por teclado en filas** (§7) — cuando exista una vista de detalle a la que abrir.
-- **Estado "sin resultados de filtro"** (§9) — `NoResultsState` está listo; se usa cuando el calendario incorpore filtros.
-- **Barra de ocupación por desarrollador** (§8) — depende de que existan reservas.
+- **Barra de ocupación individual** (§8) — la rampa por día ya existe; la barra de 56×4px por desarrollador llega con la vista de detalle de una persona.
+- **Botón con verbo en el empty state del calendario** (§9) — hoy va sin acción, porque `Crear reserva` no existe hasta `004`.

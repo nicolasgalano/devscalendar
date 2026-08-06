@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2Icon,
+  CalendarDaysIcon,
   FolderKanbanIcon,
-  HouseIcon,
   LogOutIcon,
   MenuIcon,
   PanelLeftIcon,
@@ -23,8 +23,11 @@ const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
 type NavItem = { href: string; label: string; Icon: LucideIcon };
 type NavGroup = { label: string | null; items: NavItem[] };
 
+// El calendario es la pantalla principal del producto (spec funcional §4), así
+// que encabeza la navegación y `/` redirige a él: la home de bienvenida de
+// `002` era un placeholder hasta que esta pantalla existiera.
 const BASE_NAV: NavGroup[] = [
-  { label: null, items: [{ href: "/", label: "Inicio", Icon: HouseIcon }] },
+  { label: null, items: [{ href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon }] },
 ];
 
 const ADMIN_NAV: NavGroup = {

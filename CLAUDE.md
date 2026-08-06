@@ -4,7 +4,7 @@
 
 > Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
 
-**Estado:** en desarrollo — features `001-auth-and-permissions` y `002-entities-admin` terminadas.
+**Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin` y `003-calendar-ui` terminadas.
 
 ---
 
@@ -64,7 +64,8 @@ devscalendar/
 │   │   ├── (app)/                    # route group: todo lo logueado, con shell
 │   │   │   ├── layout.tsx            # gate de sesión + AppShell
 │   │   │   ├── error.tsx             # error boundary de la app
-│   │   │   ├── page.tsx              # home autenticada
+│   │   │   ├── page.tsx              # redirige a /calendar
+│   │   │   ├── calendar/             # pantalla principal (día/mes/año)
 │   │   │   └── admin/                # ABM de maestros (solo admin)
 │   │   │       ├── layout.tsx        # guard de rol
 │   │   │       ├── clients/          # page + loading + tabla (client)
@@ -79,13 +80,15 @@ devscalendar/
 │   ├── middleware.ts                 # protege rutas + refresh de sesión
 │   ├── components/
 │   │   ├── ui/                       # shadcn/ui, comiteado y ajustado a DESIGN.md
+│   │   ├── calendar/                 # grilla, bloques, filtros, estados de reserva
 │   │   └── *.tsx                     # app-shell, theme-toggle, status, etc.
 │   ├── lib/
 │   │   ├── env.ts                    # validación de env con Zod
 │   │   ├── utils.ts                  # cn()
 │   │   ├── api/                      # guards de route handlers (requireAdmin)
+│   │   ├── calendar/                 # rangos, layout, ocupación, paleta, query
 │   │   ├── validation/               # schemas Zod por entidad
-│   │   └── supabase/                 # server/client/middleware helpers
+│   │   └── supabase/                 # server/client/middleware/session helpers
 │   └── types/
 │       └── database.ts               # generado; regenerar con `pnpm db:types`
 ├── supabase/
@@ -93,7 +96,9 @@ devscalendar/
 │   ├── migrations/                   # SQL versionado
 │   └── seed.sql
 ├── tests/
+│   ├── unit/                         # Vitest sin DB ni DOM (funciones puras)
 │   ├── integration/                  # Vitest contra el Supabase local (RLS, triggers)
+│   ├── perf/                         # presupuestos de tiempo; corren aislados
 │   └── e2e/                          # Playwright
 ├── specs/                            # SDD harness (spec/plan/tasks por feature)
 └── docs/
@@ -122,13 +127,24 @@ Scripts útiles:
 - `pnpm typecheck` — `tsc --noEmit`.
 - `pnpm lint` — ESLint.
 - `pnpm format` — Prettier.
-- `pnpm test` — tests de integración (Vitest) contra el Supabase local.
+- `pnpm test` — unitarios + integración (Vitest).
+- `pnpm test:unit` — solo los unitarios; **no necesitan Supabase levantado**.
+- `pnpm test:integration` — solo los que van contra el Supabase local.
+- `pnpm test:perf` — presupuestos de tiempo. Quedan fuera de `pnpm test` a propósito: corriendo en paralelo con el resto, la misma query medía 372 ms en vez de 69, así que la aserción mediría la máquina y no el producto. Correrlos solos.
 - `pnpm test:e2e` — E2E (Playwright); levanta `pnpm dev` solo si no hay uno corriendo.
 - `pnpm db:push` — aplica migrations al Supabase enlazado.
 - `pnpm db:reset` — recrea la DB local desde las migrations + `seed.sql`.
 - `pnpm db:types` — regenera `src/types/database.ts`.
 
 > **No corras `pnpm build` con `pnpm dev` levantado.** El build reescribe `.next/` y el dev server queda sirviendo un manifiesto viejo: los chunks dan 404, la página pierde los estilos y React no hidrata (los botones dejan de responder sin ningún error visible). Si pasa: parar el dev server, `rm -rf .next`, y volver a arrancar.
+
+> **Si ves 404 en todos los chunks, revisá que no haya un dev server zombi.** Matar la tarea de `pnpm dev` puede dejar vivo el proceso `next dev` hijo. El síntoma es traicionero: el zombi sigue ocupando el 3000 y sirviendo HTML, el `pnpm dev` nuevo se va sin avisar a otro puerto (`Port 3000 is in use, using 3003 instead`), y el que responde en el 3000 sirve un `.next` que ya no existe — 404 en todo el JS, cero hidratación, y ningún error de servidor. Diagnóstico y arreglo:
+>
+> ```bash
+> netstat -ano | grep LISTENING | grep ":300"   # ver quién ocupa cada puerto
+> taskkill //PID <pid> //F                      # matar cada zombi
+> rm -rf .next && pnpm dev                      # arrancar uno solo
+> ```
 
 ---
 
@@ -144,6 +160,15 @@ Scripts útiles:
 - Todo lo que requiere sesión vive bajo el route group `src/app/(app)/`, que resuelve el gate de sesión y el shell una sola vez. El paréntesis no aparece en la URL. Las pantallas de auth (`login`, `pending-access`, `auth/*`) quedan afuera a propósito.
 - Los guards de rol se agregan como `layout.tsx` en el subárbol correspondiente (ver `(app)/admin/layout.tsx`), no repitiendo checks en cada page.
 - En route handlers, la autorización pasa por `requireAdmin()` de `@/lib/api/require-admin`, y el payload por un schema de `@/lib/validation/`.
+- **La sesión se pide con `getCurrentUser()` / `getCurrentProfile()`** de `@/lib/supabase/session`, nunca llamando a `supabase.auth.getUser()` directo en una page o layout. Están envueltas en el `cache()` de React y se deduplican por request: `getUser()` es un round trip HTTP al servidor de auth (~200ms medidos), y los layouts anidados lo pagaban dos veces por navegación.
+
+### Estado en la URL
+
+Las vistas filtrables guardan **todo su estado en los search params**, no en React: vista, fecha, agrupación y filtros. Ver `src/lib/calendar/url.ts` y `src/lib/validation/calendar.ts`.
+
+- Cada control de navegación es un `<Link>` que reconstruye el href conservando el resto. Así, perder un filtro al cambiar de vista es imposible por construcción, la vista es compartible por link y el botón "atrás" funciona solo.
+- El parser **nunca tira**: una query string mal formada cae a los defaults. Un 500 en la pantalla principal porque alguien editó la URL sería un pésimo negocio.
+- Los valores iguales al default no se escriben en la URL, para que el caso común quede corto y legible.
 
 ### Migrations
 
@@ -166,4 +191,5 @@ Ver `specs/features/README.md` para el índice completo y estado.
 
 - **001-auth-and-permissions** — done. Google OAuth, roles, RLS base.
 - **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Quedan Q-A y Q-B por confirmar con el cliente antes de `006-priority-reallocation` — ver `specs/features/002-entities-admin/tasks.md`.
-- **Próxima:** `003-calendar-ui`. Define la paleta categórica del calendario y la rampa de densidad de ocupación, que `DESIGN.md` deja explícitamente pendientes.
+- **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Crea la tabla `bookings` **de solo lectura**: el camino de escritura es de `004`.
+- **Próxima:** `004-bookings`. Hereda `bookings` sin policies de escritura; su primera migration es el `exclusion constraint` anti doble-booking. Ver `specs/features/004-bookings/spec.md` §2.1.

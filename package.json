@@ -14,7 +14,10 @@
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:perf": "vitest run --project perf",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },

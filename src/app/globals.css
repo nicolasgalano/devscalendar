@@ -39,9 +39,58 @@
   --attention: #a16207;
   --attention-bg: #fefce8;
 
-  /* Bloqueo o daño: conflicto de reserva, acciones destructivas. */
-  --danger: #dc2626;
+  /* Bloqueo o daño: conflicto de reserva, acciones destructivas.
+     #dc2626 daba 4.41:1 sobre --danger-bg y no llegaba a AA; #cf2020 da
+     4.95:1 sobre el fondo y 5.41:1 sobre blanco. Medido en 003. */
+  --danger: #cf2020;
   --danger-bg: #fef2f2;
+
+  /* ── Paleta categórica del calendario — DESIGN.md §2 "La excepción del
+     calendario". Solo se usa DENTRO de la grilla: nunca en tablas, formularios,
+     navegación ni badges.
+
+     Excluye a propósito ámbar, naranja y rojo, que están reservados para
+     --priority-high, --attention y --danger: un bloque naranja "color por
+     proyecto" sería indistinguible de uno que reclama acción.
+
+     El texto del bloque va siempre en --foreground (13.6:1 sobre las ocho
+     superficies), nunca en un color derivado del hue. --cat-N-line es el borde
+     izquierdo de 2px (≥3.7:1 sobre su propia superficie).
+
+     Las ocho superficies están calculadas para tener la MISMA luminancia
+     (1.30:1 contra el fondo blanco, dispersión 0.0045). Que sean parejas no es
+     cosmético: es la condición 2 de §2 — si un hue pesa más que otro, la grilla
+     sugiere una importancia que no existe, y las señales de atención dejan de
+     leerse por encima del color categórico. */
+  --cat-1-surface: #dfe2e7; /* pizarra */
+  --cat-1-line: #64748b;
+  --cat-2-surface: #dfe0f5; /* índigo */
+  --cat-2-line: #5b60c9;
+  --cat-3-surface: #d5e3f7; /* azul */
+  --cat-3-line: #3b7dd8;
+  --cat-4-surface: #d2e5ea; /* cian */
+  --cat-4-line: #0e7490;
+  --cat-5-surface: #d3e6e4; /* verde azulado */
+  --cat-5-line: #0f766e;
+  --cat-6-surface: #dbe5d5; /* verde */
+  --cat-6-line: #4d7c2f;
+  --cat-7-surface: #e5dff4; /* violeta */
+  --cat-7-line: #7857c8;
+  --cat-8-surface: #f1dce6; /* rosa */
+  --cat-8-line: #b03a72;
+
+  /* ── Rampa de ocupación de las vistas Mes y Año — DESIGN.md §8.
+     Neutra por diseño: la carga no es una alerta hasta que se pasa. Al 100% se
+     usa --attention-bg y por encima --danger-bg; no hay tokens propios para
+     eso, porque son exactamente los mismos estados de siempre.
+
+     El número del día y el contador van en --foreground (mínimo 6.9:1 sobre
+     load-3), nunca en --muted-foreground, que en los escalones altos baja de
+     4.5:1. */
+  --load-0: transparent;
+  --load-1: #f4f4f5;
+  --load-2: #e4e4e7;
+  --load-3: #d4d4d8;
 
   --radius: 4px;
 
@@ -89,6 +138,31 @@
 
   --danger: #f87171;
   --danger-bg: #2a1315;
+
+  /* Superficies apenas elevadas sobre el fondo casi negro, con el hue justo
+     para distinguirse entre sí — DESIGN.md §3.6: el dark mode no es una
+     inversión. Texto --foreground: 15:1 sobre las ocho. */
+  --cat-1-surface: #1c2028;
+  --cat-1-line: #94a3b8;
+  --cat-2-surface: #1d1e2e;
+  --cat-2-line: #9aa0ee;
+  --cat-3-surface: #172336;
+  --cat-3-line: #6fa5f2;
+  --cat-4-surface: #10262c;
+  --cat-4-line: #5fbcd0;
+  --cat-5-surface: #112724;
+  --cat-5-line: #4fb3a3;
+  --cat-6-surface: #182619;
+  --cat-6-line: #86c06a;
+  --cat-7-surface: #221a33;
+  --cat-7-line: #b096ea;
+  --cat-8-surface: #2c1a25;
+  --cat-8-line: #e08bb0;
+
+  --load-0: transparent;
+  --load-1: #1c1c1f;
+  --load-2: #27272a;
+  --load-3: #3f3f46;
 }
 
 @theme inline {
@@ -127,6 +201,29 @@
 
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
+
+  /* Solo dentro de la grilla del calendario (DESIGN.md §2). */
+  --color-cat-1-surface: var(--cat-1-surface);
+  --color-cat-1-line: var(--cat-1-line);
+  --color-cat-2-surface: var(--cat-2-surface);
+  --color-cat-2-line: var(--cat-2-line);
+  --color-cat-3-surface: var(--cat-3-surface);
+  --color-cat-3-line: var(--cat-3-line);
+  --color-cat-4-surface: var(--cat-4-surface);
+  --color-cat-4-line: var(--cat-4-line);
+  --color-cat-5-surface: var(--cat-5-surface);
+  --color-cat-5-line: var(--cat-5-line);
+  --color-cat-6-surface: var(--cat-6-surface);
+  --color-cat-6-line: var(--cat-6-line);
+  --color-cat-7-surface: var(--cat-7-surface);
+  --color-cat-7-line: var(--cat-7-line);
+  --color-cat-8-surface: var(--cat-8-surface);
+  --color-cat-8-line: var(--cat-8-line);
+
+  --color-load-0: var(--load-0);
+  --color-load-1: var(--load-1);
+  --color-load-2: var(--load-2);
+  --color-load-3: var(--load-3);
 
   /* La sidebar es neutra: reusa las superficies, no tiene paleta propia. */
   --color-sidebar: var(--surface);
