@@ -1,4 +1,6 @@
 import { BookingBlock } from "@/components/calendar/booking-block";
+import { DayGridSlots } from "@/components/calendar/day-grid-slots";
+import { canManageProject, type BookingViewer } from "@/lib/bookings/permissions";
 import { formatMinuteOfDay } from "@/lib/calendar/format";
 import { assignColumns, groupIntoLanes, rowCount, toGridRows } from "@/lib/calendar/layout";
 import type { CalendarBooking } from "@/lib/calendar/query";
@@ -18,11 +20,14 @@ export function DayView({
   isoDate,
   group,
   tz,
+  viewer,
 }: {
   bookings: CalendarBooking[];
   isoDate: string;
   group: CalendarGroup;
   tz: string;
+  /** Quién mira: decide qué bloques ofrecen editar y cancelar. */
+  viewer: BookingViewer | null;
 }) {
   const window = visibleDayWindow(bookings, isoDate, tz);
   const rows = rowCount(window);
@@ -141,6 +146,17 @@ export function DayView({
                 );
               })}
 
+              {/* Antes que los bloques a propósito: la capa de alta cubre todo
+                  el carril, y lo que se dibuja después queda por encima. Así un
+                  click sobre una reserva abre su detalle y no el formulario. */}
+              <DayGridSlots
+                lane={{ axis: group, id: lane.id }}
+                laneName={lane.name}
+                isoDate={isoDate}
+                window={window}
+                rowHeight={ROW_HEIGHT}
+              />
+
               {positioned.map(({ item, column, columns }) => (
                 <BookingBlock
                   key={item.id}
@@ -150,6 +166,7 @@ export function DayView({
                   columns={columns}
                   colorKey={group === "dev" ? item.dev.id : item.project.id}
                   tz={tz}
+                  canManage={canManageProject(viewer, item.project)}
                 />
               ))}
             </div>

@@ -267,6 +267,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_booking: { Args: { target_project: string }; Returns: boolean }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

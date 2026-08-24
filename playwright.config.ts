@@ -7,6 +7,12 @@ export default defineConfig({
   // Contra `next dev` cada ruta compila en frío la primera vez que se visita,
   // y eso puede tardar decenas de segundos. Los defaults de Playwright (30s por
   // test, 5s por assertion) dan falsos negativos en flujos multi-pantalla.
+  //
+  // El 15s se deja quieto a propósito: los flujos de escritura de `004` esperan
+  // más, pero lo piden ellos (ver `AFTER_WRITE` en `bookings.spec.ts`). Subirlo
+  // acá alargaría *toda* aserción que falla, y los tests largos —el de admin,
+  // que recorre tres secciones— se quedarían sin presupuesto de test antes de
+  // llegar al final.
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {

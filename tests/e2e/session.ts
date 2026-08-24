@@ -109,3 +109,58 @@ export async function cleanupByName(clientName: string, projectName?: string) {
 export async function deleteInvite(email: string) {
   await serviceClient().from("profile_invites").delete().eq("email", email);
 }
+
+/**
+ * Cliente + proyecto a nombre de un PM, para los tests que escriben reservas.
+ * El seed no sirve para eso: sus proyectos son de otro PM, y la RLS —con razón—
+ * no deja que un PM reserve sobre ellos.
+ */
+export async function createProjectFor(
+  pmId: string,
+  names: { client: string; project: string },
+): Promise<{ clientId: string; projectId: string }> {
+  const admin = serviceClient();
+
+  const { data: client, error: clientError } = await admin
+    .from("clients")
+    .insert({ name: names.client })
+    .select("id")
+    .single();
+  if (clientError) throw clientError;
+
+  const { data: project, error: projectError } = await admin
+    .from("projects")
+    .insert({ name: names.project, client_id: client.id, pm_id: pmId })
+    .select("id")
+    .single();
+  if (projectError) throw projectError;
+
+  return { clientId: client.id, projectId: project.id };
+}
+
+/** Reserva sembrada con service_role, para estados que la API no deja crear. */
+export async function seedBooking(booking: {
+  projectId: string;
+  devId: string;
+  startsAt: string;
+  endsAt: string;
+  status?: "pending" | "approved";
+}) {
+  const { error } = await serviceClient().from("bookings").insert({
+    project_id: booking.projectId,
+    dev_id: booking.devId,
+    starts_at: booking.startsAt,
+    ends_at: booking.endsAt,
+    status: booking.status ?? "approved",
+  });
+  if (error) throw error;
+}
+
+/** Reservas, proyecto y cliente en ese orden: las FK son `restrict`. */
+export async function deleteProjectFixture(ids: { clientId: string; projectId: string }) {
+  const admin = serviceClient();
+  await admin.from("bookings").delete().eq("project_id", ids.projectId);
+  await admin.from("audit_log").delete().eq("entity_id", ids.projectId);
+  await admin.from("projects").delete().eq("id", ids.projectId);
+  await admin.from("clients").delete().eq("id", ids.clientId);
+}

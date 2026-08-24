@@ -108,6 +108,7 @@ do $$
 declare
   tz constant text := 'America/Argentina/Buenos_Aires';
   monday constant date := date_trunc('week', current_date)::date;
+  tuesday constant date := (date_trunc('week', current_date)::date) + 1;
   saturday constant date := (date_trunc('week', current_date)::date) + 5;
 
   pm_paula constant uuid := '00000000-0000-4000-8000-000000000011';
@@ -152,7 +153,19 @@ begin
     -- Saturday: non-working day, so the month view flags it as over capacity.
     ('00000000-0000-4000-8000-000000000059', proj_website, dev_rodrigo, pm_paula,
      (saturday + time '10:00') at time zone tz, (saturday + time '14:00') at time zone tz,
-     'approved', 'Migración de base, ventana de fin de semana', 'WEB-160')
+     'approved', 'Migración de base, ventana de fin de semana', 'WEB-160'),
+    -- Two back-to-back approved bookings for the same developer. This is the
+    -- edge of the anti double-booking constraint (004): tstzrange defaults to
+    -- [), so 13:00 closes the first and opens the second without colliding.
+    -- Seeded on Tuesday, away from Monday's fixtures, so `supabase db reset`
+    -- exercises that boundary on every run — if the range type were ever
+    -- changed to [], the reset itself would fail.
+    ('00000000-0000-4000-8000-00000000005a', proj_website, dev_malena, pm_paula,
+     (tuesday + time '09:00') at time zone tz, (tuesday + time '13:00') at time zone tz,
+     'approved', 'Refactor del carrito', 'WEB-171'),
+    ('00000000-0000-4000-8000-00000000005b', proj_website, dev_malena, pm_paula,
+     (tuesday + time '13:00') at time zone tz, (tuesday + time '17:00') at time zone tz,
+     'approved', 'Continuación, mismo día', 'WEB-171')
   -- Idempotent on purpose: re-running the seed without a reset refreshes the
   -- dates to the current week instead of failing on the primary key.
   on conflict (id) do update set

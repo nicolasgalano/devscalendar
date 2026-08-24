@@ -4,7 +4,7 @@
 
 > Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
 
-**Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin` y `003-calendar-ui` terminadas.
+**Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin`, `003-calendar-ui` y `004-bookings` terminadas.
 
 ---
 
@@ -85,7 +85,8 @@ devscalendar/
 │   ├── lib/
 │   │   ├── env.ts                    # validación de env con Zod
 │   │   ├── utils.ts                  # cn()
-│   │   ├── api/                      # guards de route handlers (requireAdmin)
+│   │   ├── api/                      # guards de route handlers + lectura de body
+│   │   ├── bookings/                 # transiciones, conflictos, formulario, permisos
 │   │   ├── calendar/                 # rangos, layout, ocupación, paleta, query
 │   │   ├── validation/               # schemas Zod por entidad
 │   │   └── supabase/                 # server/client/middleware/session helpers
@@ -159,8 +160,16 @@ Scripts útiles:
 
 - Todo lo que requiere sesión vive bajo el route group `src/app/(app)/`, que resuelve el gate de sesión y el shell una sola vez. El paréntesis no aparece en la URL. Las pantallas de auth (`login`, `pending-access`, `auth/*`) quedan afuera a propósito.
 - Los guards de rol se agregan como `layout.tsx` en el subárbol correspondiente (ver `(app)/admin/layout.tsx`), no repitiendo checks en cada page.
-- En route handlers, la autorización pasa por `requireAdmin()` de `@/lib/api/require-admin`, y el payload por un schema de `@/lib/validation/`.
+- En route handlers, la autorización pasa por `requireAdmin()` de `@/lib/api/require-admin` —o `requireBookingAccess(projectId)` para reservas—, y el payload por un schema de `@/lib/validation/`.
+- **El body se lee con `readJsonBody()` de `@/lib/api/read-json`, nunca con `request.json()` directo.** `request.json()` tira ante un body vacío o mal formado, y eso sale como un 500 con stack trace: un cliente que manda basura queda registrado como una falla del servidor. El helper devuelve `undefined` y el schema lo rechaza con el 400 de siempre.
 - **La sesión se pide con `getCurrentUser()` / `getCurrentProfile()`** de `@/lib/supabase/session`, nunca llamando a `supabase.auth.getUser()` directo en una page o layout. Están envueltas en el `cache()` de React y se deduplican por request: `getUser()` es un round trip HTTP al servidor de auth (~200ms medidos), y los layouts anidados lo pagaban dos veces por navegación.
+
+### Reservas
+
+- **Cancelar una reserva es un `update` de `status`, nunca un `delete`.** No hay borrado físico y `authenticated` no tiene el grant: la reserva cancelada sigue visible en el calendario con su tratamiento propio (`DESIGN.md` §8) y es el rastro que después audita `010`. La API no expone `DELETE` a propósito.
+- **El anti doble-booking está en dos capas y ninguna reemplaza a la otra** (ADR 0008): el `exclusion constraint` es la garantía dura, y el chequeo de `findConflictingBooking()` existe para responder un 409 con la reserva que bloquea. El constraint solo excluye entre `approved`, así que **en un alta nunca se dispara** — toda reserva nace `pending`. Cualquier camino de escritura nuevo tiene que hacer el mismo chequeo.
+- **Aprobar y rechazar no son del PM.** El trigger `bookings_enforce_status_transition` lo hace cumplir en la base, no solo en la API. `service_role` queda exento para que seeds y fixtures puedan sembrar estados directamente.
+- **La jornada no se valida nunca.** Reservar fuera de 09:00–17:00 o en un día no laborable es excepcional pero está permitido (Q-G): se advierte en la UI con `describeBookingWarnings()` y jamás bloquea. Los schemas de Zod no conocen la jornada a propósito, para que nadie convierta la advertencia en error.
 
 ### Estado en la URL
 
@@ -191,5 +200,6 @@ Ver `specs/features/README.md` para el índice completo y estado.
 
 - **001-auth-and-permissions** — done. Google OAuth, roles, RLS base.
 - **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Quedan Q-A y Q-B por confirmar con el cliente antes de `006-priority-reallocation` — ver `specs/features/002-entities-admin/tasks.md`.
-- **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Crea la tabla `bookings` **de solo lectura**: el camino de escritura es de `004`.
-- **Próxima:** `004-bookings`. Hereda `bookings` sin policies de escritura; su primera migration es el `exclusion constraint` anti doble-booking. Ver `specs/features/004-bookings/spec.md` §2.1.
+- **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Creó la tabla `bookings` de solo lectura.
+- **004-bookings** — done. `bookings` ya es escribible: `exclusion constraint` anti doble-booking, policies para el PM del proyecto y el admin, API de alta / edición / cancelación, y el diálogo que se abre desde el botón o desde un click en la grilla. El anti doble-booking quedó en dos capas (ADR 0008). Q-E aplicada: mover el horario o el desarrollador de una reserva aprobada la devuelve a `pending`.
+- **Próxima:** `005-approval-flow`. El desarrollador todavía no puede escribir: le falta su policy acotada a `status` sobre sus propias reservas. El trigger de transiciones ya está listo para recibirla, y al aprobar va a chocar contra el constraint — ese `23P01` hay que traducirlo (ADR 0008). Hereda además el race entre edición y aprobación (F1).

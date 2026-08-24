@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { FlagIcon } from "lucide-react";
 
+import { useBookingActions } from "@/components/calendar/booking-actions";
 import { BookingStatusTag, bookingStatusLabel } from "@/components/calendar/booking-status";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -11,6 +14,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { canCancel, canEdit } from "@/lib/bookings/transitions";
 import { formatTimeRange } from "@/lib/calendar/format";
 import type { GridRows } from "@/lib/calendar/layout";
 import { categoryClasses } from "@/lib/calendar/palette";
@@ -25,6 +29,8 @@ export type BookingBlockProps = {
   /** Which entity drives the categorical hue — follows the grouping axis. */
   colorKey: string;
   tz: string;
+  /** Whether the viewer may edit or cancel this booking (admin, or its PM). */
+  canManage: boolean;
 };
 
 /**
@@ -35,10 +41,10 @@ export type BookingBlockProps = {
  * focusable element whose accessible name carries everything the colour and
  * position convey.
  *
- * The read-only detail popover exists to resolve the tension between §12
- * (blocks must be focusable) and §7 (nothing focusable that leads nowhere):
- * there is no booking detail view until 004, so focus opens the detail right
- * here. 004 swaps the popover for the edit panel without touching the grid.
+ * The detail popover exists to resolve the tension between §12 (blocks must be
+ * focusable) and §7 (nothing focusable that leads nowhere): there is no booking
+ * detail view, so focus opens the detail right here. `004` added the edit and
+ * cancel actions to its footer without touching the grid.
  */
 export function BookingBlock({
   booking,
@@ -47,7 +53,12 @@ export function BookingBlock({
   columns,
   colorKey,
   tz,
+  canManage,
 }: BookingBlockProps) {
+  const { editBooking, cancelBooking } = useBookingActions();
+  // El popover se controla para poder cerrarlo antes de abrir el diálogo: si se
+  // quedara abierto, el foco volvería a un bloque que está tapado por el modal.
+  const [open, setOpen] = useState(false);
   const time = formatTimeRange(booking.startsAt, booking.endsAt, tz);
   const isHighPriority = booking.project.priority === "high";
   const isCancelled = booking.status === "cancelled";
@@ -66,7 +77,7 @@ export function BookingBlock({
     .join(" · ");
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={accessibleName}
         className={cn(
@@ -188,6 +199,39 @@ export function BookingBlock({
           <p className="border-t border-border pt-2 text-ui text-secondary-foreground">
             {booking.note}
           </p>
+        )}
+
+        {/* El popover mantiene su rol de detalle para quien no puede editar: sin
+            permiso, o con la reserva ya en un estado terminal, se ve lo mismo de
+            antes y ningún botón que después conteste que no. */}
+        {canManage && (canEdit(booking.status) || canCancel(booking.status)) && (
+          <div className="flex justify-end gap-1 border-t border-border pt-2">
+            {canEdit(booking.status) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setOpen(false);
+                  editBooking(booking);
+                }}
+              >
+                Editar
+              </Button>
+            )}
+            {canCancel(booking.status) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-danger"
+                onClick={() => {
+                  setOpen(false);
+                  cancelBooking(booking);
+                }}
+              >
+                Cancelar reserva
+              </Button>
+            )}
+          </div>
         )}
       </PopoverContent>
     </Popover>

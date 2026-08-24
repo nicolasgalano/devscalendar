@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+import {
+  BookingActionsProvider,
+  CreateBookingButton,
+} from "@/components/calendar/booking-actions";
 import { bookingStatusLabel } from "@/components/calendar/booking-status";
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
 import {
@@ -13,6 +17,8 @@ import { YearView } from "@/components/calendar/year-view";
 import { EmptyState, NoResultsState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { getBookingFormOptions } from "@/lib/bookings/options";
+import type { BookingViewer } from "@/lib/bookings/permissions";
 import { deriveFacets } from "@/lib/calendar/facets";
 import { aggregateDayLoad } from "@/lib/calendar/load";
 import {
@@ -25,6 +31,7 @@ import {
 import { eachDay, resolveRange, todayInTimeZone, viewBounds } from "@/lib/calendar/range";
 import { clearFiltersHref } from "@/lib/calendar/url";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/session";
 import {
   DEFAULT_STATUSES,
   hasActiveFilters,
@@ -33,6 +40,16 @@ import {
 } from "@/lib/validation/calendar";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Lo que se pinta, más en cuál de los tres estados quedó. El estado importa
+ * fuera de la grilla: es lo que decide dónde vive la acción primaria (§7) y por
+ * qué "vacío" y "sin resultados" no son el mismo cartel (§9).
+ */
+type ViewContent = {
+  node: React.ReactNode;
+  state: "data" | "empty" | "no-results";
+};
 
 /**
  * DESIGN.md §9: the "no results" state has to name the filter that is hiding
@@ -86,27 +103,38 @@ export default async function CalendarPage({
   const supabase = await createClient();
   const range = resolveRange(params.view, params.date, TIMEZONE);
 
-  const [content, facets] = await Promise.all([
+  // Ya resuelto y memorizado por el layout del route group: acá no cuesta otro
+  // round trip al servidor de auth (ver `lib/supabase/session.ts`).
+  const profile = await getCurrentProfile();
+  const viewer: BookingViewer | null = profile
+    ? { id: profile.id, role: profile.role }
+    : null;
+
+  const [content, facets, options] = await Promise.all([
     params.view === "day"
       ? renderDay()
       : renderAggregated(params.view === "month" ? "month" : "year"),
     getFacets(),
+    getBookingFormOptions(supabase, viewer),
   ]);
 
   return (
-    <>
+    <BookingActionsProvider viewer={viewer} options={options} params={params} tz={TIMEZONE}>
       <PageHeader
         title="Calendario"
         description="Reservas de tiempo de los desarrolladores sobre cada proyecto."
+        // DESIGN.md §7: con la vista vacía la acción primaria se muda al empty
+        // state, para que no haya dos botones primarios en pantalla.
+        action={content.state === "empty" ? undefined : <CreateBookingButton />}
       />
       <CalendarToolbar params={params} today={today} tz={TIMEZONE} />
       {/* Filtros y resultados comparten una sola transición, para que al
           filtrar la pantalla dé señal en vez de quedarse quieta. */}
       <CalendarPendingProvider>
         <CalendarFilters params={params} facets={facets} />
-        <CalendarResults>{content}</CalendarResults>
+        <CalendarResults>{content.node}</CalendarResults>
       </CalendarPendingProvider>
-    </>
+    </BookingActionsProvider>
   );
 
   /**
@@ -119,16 +147,25 @@ export default async function CalendarPage({
     return deriveFacets(rows, params.filters);
   }
 
-  async function renderDay() {
+  async function renderDay(): Promise<ViewContent> {
     const bookings = await getBookingsInRange(supabase, { range, filters: params.filters });
     if (bookings.length === 0) return emptyOrNoResults();
 
-    return (
-      <DayView bookings={bookings} isoDate={params.date} group={params.group} tz={TIMEZONE} />
-    );
+    return {
+      state: "data",
+      node: (
+        <DayView
+          bookings={bookings}
+          isoDate={params.date}
+          group={params.group}
+          tz={TIMEZONE}
+          viewer={viewer}
+        />
+      ),
+    };
   }
 
-  async function renderAggregated(view: "month" | "year") {
+  async function renderAggregated(view: "month" | "year"): Promise<ViewContent> {
     const { spans, devCount } = await getDayLoad(supabase, { range, filters: params.filters });
     const [from, to] = viewBounds(view, params.date);
     const days = aggregateDayLoad({
@@ -140,11 +177,15 @@ export default async function CalendarPage({
 
     if (spans.length === 0) return emptyOrNoResults();
 
-    return view === "month" ? (
-      <MonthView days={days} params={params} today={today} />
-    ) : (
-      <YearView days={days} params={params} tz={TIMEZONE} />
-    );
+    return {
+      state: "data",
+      node:
+        view === "month" ? (
+          <MonthView days={days} params={params} today={today} />
+        ) : (
+          <YearView days={days} params={params} tz={TIMEZONE} />
+        ),
+    };
   }
 
   /**
@@ -153,30 +194,39 @@ export default async function CalendarPage({
    * data may well exist just outside them — saying "no bookings" there would be
    * a lie that sends the user looking for a bug.
    */
-  async function emptyOrNoResults() {
+  async function emptyOrNoResults(): Promise<ViewContent> {
     if (hasActiveFilters(params.filters)) {
       const applied = describeFilters(params, await getSelectedFilterNames(supabase, params.filters));
-      return (
-        <NoResultsState
-          description={`Ninguna reserva coincide con ${applied} en este período.`}
-          onClear={
-            // Link, no botón: navega. Ver la nota en `calendar-toolbar.tsx`.
-            <Link
-              href={clearFiltersHref(params)}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Limpiar filtros
-            </Link>
-          }
-        />
-      );
+      return {
+        state: "no-results",
+        node: (
+          <NoResultsState
+            description={`Ninguna reserva coincide con ${applied} en este período.`}
+            onClear={
+              // Link, no botón: navega. Ver la nota en `calendar-toolbar.tsx`.
+              <Link
+                href={clearFiltersHref(params)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Limpiar filtros
+              </Link>
+            }
+          />
+        ),
+      };
     }
 
-    return (
-      <EmptyState
-        title="Sin reservas en este período"
-        description="Las reservas que se creen para el equipo van a aparecer acá."
-      />
-    );
+    return {
+      state: "empty",
+      node: (
+        <EmptyState
+          title="Sin reservas en este período"
+          description="Las reservas que se creen para el equipo van a aparecer acá."
+          // Salda la deuda F2 de 003: el empty state del calendario ya tiene su
+          // verbo (DESIGN.md §9, §14).
+          action={<CreateBookingButton />}
+        />
+      ),
+    };
   }
 }

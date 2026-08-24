@@ -296,6 +296,8 @@ Rechazada y desplazada llevan color porque obligan al PM a reasignar; el resto n
 
 Un conflicto (doble booking, o realocación bloqueada entre proyectos del mismo nivel — spec §7.1) se marca con icono `alert-triangle` y texto en `--danger`, más una explicación de una línea de qué lo bloquea. **Nunca solo el color:** el motivo siempre está en texto.
 
+**Advertir y bloquear no comparten tratamiento.** Lo que impide seguir usa `alert-triangle` sobre `--danger`; lo que solo avisa —reservar fuera de la jornada o en un feriado, que es excepcional pero está permitido (Q-G)— usa `circle-alert` sobre `--attention` y deja el botón de guardar activo. Si las dos cosas se vieran igual, el usuario aprendería a ignorar las dos.
+
 ### Ocupación de un desarrollador
 
 Barra horizontal de 56×4px con radio 2px, acompañada de las horas en tipografía de datos (`.font-data`). Neutra por debajo del 100% de la capacidad del día; en `--attention` al llegar al 100%; en `--danger` por encima (sobreasignación).
@@ -400,9 +402,14 @@ Aplicado en la feature `003-calendar-ui`:
 - **Estado "sin resultados de filtro"** (§9), que además nombra el filtro aplicado y ofrece limpiarlo.
 - Ajuste de `--danger` a `#cf2020`: el valor anterior no llegaba a AA sobre `--danger-bg`.
 
+Aplicado en la feature `004-bookings`:
+
+- **Estado de conflicto** (§8) — `alert-triangle`, texto en `--danger`, el motivo en palabras y un link a la reserva que bloquea, en el diálogo de reserva. El color no porta nada que no esté también escrito.
+- **Botón con verbo en el empty state del calendario** (§9) — `Crear reserva`, que además es la única acción primaria de la vista: vive en el encabezado cuando hay reservas y se muda al empty state cuando no las hay (§7).
+- **Advertencias sin bloqueo** (§8, la excepción de Q-G) — jornada y día no laborable se advierten en `--attention` con `circle-alert`, nunca en `--danger` y nunca deshabilitando guardar. `alert-triangle` queda reservado para el conflicto, que sí impide seguir.
+- **Diálogo de confirmación destructivo** (§7) — cancelar una reserva es terminal, así que pasa por confirmación; es el único lugar donde el botón destructivo lleva fondo propio.
+
 Pendiente, por depender de features todavía no construidas:
 
-- **Conflicto de reserva** (§8) — el componente llega con el anti doble-booking de `004-bookings`.
 - **Navegación por teclado en filas** (§7) — cuando exista una vista de detalle a la que abrir.
 - **Barra de ocupación individual** (§8) — la rampa por día ya existe; la barra de 56×4px por desarrollador llega con la vista de detalle de una persona.
-- **Botón con verbo en el empty state del calendario** (§9) — hoy va sin acción, porque `Crear reserva` no existe hasta `004`.
