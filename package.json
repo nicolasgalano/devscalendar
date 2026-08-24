@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:types": "supabase gen types typescript --local > src/types/database.ts",
+    "db:types": "supabase gen types typescript --linked > src/types/database.ts",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
     "test": "vitest run --project unit --project integration",
