@@ -11,6 +11,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 /**
  * T4.3 y T4.4 — feature 002. El trigger `projects_log_priority_change` registra
@@ -26,12 +27,12 @@ describe("audit_log and soft delete", () => {
 
   beforeAll(async () => {
     const adm = await createUserWithRole(
-      `audit-admin-${randomUUID()}@example.com`,
+      testEmail(`audit-admin-${randomUUID()}`),
       password,
       "admin",
     );
     const projectManager = await createUserWithRole(
-      `audit-pm-${randomUUID()}@example.com`,
+      testEmail(`audit-pm-${randomUUID()}`),
       password,
       "pm",
     );

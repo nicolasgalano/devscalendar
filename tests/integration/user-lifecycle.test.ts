@@ -11,6 +11,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 /**
  * Regresión: dar de baja a un usuario no puede quedar bloqueado por las
@@ -32,9 +33,9 @@ describe("deleting a user with soft references", () => {
   });
 
   it("nulls primary_pm_id on the devs that pointed at the deleted PM", async () => {
-    const pm = await createUserWithRole(`life-pm-${randomUUID()}@example.com`, password, "pm");
+    const pm = await createUserWithRole(testEmail(`life-pm-${randomUUID()}`), password, "pm");
     const dev = await createUserWithRole(
-      `life-dev-${randomUUID()}@example.com`,
+      testEmail(`life-dev-${randomUUID()}`),
       password,
       "developer",
     );
@@ -62,11 +63,11 @@ describe("deleting a user with soft references", () => {
 
   it("keeps invitations sent by a deleted admin", async () => {
     const admin = await createUserWithRole(
-      `life-admin-${randomUUID()}@example.com`,
+      testEmail(`life-admin-${randomUUID()}`),
       password,
       "admin",
     );
-    const invitedEmail = `life-invited-${randomUUID()}@example.com`;
+    const invitedEmail = testEmail(`life-invited-${randomUUID()}`);
 
     try {
       await adminClient()
@@ -90,12 +91,12 @@ describe("deleting a user with soft references", () => {
 
   it("keeps the audit trail after its author is deleted", async () => {
     const admin = await createUserWithRole(
-      `life-auditor-${randomUUID()}@example.com`,
+      testEmail(`life-auditor-${randomUUID()}`),
       password,
       "admin",
     );
     const pm = await createUserWithRole(
-      `life-owner-${randomUUID()}@example.com`,
+      testEmail(`life-owner-${randomUUID()}`),
       password,
       "pm",
     );
@@ -132,7 +133,7 @@ describe("deleting a user with soft references", () => {
 
   it("refuses to delete a PM that still owns projects", async () => {
     const pm = await createUserWithRole(
-      `life-owner2-${randomUUID()}@example.com`,
+      testEmail(`life-owner2-${randomUUID()}`),
       password,
       "pm",
     );

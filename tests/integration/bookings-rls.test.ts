@@ -14,6 +14,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 const password = "Test-password-123!";
 
@@ -35,16 +36,16 @@ describe("bookings RLS", () => {
   beforeAll(async () => {
     const suffix = randomUUID().slice(0, 8);
     const adminUser = await createUserWithRole(
-      `bk-admin-${suffix}@example.com`,
+      testEmail(`bk-admin-${suffix}`),
       password,
       "admin",
     );
     const devUser = await createUserWithRole(
-      `bk-dev-${suffix}@example.com`,
+      testEmail(`bk-dev-${suffix}`),
       password,
       "developer",
     );
-    const pending = await createTestUser(`bk-none-${suffix}@example.com`, password);
+    const pending = await createTestUser(testEmail(`bk-none-${suffix}`), password);
 
     admin = { id: adminUser.id, email: adminUser.email! };
     developer = { id: devUser.id, email: devUser.email! };

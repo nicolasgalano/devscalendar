@@ -18,18 +18,19 @@ export function adminClient(): SupabaseClient<Database> {
 }
 
 /**
- * `email` se usa como **etiqueta**, no como dirección final: el email real lo
- * arma `testEmail()` con el identificador de corrida (`docs/testing.md`). Así la
- * convención se aplica sola en los ~30 lugares que crean usuarios, sin que cada
- * test tenga que acordarse.
+ * El email llega ya armado por `testEmail()` desde el test, y **no se reescribe
+ * acá**.
  *
- * Todos los llamadores ya usan el email **devuelto** para iniciar sesión, así
- * que reescribirlo acá es seguro; pasar el literal original a `signInClient()`
- * fallaría, y por eso ninguno lo hace.
+ * Se intentó al revés —que el helper aplicara la convención solo— y rompió dos
+ * veces: un test inicia sesión con el mismo literal que usó para crear, y
+ * `profile-invites` inserta una invitación para un email y espera que el
+ * trigger la consuma al crearse ese usuario. En los dos casos el email es
+ * **dato**, no una etiqueta decorativa, y cambiarlo por debajo rompe la premisa
+ * del test.
  */
 export async function createTestUser(email: string, password: string) {
   const { data, error } = await adminClient().auth.admin.createUser({
-    email: testEmail(email),
+    email,
     password,
     email_confirm: true,
   });

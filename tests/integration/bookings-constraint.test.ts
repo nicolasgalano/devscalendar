@@ -12,6 +12,7 @@ import {
   createUserWithRole,
   deleteTestUser,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 const password = "Test-password-123!";
 const at = (hour: number) =>
@@ -32,9 +33,9 @@ describe("bookings_no_overlap", () => {
 
   beforeAll(async () => {
     const suffix = randomUUID().slice(0, 8);
-    pm = await createUserWithRole(`cst-pm-${suffix}@example.com`, password, "pm");
-    devA = await createUserWithRole(`cst-a-${suffix}@example.com`, password, "developer");
-    devB = await createUserWithRole(`cst-b-${suffix}@example.com`, password, "developer");
+    pm = await createUserWithRole(testEmail(`cst-pm-${suffix}`), password, "pm");
+    devA = await createUserWithRole(testEmail(`cst-a-${suffix}`), password, "developer");
+    devB = await createUserWithRole(testEmail(`cst-b-${suffix}`), password, "developer");
 
     clientId = (await createClientRow(`CST cliente ${suffix}`)).id;
     projectId = (

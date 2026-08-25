@@ -10,6 +10,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 /**
  * T4.1 — feature 002. Escrituras sobre los maestros son solo de admin; el resto
@@ -24,12 +25,12 @@ describe("clients / projects / profile_invites RLS", () => {
 
   beforeAll(async () => {
     const dev = await createUserWithRole(
-      `entities-dev-${randomUUID()}@example.com`,
+      testEmail(`entities-dev-${randomUUID()}`),
       password,
       "developer",
     );
     const adm = await createUserWithRole(
-      `entities-admin-${randomUUID()}@example.com`,
+      testEmail(`entities-admin-${randomUUID()}`),
       password,
       "admin",
     );
@@ -113,7 +114,7 @@ describe("clients / projects / profile_invites RLS", () => {
   });
 
   it("hides profile_invites from non-admins", async () => {
-    const email = `invited-${randomUUID()}@example.com`;
+    const email = testEmail(`invited-${randomUUID()}`);
     const { error: seedError } = await adminClient()
       .from("profile_invites")
       .insert({ email, role: "developer" });
@@ -142,7 +143,7 @@ describe("clients / projects / profile_invites RLS", () => {
   });
 
   it("keeps a user with no role out of the masters", async () => {
-    const email = `norole-${randomUUID()}@example.com`;
+    const email = testEmail(`norole-${randomUUID()}`);
     const user = await createTestUser(email, password);
     try {
       const client = await signInClient(email, password);

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestUser, deleteTestUser, signInClient } from "./helpers";
+import { testEmail } from "../run-id";
 
 describe("profiles RLS", () => {
   const password = "Test-password-123!";
@@ -9,8 +10,8 @@ describe("profiles RLS", () => {
   let userB: { id: string; email: string };
 
   beforeAll(async () => {
-    const a = await createTestUser(`rls-a-${randomUUID()}@example.com`, password);
-    const b = await createTestUser(`rls-b-${randomUUID()}@example.com`, password);
+    const a = await createTestUser(testEmail(`rls-a-${randomUUID()}`), password);
+    const b = await createTestUser(testEmail(`rls-b-${randomUUID()}`), password);
     userA = { id: a.id, email: a.email! };
     userB = { id: b.id, email: b.email! };
   });

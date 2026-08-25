@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { adminClient, createTestUser, deleteTestUser } from "./helpers";
+import { testEmail } from "../run-id";
 
 /**
  * T4.2 — feature 002. `handle_new_user` consulta `profile_invites` al crear el
@@ -24,7 +25,7 @@ describe("handle_new_user with profile_invites", () => {
   });
 
   it("gives the invited role to a profile created afterwards", async () => {
-    const email = `invite-pm-${randomUUID()}@example.com`;
+    const email = testEmail(`invite-pm-${randomUUID()}`);
     invitedEmail = email;
 
     const { error: inviteError } = await adminClient()
@@ -46,7 +47,7 @@ describe("handle_new_user with profile_invites", () => {
   });
 
   it("consumes the invitation so it cannot be reused", async () => {
-    const email = `invite-once-${randomUUID()}@example.com`;
+    const email = testEmail(`invite-once-${randomUUID()}`);
     invitedEmail = email;
 
     await adminClient().from("profile_invites").insert({ email, role: "admin" });
@@ -65,7 +66,7 @@ describe("handle_new_user with profile_invites", () => {
   });
 
   it("still creates a role-less profile when there is no invitation", async () => {
-    const email = `invite-none-${randomUUID()}@example.com`;
+    const email = testEmail(`invite-none-${randomUUID()}`);
     const user = await createTestUser(email, "Test-password-123!");
     userId = user.id;
 
@@ -80,12 +81,12 @@ describe("handle_new_user with profile_invites", () => {
   });
 
   it("does not apply an invitation addressed to a different email", async () => {
-    const invited = `invite-other-${randomUUID()}@example.com`;
+    const invited = testEmail(`invite-other-${randomUUID()}`);
     invitedEmail = invited;
     await adminClient().from("profile_invites").insert({ email: invited, role: "admin" });
 
     const user = await createTestUser(
-      `invite-unrelated-${randomUUID()}@example.com`,
+      testEmail(`invite-unrelated-${randomUUID()}`),
       "Test-password-123!",
     );
     userId = user.id;

@@ -23,6 +23,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "../integration/helpers";
+import { testEmail } from "../run-id";
 
 /**
  * Suite smoke: lo que **solo PostgREST** puede confirmar.
@@ -66,8 +67,12 @@ describe("contrato con PostgREST y GoTrue", () => {
 
   beforeAll(async () => {
     const suffix = randomUUID().slice(0, 8);
-    const pmUser = await createUserWithRole(`smoke-pm-${suffix}`, password, "pm");
-    const devUser = await createUserWithRole(`smoke-dev-${suffix}`, password, "developer");
+    const pmUser = await createUserWithRole(testEmail(`smoke-pm-${suffix}`), password, "pm");
+    const devUser = await createUserWithRole(
+      testEmail(`smoke-dev-${suffix}`),
+      password,
+      "developer",
+    );
     pm = { id: pmUser.id, email: pmUser.email! };
     dev = { id: devUser.id };
 

@@ -23,6 +23,7 @@ import {
   deleteTestUser,
   signInClient,
 } from "./helpers";
+import { testEmail } from "../run-id";
 
 const password = "Test-password-123!";
 
@@ -54,19 +55,19 @@ describe("calendar query layer", () => {
 
   beforeAll(async () => {
     const suffix = randomUUID().slice(0, 8);
-    const pmUser = await createUserWithRole(`cq-pm-${suffix}@example.com`, password, "pm");
+    const pmUser = await createUserWithRole(testEmail(`cq-pm-${suffix}`), password, "pm");
     const otherPmUser = await createUserWithRole(
-      `cq-pm2-${suffix}@example.com`,
+      testEmail(`cq-pm2-${suffix}`),
       password,
       "pm",
     );
     const devAUser = await createUserWithRole(
-      `cq-dev-a-${suffix}@example.com`,
+      testEmail(`cq-dev-a-${suffix}`),
       password,
       "developer",
     );
     const devBUser = await createUserWithRole(
-      `cq-dev-b-${suffix}@example.com`,
+      testEmail(`cq-dev-b-${suffix}`),
       password,
       "developer",
     );
