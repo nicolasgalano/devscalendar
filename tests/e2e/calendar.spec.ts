@@ -210,6 +210,20 @@ test("the select keeps its label visible and offers 'Todos' first", async ({ pag
   await expect(trigger).toContainText("Desarrollador");
 });
 
+/**
+ * Cierra el desplegable abierto y **espera a que desaparezca de verdad**.
+ *
+ * `getByRole("option")` es global: mientras el popup anterior siga montado —se
+ * cierra con una animación de 120ms— devuelve *sus* opciones. Sin esta espera el
+ * test lee el select equivocado, y el síntoma es desconcertante: pide
+ * desarrolladores y recibe nombres de clientes. Pasaba en una máquina rápida y
+ * fallaba en el runner.
+ */
+async function closeSelect(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("option")).toHaveCount(0);
+}
+
 test("filters are interconnected", async ({ page }) => {
   await page.goto(`/calendar?view=day&date=${mondayOfThisWeek()}`);
 
@@ -217,7 +231,7 @@ test("filters are interconnected", async ({ page }) => {
   await page.getByLabel("Cliente").click();
   await expect(page.getByRole("option", { name: "Acme Corp" })).toBeVisible();
   await expect(page.getByRole("option", { name: "Nimbus SRL" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await closeSelect(page);
 
   // Malena solo tiene reservas de Portal de reservas (Nimbus) ese día, más una
   // pendiente de Website; Rodrigo es el que acota de verdad.
@@ -228,11 +242,12 @@ test("filters are interconnected", async ({ page }) => {
   const clientOptions = await page.getByRole("option").allTextContents();
   // Cristian tiene reservas en los dos clientes; el PM sí se acota.
   expect(clientOptions).toContain("Todos");
-  await page.keyboard.press("Escape");
+  await closeSelect(page);
 
   // El propio filtro de desarrollador sigue ofreciendo a todos: si se acotara a
   // sí mismo, no habría forma de cambiar de dev sin limpiar.
   await page.getByLabel("Desarrollador").click();
+  await expect(page.getByRole("option", { name: "Malena Rojas" })).toBeVisible();
   const devOptions = await page.getByRole("option").allTextContents();
   expect(devOptions).toContain("Malena Rojas");
   expect(devOptions).toContain("Rodrigo Paz");
