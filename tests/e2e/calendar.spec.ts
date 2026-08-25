@@ -205,8 +205,18 @@ test("the select keeps its label visible and offers 'Todos' first", async ({ pag
 
   // El desplegable se abre DEBAJO del trigger, no encima: con el default de
   // Base UI la opción activa se posiciona sobre el trigger y tapa la etiqueta.
-  const firstOptionBox = (await options.first().boundingBox())!;
-  expect(firstOptionBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
+  //
+  // Se reintenta porque `boundingBox()` **no espera animaciones CSS**: el popup
+  // entra con `slide-in-from-top-2`, o sea 8px más arriba de su posición final,
+  // y medirlo a mitad de camino da un valor que no es el que ve el usuario. En
+  // una máquina rápida la animación ya había terminado; en el runner falló por
+  // 1.4px. La aserción sigue siendo estricta — lo que se relaja es *cuándo* se
+  // mide, no cuánto se tolera.
+  await expect(async () => {
+    const firstOptionBox = (await options.first().boundingBox())!;
+    expect(firstOptionBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
+  }).toPass({ timeout: 5_000 });
+
   await expect(trigger).toContainText("Desarrollador");
 });
 
