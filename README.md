@@ -16,18 +16,17 @@ Ver `docs/adr/0001-tech-stack.md` para el detalle y motivo de cada elección.
 # 1. Dependencias
 pnpm install
 
-# 2. Supabase — elegí una opción:
-#    (a) local:  brew install supabase/tap/supabase && supabase start
-#    (b) cloud:  crear el proyecto en supabase.com
-
-# 3. Configurar env vars
+# 2. Configurar env vars
 cp .env.example .env.local
 # Editar .env.local con NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY
+# (dashboard de Supabase → Settings → API). La base vive en la nube: no hace
+# falta Docker. El CLI ya viene como devDependency.
+
+# 3. Enlazar el proyecto
+pnpm exec supabase link --project-ref <ref>
 
 # 4. Aplicar migrations
-pnpm db:push        # cloud
-# ó
-supabase db reset   # local
+pnpm db:push
 
 # 5. Habilitar Google OAuth en el dashboard de Supabase
 #    (Auth → Providers → Google, con credenciales de Google Cloud Console)
@@ -43,16 +42,23 @@ Scripts disponibles: ver la sección "Cómo correr localmente" de `CLAUDE.md`.
 
 ## Tests
 
-```bash
-# Integration (Vitest, contra Supabase local — requiere `supabase start` corriendo
-# y .env.local con NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY)
-pnpm test
+**Estrategia completa: [`docs/testing.md`](docs/testing.md).** Leerla antes de tocar tests, migrations o código que hable con Supabase.
 
-# E2E (Playwright — levanta `pnpm dev` automáticamente si no está corriendo)
-pnpm test:e2e
+En tu máquina corren los unitarios y nada más:
+
+```bash
+pnpm test:unit   # 129 tests, ~4s, sin base y sin credenciales
 ```
 
-Los tests de integración (`tests/integration/`) crean y borran usuarios de prueba vía `auth.admin` en cada corrida — no tocan tu sesión ni tus datos manuales.
+Integración, smoke y E2E necesitan servicios reales (PostgREST y GoTrue, no solo Postgres) y corren **únicamente en CI**, contra un stack efímero de Supabase que se levanta y se descarta dentro del job:
+
+```bash
+pnpm test:integration   # RLS, triggers, constraints
+pnpm test:smoke         # embeds y filtros que solo PostgREST puede confirmar
+pnpm test:e2e           # Playwright, con la app apuntada al stack efímero
+```
+
+`tests/env.ts` rechaza cualquier URL que no sea local, así que **ningún test automático puede escribir en un proyecto alojado**, ni por accidente ni a propósito. El proyecto remoto queda para pruebas manuales; si dejás datos, se limpian por corrida con `node scripts/cleanup-test-data.mjs --run-id=<id>`.
 
 ## Requisitos
 

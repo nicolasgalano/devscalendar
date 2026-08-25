@@ -1,7 +1,9 @@
--- Seed data for local development.
--- Run with: `supabase db reset` (executes this file automatically after migrations).
+-- Seed data for a development database.
+-- Run with: `pnpm db:seed` (pushes migrations and then this file to the linked
+-- project). Every statement is idempotent — `on conflict` throughout — so it is
+-- safe to re-run against a database that already has data.
 --
--- Everything here uses fixed UUIDs so a reset always lands on the same data and
+-- Everything here uses fixed UUIDs so every seed run lands on the same data and
 -- you can hardcode ids while debugging:
 --
 --   …0011/0012 PMs · …0021–0023 developers · …0031/0032 clients
@@ -53,7 +55,7 @@ where id in ('00000000-0000-4000-8000-000000000021',
 
 -- Admin access for the local developer.
 --
--- `supabase db reset` wipes auth.users, so after every reset a real Google
+-- On a database seeded from scratch, auth.users is empty, so a real Google
 -- login lands on /pending-access with no role. Seeding the invite means the
 -- next login self-heals: the `handle_new_user` trigger consumes it and the
 -- profile is born as admin (ADR 0004).
@@ -93,7 +95,7 @@ on conflict (id) do nothing;
 -- ─────────────────────────────────────────────────────────────
 -- 3. Bookings (feature 003-calendar-ui)
 -- ─────────────────────────────────────────────────────────────
--- Anchored to the Monday of the current week, so a reset always lands on a
+-- Anchored to the Monday of the current week, so every seed run lands on a
 -- populated day view without editing dates by hand. Wall-clock times are built
 -- in the client's timezone, which is the one the calendar renders in (Q-10).
 --
@@ -157,16 +159,16 @@ begin
     -- Two back-to-back approved bookings for the same developer. This is the
     -- edge of the anti double-booking constraint (004): tstzrange defaults to
     -- [), so 13:00 closes the first and opens the second without colliding.
-    -- Seeded on Tuesday, away from Monday's fixtures, so `supabase db reset`
-    -- exercises that boundary on every run — if the range type were ever
-    -- changed to [], the reset itself would fail.
+    -- Seeded on Tuesday, away from Monday's fixtures, so every seed run
+    -- exercises that boundary — if the range type were ever changed to [],
+    -- the seed itself would fail.
     ('00000000-0000-4000-8000-00000000005a', proj_website, dev_malena, pm_paula,
      (tuesday + time '09:00') at time zone tz, (tuesday + time '13:00') at time zone tz,
      'approved', 'Refactor del carrito', 'WEB-171'),
     ('00000000-0000-4000-8000-00000000005b', proj_website, dev_malena, pm_paula,
      (tuesday + time '13:00') at time zone tz, (tuesday + time '17:00') at time zone tz,
      'approved', 'Continuación, mismo día', 'WEB-171')
-  -- Idempotent on purpose: re-running the seed without a reset refreshes the
+  -- Idempotent on purpose: re-running the seed refreshes the
   -- dates to the current week instead of failing on the primary key.
   on conflict (id) do update set
     project_id = excluded.project_id,

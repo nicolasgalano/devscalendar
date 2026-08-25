@@ -2,9 +2,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/types/database";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { loadTestEnv } from "../env";
+import { testEmail, testName } from "../run-id";
+
+// El guard vuelve a correr acá, no solo en `setup.ts`: es la única forma de que
+// un archivo que importe estos helpers desde otro proyecto de Vitest herede la
+// misma protección sin acordarse de nada.
+const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceRoleKey: SERVICE_ROLE_KEY } =
+  loadTestEnv();
 
 export function adminClient(): SupabaseClient<Database> {
   return createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -12,9 +17,19 @@ export function adminClient(): SupabaseClient<Database> {
   });
 }
 
+/**
+ * `email` se usa como **etiqueta**, no como dirección final: el email real lo
+ * arma `testEmail()` con el identificador de corrida (`docs/testing.md`). Así la
+ * convención se aplica sola en los ~30 lugares que crean usuarios, sin que cada
+ * test tenga que acordarse.
+ *
+ * Todos los llamadores ya usan el email **devuelto** para iniciar sesión, así
+ * que reescribirlo acá es seguro; pasar el literal original a `signInClient()`
+ * fallaría, y por eso ninguno lo hace.
+ */
 export async function createTestUser(email: string, password: string) {
   const { data, error } = await adminClient().auth.admin.createUser({
-    email,
+    email: testEmail(email),
     password,
     email_confirm: true,
   });
@@ -59,10 +74,11 @@ export async function createUserWithRole(
   return user;
 }
 
+/** El nombre viaja con el prefijo `[test:<runId>]`. Usá el `data` devuelto. */
 export async function createClientRow(name: string) {
   const { data, error } = await adminClient()
     .from("clients")
-    .insert({ name })
+    .insert({ name: testName(name) })
     .select()
     .single();
   if (error) throw error;
@@ -78,7 +94,7 @@ export async function createProjectRow(input: {
   const { data, error } = await adminClient()
     .from("projects")
     .insert({
-      name: input.name,
+      name: testName(input.name),
       client_id: input.clientId,
       pm_id: input.pmId,
       priority: input.priority ?? "normal",

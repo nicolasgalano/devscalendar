@@ -8,7 +8,8 @@ export default defineConfig({
   test: {
     projects: [
       // Pure functions: no DOM, no database, no env. They have to keep running
-      // without a local Supabase — that is the point of splitting the projects.
+      // without any Supabase at all — that is the point of splitting the projects,
+      // and why they are the only level that runs on the dev machine.
       {
         resolve: { alias },
         test: {
@@ -17,7 +18,8 @@ export default defineConfig({
           include: ["tests/unit/**/*.test.ts"],
         },
       },
-      // Against the local Supabase: RLS, triggers and the query layer.
+      // Against the *test* Supabase project (never the dev one — see tests/env.ts):
+      // RLS, triggers and the query layer.
       {
         resolve: { alias },
         test: {
@@ -29,11 +31,27 @@ export default defineConfig({
           hookTimeout: 20_000,
         },
       },
+      // Smoke: lo que solo PostgREST y GoTrue pueden confirmar (embeds, `!inner`,
+      // filtros sobre columnas embebidas, login con contraseña). Proyecto propio
+      // para poder correrlo suelto y para que se lea, en el workflow, como un
+      // nivel distinto del de integración.
+      {
+        resolve: { alias },
+        test: {
+          name: "smoke",
+          environment: "node",
+          include: ["tests/smoke/**/*.test.ts"],
+          setupFiles: ["./tests/integration/setup.ts"],
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+        },
+      },
       // Timing budgets. Outside `pnpm test` on purpose: the integration files
-      // run in parallel against one local Postgres, and under that contention
+      // run in parallel against one Postgres, and under that contention
       // the same query measured 372 ms instead of 69 ms. A timing assertion
       // competing with other tests measures the machine, not the product.
-      // Run with `pnpm test:perf`, alone.
+      // Run with `pnpm test:perf`, alone. Los números se calibraron contra Postgres
+      // local; contra la nube miden latencia de red y hay que recalibrarlos.
       {
         resolve: { alias },
         test: {

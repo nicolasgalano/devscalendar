@@ -1,19 +1,8 @@
-import path from "node:path";
-import { config } from "dotenv";
+import { loadTestEnv } from "../env";
 
-config({ path: path.resolve(__dirname, "../../.env.local") });
-
-const required = [
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-];
-
-for (const key of required) {
-  if (!process.env[key]) {
-    throw new Error(
-      `Missing ${key}. Integration tests need a running local Supabase ` +
-        "(`pnpm exec supabase start`) with `.env.local` populated — see tests/integration/README.md.",
-    );
-  }
-}
+/**
+ * Integración y smoke corren contra el stack efímero de Supabase de CI. El
+ * guard vive en `tests/env.ts` y rechaza cualquier URL que no sea local, que es
+ * lo que impide que la suite le escriba a un proyecto alojado.
+ */
+loadTestEnv();

@@ -16,6 +16,10 @@ dist/
 .env
 .env.local
 .env.*.local
+# Los tests toman sus credenciales del entorno del job, así que este archivo no
+# debería existir. Se ignora igual: `.env.*.local` no lo cubriría, y si alguien
+# lo crea trae una service_role key adentro.
+.env.test
 
 # supabase
 supabase/.branches/

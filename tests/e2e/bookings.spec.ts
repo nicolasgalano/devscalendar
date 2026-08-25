@@ -10,6 +10,7 @@ import {
   seedBooking,
   type TestUser,
 } from "./session";
+import { escapeForRegExp as rx, testName } from "../run-id";
 
 /**
  * El camino de escritura, de punta a punta: alta desde la grilla, edición,
@@ -35,9 +36,12 @@ const SATURDAY = "2027-04-24";
  */
 const AFTER_WRITE = { timeout: 45_000 };
 
+// `testName` agrega el identificador de corrida. Se etiqueta acá y no dentro de
+// las fixtures a propósito: estos nombres se usan también como locators, así que
+// tienen que ser exactamente lo que la app va a mostrar.
 const suffix = randomUUID().slice(0, 8);
-const CLIENT_NAME = `E2E cliente ${suffix}`;
-const PROJECT_NAME = `E2E proyecto ${suffix}`;
+const CLIENT_NAME = testName(`E2E cliente ${suffix}`);
+const PROJECT_NAME = testName(`E2E proyecto ${suffix}`);
 
 let pm: TestUser;
 let dev: TestUser;
@@ -129,7 +133,7 @@ test("a PM creates, edits and cancels a booking", async ({ page }) => {
 
   // AC-1.1: nace pendiente, y el bloque lo dice.
   const block = page.getByRole("button", {
-    name: new RegExp(`${dev.fullName}.*${PROJECT_NAME}.*10:00–13:00.*Pendiente`),
+    name: new RegExp(`${rx(dev.fullName)}.*${rx(PROJECT_NAME)}.*10:00–13:00.*Pendiente`),
   });
   await expect(block).toBeVisible(AFTER_WRITE);
 
@@ -145,7 +149,7 @@ test("a PM creates, edits and cancels a booking", async ({ page }) => {
   await editDialog.getByRole("button", { name: "Guardar cambios" }).click();
 
   const edited = page.getByRole("button", {
-    name: new RegExp(`${dev.fullName}.*${PROJECT_NAME}.*10:00–12:00`),
+    name: new RegExp(`${rx(dev.fullName)}.*${rx(PROJECT_NAME)}.*10:00–12:00`),
   });
   await expect(edited).toBeVisible(AFTER_WRITE);
 
@@ -250,7 +254,7 @@ test("warns about a Saturday and about hours, without blocking the save", async 
 
   await expect(
     page.getByRole("button", {
-      name: new RegExp(`${dev.fullName}.*${PROJECT_NAME}.*19:00–21:00`),
+      name: new RegExp(`${rx(dev.fullName)}.*${rx(PROJECT_NAME)}.*19:00–21:00`),
     }),
   ).toBeVisible(AFTER_WRITE);
 });

@@ -1,14 +1,18 @@
-import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import type { BrowserContext } from "@playwright/test";
 
-config({ path: path.resolve(__dirname, "../../.env.local") });
+import { loadTestEnv } from "../env";
+import { testEmail, testName } from "../run-id";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Stack efímero de CI, nunca un proyecto alojado: acá abajo se crean y se
+// borran usuarios de auth con la service_role key. El guard está en
+// `tests/env.ts` y rechaza cualquier URL que no sea local.
+const {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY,
+  serviceRoleKey: SERVICE_ROLE_KEY,
+} = loadTestEnv();
 
 type Role = "admin" | "pm" | "developer";
 
@@ -29,11 +33,14 @@ function serviceClient() {
 export async function createUser(role: Role): Promise<TestUser> {
   const admin = serviceClient();
   const id = randomUUID();
-  const email = `e2e-${role}-${id}@example.com`;
+  // Identificador de corrida + uuid: lo primero identifica los registros como
+  // datos de prueba, lo segundo evita que dos archivos que corren en paralelo
+  // dentro de la misma corrida se pisen.
+  const email = testEmail(`e2e-${role}-${id}`);
   const password = `E2e-password-${id}!`;
   // Único: los tests corren en paralelo y varios crean un PM a la vez, así que
   // un nombre compartido vuelve ambiguos los locators por texto.
-  const fullName = `QA ${role} ${id.slice(0, 8)}`;
+  const fullName = testName(`QA ${role} ${id.slice(0, 8)}`);
 
   const { data, error } = await admin.auth.admin.createUser({
     email,

@@ -56,7 +56,10 @@ devscalendar/
 ├── postcss.config.mjs                # Tailwind v4 (sin tailwind.config.ts)
 ├── playwright.config.ts
 ├── vitest.config.ts
-├── .env.example                      # variables requeridas
+├── .env.example                      # variables requeridas (desarrollo)
+├── .github/workflows/tests.yml       # CI: stack efímero de Supabase + toda la suite
+├── scripts/
+│   └── cleanup-test-data.mjs         # limpieza por runId de pruebas manuales
 ├── src/
 │   ├── app/                          # rutas Next.js App Router
 │   │   ├── layout.tsx                # fuentes + ThemeProvider
@@ -93,16 +96,21 @@ devscalendar/
 │   └── types/
 │       └── database.ts               # generado; regenerar con `pnpm db:types`
 ├── supabase/
-│   ├── config.toml                   # `supabase start` local
+│   ├── config.toml                   # solo para `supabase start`; ya no se usa
 │   ├── migrations/                   # SQL versionado
 │   └── seed.sql
 ├── tests/
-│   ├── unit/                         # Vitest sin DB ni DOM (funciones puras)
-│   ├── integration/                  # Vitest contra el Supabase local (RLS, triggers)
+│   ├── env.ts                        # guard: solo stack local; nunca un proyecto remoto
+│   ├── run-id.ts                     # identificador por corrida y convenciones de nombres
+│   ├── unit/                         # sin DB: funciones puras + Supabase mockeado
+│   │   └── helpers/supabase-mock.ts  # doble del cliente
+│   ├── smoke/                        # contrato con PostgREST y GoTrue (solo CI)
+│   ├── integration/                  # RLS, triggers y constraints (solo CI)
 │   ├── perf/                         # presupuestos de tiempo; corren aislados
-│   └── e2e/                          # Playwright
+│   └── e2e/                          # Playwright (solo CI)
 ├── specs/                            # SDD harness (spec/plan/tasks por feature)
 └── docs/
+    ├── testing.md                    # estrategia de testing — leer antes de tocar tests
     └── adr/                          # architecture decision records
 ```
 
@@ -112,14 +120,17 @@ devscalendar/
 
 Antes del primer run necesitás:
 
+**La base vive en Supabase Cloud. No hace falta Docker ni `supabase start`.** El CLI viene como devDependency: se invoca `pnpm exec supabase`, nunca instalado a mano.
+
 1. **Instalar deps:** `pnpm install`.
-2. **Configurar Supabase.** Dos opciones:
-   - **Local (recomendado para dev):** instalar Supabase CLI (`brew install supabase/tap/supabase`), después `supabase start`. Guardar la anon key impresa en `.env.local`.
-   - **Cloud:** crear proyecto en supabase.com, copiar URL + anon key en `.env.local`.
-3. **Aplicar migrations:** `pnpm db:push` (o `supabase db reset` si es local).
-4. **Habilitar Google OAuth:** en Supabase dashboard → Auth → Providers → Google. Cargar client id + secret de Google Cloud Console. Agregar la redirect URI que Supabase indica al proyecto de Google.
-5. **Generar types:** `pnpm db:types`.
-6. **Arrancar Next.js:** `pnpm dev`.
+2. **Credenciales de desarrollo:** copiar `.env.example` a `.env.local` y completar URL + anon key del proyecto (dashboard → Settings → API).
+3. **Enlazar el proyecto:** `pnpm exec supabase link --project-ref <ref>`. Sin esto, `db:push` y `db:types` no tienen a dónde ir.
+4. **Aplicar migrations:** `pnpm db:push`.
+5. **Habilitar Google OAuth:** en Supabase dashboard → Auth → Providers → Google. Cargar client id + secret de Google Cloud Console. Agregar la redirect URI que Supabase indica al proyecto de Google.
+6. **Generar types:** `pnpm db:types`.
+7. **Arrancar Next.js:** `pnpm dev`.
+
+Ese proyecto es **solo de desarrollo**, para trabajar y probar a mano. Los tests automáticos no lo tocan nunca: corren contra un stack efímero en CI. Ver "Tests y bases de datos" más abajo.
 
 Scripts útiles:
 
@@ -128,24 +139,46 @@ Scripts útiles:
 - `pnpm typecheck` — `tsc --noEmit`.
 - `pnpm lint` — ESLint.
 - `pnpm format` — Prettier.
-- `pnpm test` — unitarios + integración (Vitest).
-- `pnpm test:unit` — solo los unitarios; **no necesitan Supabase levantado**.
-- `pnpm test:integration` — solo los que van contra el Supabase local.
-- `pnpm test:perf` — presupuestos de tiempo. Quedan fuera de `pnpm test` a propósito: corriendo en paralelo con el resto, la misma query medía 372 ms en vez de 69, así que la aserción mediría la máquina y no el producto. Correrlos solos.
-- `pnpm test:e2e` — E2E (Playwright); levanta `pnpm dev` solo si no hay uno corriendo.
-- `pnpm db:push` — aplica migrations al Supabase enlazado.
-- `pnpm db:reset` — recrea la DB local desde las migrations + `seed.sql`.
-- `pnpm db:types` — regenera `src/types/database.ts`.
+- `pnpm test:unit` — **lo único que corre en tu máquina**: sin base, sin credenciales, con Supabase mockeado.
+- `pnpm test` — unitarios + integración. Los de integración necesitan el stack efímero, así que en la práctica esto es un comando de CI.
+- `pnpm test:integration` — RLS, triggers y constraints contra el stack efímero.
+- `pnpm test:smoke` — lo que solo PostgREST y GoTrue pueden confirmar: embeds, `!inner`, filtros sobre columnas embebidas.
+- `pnpm test:e2e` — Playwright; levanta su propio `pnpm dev` en el **puerto 3100** apuntado al stack efímero.
+- `pnpm test:perf` — presupuestos de tiempo. Fuera de `pnpm test` y fuera de CI: corriendo en paralelo con el resto, la misma query medía 372 ms en vez de 69, así que la aserción mediría la máquina y no el producto. **Sus números se calibraron contra Postgres local y hay que recalibrarlos.**
+- `node scripts/cleanup-test-data.mjs --run-id=<id>` — limpieza quirúrgica de una prueba manual sobre el proyecto remoto.
+- `pnpm db:push` — aplica migrations al proyecto enlazado.
+- `pnpm db:seed` — migrations + `seed.sql` al proyecto enlazado. El seed es idempotente (`on conflict` en todos los inserts), así que se puede repetir.
+- `pnpm db:types` — regenera `src/types/database.ts` desde el proyecto enlazado.
+
+> **No existe `db:reset`, y es a propósito.** `supabase db reset` recrea la base **local**, que ya no usamos; el arreglo aparente es agregarle `--linked`, y eso **borra la base de la nube entera**. Si necesitás datos de cero, es `db:seed` sobre una base vacía, o recrear el proyecto desde el dashboard.
 
 > **No corras `pnpm build` con `pnpm dev` levantado.** El build reescribe `.next/` y el dev server queda sirviendo un manifiesto viejo: los chunks dan 404, la página pierde los estilos y React no hidrata (los botones dejan de responder sin ningún error visible). Si pasa: parar el dev server, `rm -rf .next`, y volver a arrancar.
 
 > **Si ves 404 en todos los chunks, revisá que no haya un dev server zombi.** Matar la tarea de `pnpm dev` puede dejar vivo el proceso `next dev` hijo. El síntoma es traicionero: el zombi sigue ocupando el 3000 y sirviendo HTML, el `pnpm dev` nuevo se va sin avisar a otro puerto (`Port 3000 is in use, using 3003 instead`), y el que responde en el 3000 sirve un `.next` que ya no existe — 404 en todo el JS, cero hidratación, y ningún error de servidor. Diagnóstico y arreglo:
 >
 > ```bash
-> netstat -ano | grep LISTENING | grep ":300"   # ver quién ocupa cada puerto
-> taskkill //PID <pid> //F                      # matar cada zombi
-> rm -rf .next && pnpm dev                      # arrancar uno solo
+> netstat -ano | grep LISTENING | grep -E ":3(00|10)"  # 3000 dev · 3100 tests
+> taskkill //PID <pid> //F                              # matar cada zombi
+> rm -rf .next && pnpm dev                              # arrancar uno solo
 > ```
+>
+> Con los E2E en el 3100 hay **dos** servidores legítimos posibles a la vez, así que revisá los dos rangos antes de matar nada.
+
+---
+
+## Tests y bases de datos
+
+> **Leé `docs/testing.md` antes de tocar tests, migrations o cualquier código que hable con Supabase.** Acá va solo lo obligatorio.
+
+- **No se ejecuta Supabase ni Docker localmente.** La máquina de desarrollo no da RAM ni disco. En los runners de CI sí se usan.
+- **Ningún test automático corre contra un proyecto remoto ni contra producción.** `tests/env.ts` rechaza cualquier URL que no sea local, y por eso los tests toman las credenciales del entorno del job, nunca de `.env.local`.
+- **Los tests unitarios mockean Supabase** (`tests/unit/helpers/supabase-mock.ts`) y no tocan ninguna base. Son los únicos que corren en tu máquina: `pnpm test:unit`.
+- **Integración, smoke y E2E usan el stack efímero de Supabase en CI**, que se levanta y se descarta dentro del job. No se pueden correr local, y está bien que así sea.
+- **Los mocks no reemplazan tests de integración.** Una policy de RLS o un embed de PostgREST verificados contra un mock no están verificados.
+- **No se agregan campos de testing al esquema productivo.** Los datos de prueba se identifican por convención sobre campos existentes (`[test:<runId>]`, `test-<runId>-…@example.com`); ver `tests/run-id.ts`.
+- **El proyecto remoto es solo para pruebas manuales.** Si dejás datos, limpialos con `node scripts/cleanup-test-data.mjs --run-id=<id>`, que exige el identificador y borra únicamente esa corrida. Nunca limpiezas globales ni truncados.
+- **No existe `db:reset`, y es a propósito:** resetear apuntando a un proyecto alojado borra la base entera.
+- Antes de dar un cambio por terminado: `pnpm typecheck`, `pnpm lint` y `pnpm test:unit`. El resto lo verifica CI.
 
 ---
 

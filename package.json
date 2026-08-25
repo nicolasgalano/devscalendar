@@ -12,14 +12,16 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:types": "supabase gen types typescript --linked > src/types/database.ts",
-    "db:push": "supabase db push",
-    "db:reset": "supabase db reset",
+    "db:push": "supabase db push --linked",
+    "db:seed": "supabase db push --linked --include-seed",
     "test": "vitest run --project unit --project integration",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
+    "test:smoke": "vitest run --project smoke",
     "test:perf": "vitest run --project perf",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "cleanup:test-data": "node scripts/cleanup-test-data.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

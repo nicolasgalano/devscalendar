@@ -9,6 +9,7 @@ import {
   deleteUser,
   type TestUser,
 } from "./session";
+import { testEmail, testName } from "../run-id";
 
 /**
  * Los botones se renderizan en el servidor pero el handler recién se engancha
@@ -27,10 +28,12 @@ async function openDialog(page: Page, buttonName: string) {
  * proyecto sobre ese cliente y un usuario, y los ve listados.
  */
 test.describe("admin entity management", () => {
+  // Etiquetados con el identificador de corrida: acá los nombres se tipean en
+  // el formulario, así que lo que crea la app es exactamente esta constante.
   const suffix = randomUUID().slice(0, 8);
-  const clientName = `E2E Cliente ${suffix}`;
-  const projectName = `E2E Proyecto ${suffix}`;
-  const invitedEmail = `e2e-invited-${suffix}@example.com`;
+  const clientName = testName(`E2E Cliente ${suffix}`);
+  const projectName = testName(`E2E Proyecto ${suffix}`);
+  const invitedEmail = testEmail(`invited-${suffix}`);
 
   let admin: TestUser;
   let pm: TestUser;

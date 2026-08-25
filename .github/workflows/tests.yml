@@ -1,0 +1,189 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Una corrida por rama: si pusheás tres veces seguidas, solo la última importa.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.0"
+  # Fijada a propósito: el CLI cambia el formato de `supabase status` y los
+  # nombres de sus contenedores entre versiones, y este workflow depende de los
+  # dos. Coincide con la devDependency `supabase` del package.json.
+  SUPABASE_CLI_VERSION: "2.110.0"
+
+jobs:
+  # Sin base de datos y en segundos. Job aparte para que un error de tipos o de
+  # una función pura se sepa enseguida, sin esperar a que levante el stack.
+  static:
+    name: Tipos, lint y unitarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+
+      # Sin Supabase, sin Docker y sin credenciales: es el nivel que también se
+      # corre en la máquina de desarrollo.
+      - run: pnpm test:unit
+
+  # Todo lo que necesita servicios reales. El stack vive y muere con el job.
+  database:
+    name: Integración, smoke y E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # `config.toml` tiene el proveedor de Google en `enabled = true` y lo
+      # referencia con `env(...)`: sin estas variables el stack no arranca. Van
+      # en dummy porque las fixtures entran con email y contraseña, nunca por
+      # OAuth — el proveedor solo tiene que existir, no funcionar.
+      SUPABASE_AUTH_GOOGLE_CLIENT_ID: ci-dummy-client-id
+      SUPABASE_AUTH_GOOGLE_SECRET: ci-dummy-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # Solo lo que los tests usan de verdad: Postgres, Kong (el gateway que
+      # publica /rest/v1 y /auth/v1), PostgREST y GoTrue. Se queda también
+      # mailpit, que es liviano y le evita a GoTrue un SMTP inexistente.
+      #
+      # Studio, Storage, imgproxy, Realtime, Edge Runtime, Supavisor y el par
+      # logflare/vector no participan de ningún test y son la mayor parte del
+      # tiempo de arranque y de la RAM del runner.
+      - name: Levantar el stack mínimo de Supabase
+        run: |
+          supabase start \
+            -x studio,storage-api,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+
+      # `supabase start` ya espera health checks, pero esto se verifica igual:
+      # si un servicio excluido resultara necesario, el fallo tiene que salir
+      # acá y no como una suite entera en rojo quince minutos después.
+      - name: Verificar que Postgres, PostgREST y GoTrue respondan
+        run: |
+          set -euo pipefail
+
+          wait_for() {
+            local name="$1" cmd="$2" tries=30
+            until eval "$cmd" >/dev/null 2>&1; do
+              tries=$((tries - 1))
+              if [ "$tries" -le 0 ]; then
+                echo "::error::$name no respondió a tiempo"
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "$name OK"
+          }
+
+          wait_for "Postgres"  "pg_isready -h 127.0.0.1 -p 54322 -U postgres"
+          wait_for "GoTrue"    "curl -fsS http://127.0.0.1:54321/auth/v1/health"
+          wait_for "PostgREST" "curl -fsS -o /dev/null http://127.0.0.1:54321/rest/v1/"
+
+      # Explícito aunque `supabase start` ya las aplica: reconstruye la base
+      # desde cero con las migrations versionadas más `seed.sql`, así que
+      # verifica de paso que las migrations levanten una base limpia sin
+      # depender de un estado previo.
+      - name: Aplicar migrations y seed desde cero
+        run: supabase db reset --local
+
+      # Las claves salen del stack recién levantado y se exponen solo como
+      # variables del job. `add-mask` las tacha en los logs: aunque un paso
+      # futuro las imprima por accidente, no quedan en el registro de la
+      # corrida. Ninguna credencial del proyecto remoto entra acá.
+      - name: Exportar credenciales del stack efímero
+        run: |
+          set -euo pipefail
+          supabase status -o env > /tmp/supabase-status.env
+
+          read_var() {
+            grep "^$1=" /tmp/supabase-status.env | head -1 | cut -d= -f2- | tr -d '"'
+          }
+
+          API_URL="$(read_var API_URL)"
+          ANON_KEY="$(read_var ANON_KEY)"
+          SERVICE_ROLE_KEY="$(read_var SERVICE_ROLE_KEY)"
+
+          if [ -z "$API_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
+            echo "::error::No se pudieron leer las credenciales del stack efímero"
+            exit 1
+          fi
+
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+          rm -f /tmp/supabase-status.env
+          echo "Stack efímero en $API_URL"
+
+      - name: Tests de integración
+        run: pnpm test:integration
+
+      - name: Suite smoke contra PostgREST y GoTrue
+        run: pnpm test:smoke
+
+      - name: Instalar Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Playwright levanta su propio `next dev` en el 3100 y le inyecta estas
+      # mismas credenciales (ver `playwright.config.ts`), así que el navegador y
+      # las fixtures comparten la base efímera.
+      - name: E2E
+        run: pnpm test:e2e
+
+      - name: Guardar diagnóstico de Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # `always()`: el stack se descarta aunque algún test falle o el job se
+      # cancele. Es la garantía final de aislamiento — más fuerte que cualquier
+      # limpieza por test, porque no depende de que un `afterAll` llegue a
+      # correr.
+      - name: Descartar el stack
+        if: always()
+        run: supabase stop --no-backup
