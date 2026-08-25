@@ -16,10 +16,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
   - Columnas `response_note text` y `responded_at timestamptz`, ambas nullable.
   - Policy `bookings: developer responds` (`plan.md` §3.2).
   - **Guard de columnas dentro de `enforce_booking_status_transition()`**, extendiendo la función de `004` en vez de agregar un trigger nuevo: dos triggers `before update` sobre la misma tabla se ejecutan por orden alfabético de nombre, y hacer depender una regla de seguridad de eso es pedirla prestada al azar.
-  - _DoD: `pnpm db:push` aplica limpio **sobre el proyecto de tests primero** —que es el descartable— y recién después sobre el de desarrollo; T3.2 en verde._
+  - _DoD: **CI primero** — el job `database` reconstruye la base desde cero (`supabase db reset --local`) y T3.2 queda en verde. Recién con el PR verde se aplica al proyecto remoto con `pnpm db:push`. Ver `docs/testing.md` §8: una migration rota tiene que descubrirse contra una base descartable, no contra la de desarrollo._
 - [ ] **T1.2** — Trigger `bookings_log_status_change` → `audit_log` (`plan.md` §3.4). Mismo patrón que `projects_log_priority_change`: `security definer`, sin `grant insert` para nadie. _DoD: T3.5._
 - [ ] **T1.3** — `pnpm db:types`. _DoD: `pnpm typecheck` limpio._
-- [ ] **T1.4** — Ampliar `seed.sql` con reservas pendientes del dev del seed, para que la bandeja tenga contenido apenas se levanta el entorno. Mantener la idempotencia (`on conflict`), que ahora es requisito y no comodidad: sin `db:reset`, el seed se corre sobre una base que ya tiene datos. _DoD: `pnpm db:seed` deja al menos tres pendientes de fechas distintas, y correrlo dos veces seguidas no falla ni duplica._
+- [ ] **T1.4** — Ampliar `seed.sql` con reservas pendientes del dev del seed, para que la bandeja tenga contenido apenas se levanta el entorno. Mantener la idempotencia (`on conflict`), que ahora es requisito y no comodidad: el seed se corre sobre bases que ya tienen datos. _DoD: el stack efímero de CI queda con al menos tres pendientes de fechas distintas, y `pnpm db:seed` sobre el proyecto remoto corrido dos veces seguidas no falla ni duplica._
 
 ## Phase 2 — Reglas y API
 
