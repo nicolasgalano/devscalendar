@@ -8,11 +8,7 @@ import { testEmail, testName } from "../run-id";
 // Stack efímero de CI, nunca un proyecto alojado: acá abajo se crean y se
 // borran usuarios de auth con la service_role key. El guard está en
 // `tests/env.ts` y rechaza cualquier URL que no sea local.
-const {
-  url: SUPABASE_URL,
-  anonKey: ANON_KEY,
-  serviceRoleKey: SERVICE_ROLE_KEY,
-} = loadTestEnv();
+const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceRoleKey: SERVICE_ROLE_KEY } = loadTestEnv();
 
 type Role = "admin" | "pm" | "developer";
 
@@ -75,8 +71,7 @@ export async function authenticate(context: BrowserContext, user: TestUser) {
   if (error || !data.session) throw error ?? new Error("signIn returned no session");
 
   const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
-  const value =
-    "base64-" + Buffer.from(JSON.stringify(data.session), "utf8").toString("base64url");
+  const value = "base64-" + Buffer.from(JSON.stringify(data.session), "utf8").toString("base64url");
 
   await context.addCookies([
     {
@@ -145,21 +140,49 @@ export async function createProjectFor(
   return { clientId: client.id, projectId: project.id };
 }
 
-/** Reserva sembrada con service_role, para estados que la API no deja crear. */
+/**
+ * Reserva sembrada con service_role, para estados que la API no deja crear.
+ *
+ * Devuelve el id: `005` necesita mover una reserva por debajo del navegador
+ * para provocar la carrera entre la edición del PM y la respuesta del dev.
+ */
 export async function seedBooking(booking: {
   projectId: string;
   devId: string;
   startsAt: string;
   endsAt: string;
   status?: "pending" | "approved";
-}) {
-  const { error } = await serviceClient().from("bookings").insert({
-    project_id: booking.projectId,
-    dev_id: booking.devId,
-    starts_at: booking.startsAt,
-    ends_at: booking.endsAt,
-    status: booking.status ?? "approved",
-  });
+  note?: string;
+}): Promise<string> {
+  const { data, error } = await serviceClient()
+    .from("bookings")
+    .insert({
+      project_id: booking.projectId,
+      dev_id: booking.devId,
+      starts_at: booking.startsAt,
+      ends_at: booking.endsAt,
+      status: booking.status ?? "approved",
+      note: booking.note ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+/**
+ * Mueve una reserva sin pasar por el navegador, para simular al PM editándola
+ * mientras el desarrollador la mira (`005` R-2).
+ *
+ * Va por `service_role` a propósito: lo que el test necesita es que `updated_at`
+ * avance, no ejercitar el camino de escritura del PM — eso ya lo cubre
+ * `bookings.spec.ts`.
+ */
+export async function moveBooking(bookingId: string, times: { startsAt: string; endsAt: string }) {
+  const { error } = await serviceClient()
+    .from("bookings")
+    .update({ starts_at: times.startsAt, ends_at: times.endsAt })
+    .eq("id", bookingId);
   if (error) throw error;
 }
 

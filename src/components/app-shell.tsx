@@ -7,6 +7,7 @@ import {
   Building2Icon,
   CalendarDaysIcon,
   FolderKanbanIcon,
+  InboxIcon,
   LogOutIcon,
   MenuIcon,
   PanelLeftIcon,
@@ -16,6 +17,7 @@ import {
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import type { UserRole } from "@/lib/bookings/permissions";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
@@ -40,6 +42,21 @@ const ADMIN_NAV: NavGroup = {
 };
 
 /**
+ * `005` T4.1 — la bandeja es del desarrollador y de nadie más, así que su item
+ * aparece solo con ese rol. El guard real vive en `(app)/inbox/layout.tsx`:
+ * esconder el link no es una autorización, es no ofrecer un camino que después
+ * rebota.
+ *
+ * El badge con la cantidad de pendientes es de `010`: saber cuántas hay sin
+ * entrar ya es media notificación, y las notificaciones se difirieron enteras.
+ */
+const DEVELOPER_NAV_ITEM: NavItem = {
+  href: "/inbox",
+  label: "Pendientes",
+  Icon: InboxIcon,
+};
+
+/**
  * DESIGN.md §7: el item activo se determina por coincidencia de segmento, no por
  * igualdad exacta — `/admin/projects/42` mantiene activo `Proyectos`.
  * `/` es la excepción: solo coincide de forma exacta.
@@ -60,15 +77,24 @@ function labelForPath(pathname: string, nav: NavGroup[]) {
 
 export function AppShell({
   children,
-  isAdmin,
+  role,
   userLabel,
 }: {
   children: React.ReactNode;
-  isAdmin: boolean;
+  /** Pasa el rol entero y no un `isAdmin`: con `005` ya son dos los que abren
+   *  navegación propia, y un booleano por rol se multiplica con cada feature. */
+  role: UserRole;
   userLabel: string;
 }) {
   const pathname = usePathname();
-  const nav = isAdmin ? [...BASE_NAV, ADMIN_NAV] : BASE_NAV;
+  const nav: NavGroup[] = [
+    {
+      label: null,
+      items:
+        role === "developer" ? [...BASE_NAV[0]!.items, DEVELOPER_NAV_ITEM] : BASE_NAV[0]!.items,
+    },
+    ...(role === "admin" ? [ADMIN_NAV] : []),
+  ];
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -98,13 +124,13 @@ export function AppShell({
           type="button"
           aria-label="Cerrar navegación"
           onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-foreground/20 lg:hidden"
+          className="bg-foreground/20 fixed inset-0 z-40 lg:hidden"
         />
       )}
 
       <aside
         className={cn(
-          "z-50 flex shrink-0 flex-col border-r border-border bg-sidebar",
+          "border-border bg-sidebar z-50 flex shrink-0 flex-col border-r",
           mounted && "transition-[width]",
           collapsed ? "w-14" : "w-60",
           // Drawer por debajo de 1024px.
@@ -114,13 +140,13 @@ export function AppShell({
       >
         <div
           className={cn(
-            "flex h-12 shrink-0 items-center border-b border-border",
+            "border-border flex h-12 shrink-0 items-center border-b",
             collapsed ? "justify-center px-2" : "px-3",
           )}
         >
           <Link
             href="/"
-            className="truncate rounded-md text-emphasis font-medium outline-none focus-visible:outline-2 focus-visible:outline-ring"
+            className="text-emphasis focus-visible:outline-ring truncate rounded-md font-medium outline-none focus-visible:outline-2"
           >
             {collapsed ? "DC" : "DevsCalendar"}
           </Link>
@@ -130,7 +156,7 @@ export function AppShell({
           {nav.map((group) => (
             <div key={group.label ?? "root"} className="mb-4 last:mb-0">
               {group.label && !collapsed && (
-                <p className="px-2 pb-1 text-caption font-medium text-muted-foreground">
+                <p className="text-caption text-muted-foreground px-2 pb-1 font-medium">
                   {group.label}
                 </p>
               )}
@@ -144,11 +170,11 @@ export function AppShell({
                         aria-current={active ? "page" : undefined}
                         title={collapsed ? label : undefined}
                         className={cn(
-                          "relative flex h-8 items-center gap-2 rounded-md px-2 text-ui outline-none",
-                          "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                          "text-ui relative flex h-8 items-center gap-2 rounded-md px-2 outline-none",
+                          "focus-visible:outline-ring focus-visible:outline-2 focus-visible:-outline-offset-2",
                           collapsed && "justify-center px-0",
                           active
-                            ? "bg-surface-active font-medium text-primary"
+                            ? "bg-surface-active text-primary font-medium"
                             : "text-secondary-foreground hover:bg-surface-hover hover:text-foreground",
                         )}
                       >
@@ -156,7 +182,7 @@ export function AppShell({
                         {active && (
                           <span
                             aria-hidden="true"
-                            className="absolute inset-y-1 left-0 w-0.5 bg-primary"
+                            className="bg-primary absolute inset-y-1 left-0 w-0.5"
                           />
                         )}
                         <Icon aria-hidden="true" className="size-4 shrink-0" />
@@ -170,7 +196,7 @@ export function AppShell({
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-border p-2">
+        <div className="border-border shrink-0 border-t p-2">
           <Button
             variant="ghost"
             size={collapsed ? "icon-sm" : "sm"}
@@ -185,7 +211,7 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+        <header className="border-border bg-background sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -197,22 +223,17 @@ export function AppShell({
           </Button>
 
           <nav aria-label="Ubicación" className="min-w-0 flex-1">
-            <p className="truncate text-ui text-muted-foreground">
+            <p className="text-ui text-muted-foreground truncate">
               {currentLabel ?? "DevsCalendar"}
             </p>
           </nav>
 
-          <span className="hidden truncate text-caption text-muted-foreground sm:block">
+          <span className="text-caption text-muted-foreground hidden truncate sm:block">
             {userLabel}
           </span>
           <ThemeToggle />
           <form action="/auth/signout" method="post">
-            <Button
-              type="submit"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Cerrar sesión"
-            >
+            <Button type="submit" variant="ghost" size="icon-sm" aria-label="Cerrar sesión">
               <LogOutIcon aria-hidden="true" />
             </Button>
           </form>

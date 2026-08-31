@@ -1,15 +1,10 @@
 import Link from "next/link";
 
-import {
-  BookingActionsProvider,
-  CreateBookingButton,
-} from "@/components/calendar/booking-actions";
+import { BookingActionsProvider, CreateBookingButton } from "@/components/calendar/booking-actions";
+import { BookingResponseProvider } from "@/components/calendar/booking-response";
 import { bookingStatusLabel } from "@/components/calendar/booking-status";
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
-import {
-  CalendarPendingProvider,
-  CalendarResults,
-} from "@/components/calendar/calendar-pending";
+import { CalendarPendingProvider, CalendarResults } from "@/components/calendar/calendar-pending";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { DayView } from "@/components/calendar/day-view";
 import { MonthView } from "@/components/calendar/month-view";
@@ -106,9 +101,7 @@ export default async function CalendarPage({
   // Ya resuelto y memorizado por el layout del route group: acá no cuesta otro
   // round trip al servidor de auth (ver `lib/supabase/session.ts`).
   const profile = await getCurrentProfile();
-  const viewer: BookingViewer | null = profile
-    ? { id: profile.id, role: profile.role }
-    : null;
+  const viewer: BookingViewer | null = profile ? { id: profile.id, role: profile.role } : null;
 
   const [content, facets, options] = await Promise.all([
     params.view === "day"
@@ -120,20 +113,29 @@ export default async function CalendarPage({
 
   return (
     <BookingActionsProvider viewer={viewer} options={options} params={params} tz={TIMEZONE}>
-      <PageHeader
-        title="Calendario"
-        description="Reservas de tiempo de los desarrolladores sobre cada proyecto."
-        // DESIGN.md §7: con la vista vacía la acción primaria se muda al empty
-        // state, para que no haya dos botones primarios en pantalla.
-        action={content.state === "empty" ? undefined : <CreateBookingButton />}
-      />
-      <CalendarToolbar params={params} today={today} tz={TIMEZONE} />
-      {/* Filtros y resultados comparten una sola transición, para que al
+      {/*
+        `005` T4.5: el desarrollador asignado responde desde el popover del
+        bloque, así que sus diálogos también tienen que vivir por encima de la
+        grilla. Provider aparte del de `004` y no una fusión: son dos permisos
+        distintos —el PM administra, el dev se compromete— y la bandeja usa
+        este solo, sin arrastrar el formulario de alta.
+      */}
+      <BookingResponseProvider params={params} tz={TIMEZONE}>
+        <PageHeader
+          title="Calendario"
+          description="Reservas de tiempo de los desarrolladores sobre cada proyecto."
+          // DESIGN.md §7: con la vista vacía la acción primaria se muda al empty
+          // state, para que no haya dos botones primarios en pantalla.
+          action={content.state === "empty" ? undefined : <CreateBookingButton />}
+        />
+        <CalendarToolbar params={params} today={today} tz={TIMEZONE} />
+        {/* Filtros y resultados comparten una sola transición, para que al
           filtrar la pantalla dé señal en vez de quedarse quieta. */}
-      <CalendarPendingProvider>
-        <CalendarFilters params={params} facets={facets} />
-        <CalendarResults>{content.node}</CalendarResults>
-      </CalendarPendingProvider>
+        <CalendarPendingProvider>
+          <CalendarFilters params={params} facets={facets} />
+          <CalendarResults>{content.node}</CalendarResults>
+        </CalendarPendingProvider>
+      </BookingResponseProvider>
     </BookingActionsProvider>
   );
 
@@ -196,7 +198,10 @@ export default async function CalendarPage({
    */
   async function emptyOrNoResults(): Promise<ViewContent> {
     if (hasActiveFilters(params.filters)) {
-      const applied = describeFilters(params, await getSelectedFilterNames(supabase, params.filters));
+      const applied = describeFilters(
+        params,
+        await getSelectedFilterNames(supabase, params.filters),
+      );
       return {
         state: "no-results",
         node: (

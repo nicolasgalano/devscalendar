@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FlagIcon } from "lucide-react";
 
 import { useBookingActions } from "@/components/calendar/booking-actions";
+import { useBookingResponse } from "@/components/calendar/booking-response";
 import { BookingStatusTag, bookingStatusLabel } from "@/components/calendar/booking-status";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +32,11 @@ export type BookingBlockProps = {
   tz: string;
   /** Whether the viewer may edit or cancel this booking (admin, or its PM). */
   canManage: boolean;
+  /**
+   * Whether the viewer is the assigned developer and the booking is still
+   * pending — the only combination that gets `Aprobar` / `Rechazar` (`005`).
+   */
+  canRespond: boolean;
 };
 
 /**
@@ -54,8 +60,11 @@ export function BookingBlock({
   colorKey,
   tz,
   canManage,
+  canRespond,
 }: BookingBlockProps) {
   const { editBooking, cancelBooking } = useBookingActions();
+  const { approve, reject, busyId } = useBookingResponse();
+  const responding = busyId === booking.id;
   // El popover se controla para poder cerrarlo antes de abrir el diálogo: si se
   // quedara abierto, el foco volvería a un bloque que está tapado por el modal.
   const [open, setOpen] = useState(false);
@@ -83,8 +92,8 @@ export function BookingBlock({
         className={cn(
           "absolute overflow-hidden rounded-md border-l-2 px-1.5 py-1 text-left outline-none",
           "cursor-pointer transition-[box-shadow,opacity]",
-          "hover:ring-1 hover:ring-foreground/15",
-          "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+          "hover:ring-foreground/15 hover:ring-1",
+          "focus-visible:outline-ring focus-visible:outline-2 focus-visible:-outline-offset-2",
           categoryClasses(colorKey),
           // DESIGN.md §2, condition 2: attention signals have to read *above*
           // the categorical hue. The left rule switches from the project's
@@ -133,11 +142,11 @@ export function BookingBlock({
             <span className="flex items-center gap-1">
               {/* AC-2.3: priority reads as an icon too, never as colour alone. */}
               {isHighPriority && (
-                <FlagIcon aria-hidden="true" className="size-3 shrink-0 text-priority-high" />
+                <FlagIcon aria-hidden="true" className="text-priority-high size-3 shrink-0" />
               )}
               <span
                 className={cn(
-                  "truncate text-caption font-medium",
+                  "text-caption truncate font-medium",
                   isCancelled ? "text-muted-foreground line-through" : "text-foreground",
                 )}
               >
@@ -154,13 +163,13 @@ export function BookingBlock({
                 iconOnly
                 className="shrink-0 [&_svg]:size-3"
               />
-              <span className="truncate text-caption text-secondary-foreground">
+              <span className="text-caption text-secondary-foreground truncate">
                 {booking.project.name}
               </span>
             </span>
           </span>
 
-          <span className="max-w-1/2 shrink-0 truncate text-caption text-muted-foreground">
+          <span className="text-caption text-muted-foreground max-w-1/2 shrink-0 truncate">
             {booking.project.client.name}
           </span>
         </span>
@@ -172,7 +181,7 @@ export function BookingBlock({
           <PopoverDescription>{booking.project.client.name}</PopoverDescription>
         </PopoverHeader>
 
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-ui">
+        <dl className="text-ui grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
           <dt className="text-muted-foreground">Desarrollador</dt>
           <dd>{booking.dev.name}</dd>
 
@@ -196,16 +205,47 @@ export function BookingBlock({
         </dl>
 
         {booking.note && (
-          <p className="border-t border-border pt-2 text-ui text-secondary-foreground">
+          <p className="border-border text-ui text-secondary-foreground border-t pt-2">
             {booking.note}
           </p>
+        )}
+
+        {/*
+          `005` T4.5 — simétrico con lo que `004` hizo para el PM: el
+          desarrollador asignado responde sin salir del calendario.
+
+          Va en su propia fila y no mezclado con `Editar` / `Cancelar` porque un
+          admin que además es el dev de la reserva ve las dos cosas, y son
+          decisiones distintas: una administra la reserva, la otra compromete su
+          tiempo. El popover se cierra antes de abrir el diálogo, igual que en
+          `004`: si quedara abierto, el foco volvería a un bloque tapado por el
+          modal.
+        */}
+        {canRespond && (
+          <div className="border-border flex justify-end gap-1 border-t pt-2">
+            <Button size="sm" disabled={responding} onClick={() => approve(booking)}>
+              {responding ? "Aprobando…" : "Aprobar"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-danger"
+              disabled={responding}
+              onClick={() => {
+                setOpen(false);
+                reject(booking);
+              }}
+            >
+              Rechazar
+            </Button>
+          </div>
         )}
 
         {/* El popover mantiene su rol de detalle para quien no puede editar: sin
             permiso, o con la reserva ya en un estado terminal, se ve lo mismo de
             antes y ningún botón que después conteste que no. */}
         {canManage && (canEdit(booking.status) || canCancel(booking.status)) && (
-          <div className="flex justify-end gap-1 border-t border-border pt-2">
+          <div className="border-border flex justify-end gap-1 border-t pt-2">
             {canEdit(booking.status) && (
               <Button
                 variant="ghost"

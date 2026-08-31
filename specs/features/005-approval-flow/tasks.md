@@ -2,7 +2,7 @@
 
 - **ID:** 005-approval-flow
 - **Plan reference:** `./plan.md`
-- **Status:** fases 1-3 cerradas y verificadas en CI (run 33406711842, verde). T1.3 sigue bloqueada por credenciales. Próxima: fase 4 (UI).
+- **Status:** fases 1-4 escritas. 1-3 verdes en CI; la 4 corre sus E2E en la próxima corrida. T1.3 bloqueada por credenciales.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -84,15 +84,29 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Phase 4 — UI
 
-- [ ] **T4.1** — Ruta `/(app)/inbox/` con guard de rol `developer` en su `layout.tsx`, siguiendo el patrón de `(app)/admin/layout.tsx`. Item de navegación visible solo para devs. _DoD: un PM que entra a mano a `/inbox` no la ve._
-- [ ] **T4.2** — La lista (AC-1.1): pendientes del dev ordenadas por `starts_at`, con proyecto, cliente, franja y la nota del PM. Filas de 36px. _DoD: los cuatro estados de datos de `DESIGN.md` §9._
-- [ ] **T4.3** — Aprobar: un clic, sin diálogo. `Aprobar` es la acción primaria de la vista; `Rechazar` secundaria con texto en `--danger` (`DESIGN.md` §7).
-- [ ] **T4.4** — Diálogo de rechazo con comentario **obligatorio**. Validar al usar el botón, no deshabilitándolo — misma decisión que `004` T3.1.
-- [ ] **T4.5** — `Aprobar` / `Rechazar` en el popover del bloque del calendario cuando el que mira es el dev asignado y la reserva está `pending`. Reusa `BookingActionsProvider`. _DoD: el PM sigue viendo `Editar` / `Cancelar` y nada más._
-- [ ] **T4.6** — Estado de conflicto y de carrera en la UI: el 409 del constraint muestra la reserva que bloquea (componente de `004`); el 409 de `expectedUpdatedAt` dice que la reserva cambió y refresca la bandeja. _DoD: el motivo siempre en palabras, nunca solo color._
-- [ ] **T4.7** — E2E: el dev entra a la bandeja, aprueba una, rechaza otra con comentario, y el PM ve los dos estados en el calendario. Más el caso de la carrera.
-  - **Calentamiento de rutas autenticado** en `beforeAll`, como en `004` T4.5: `next dev` compila cada handler la primera vez y eso se come la primera aserción.
-  - Fixtures propias y **una fecha por test** (`fullyParallel` está activo).
+- [x] **T4.1** — Ruta `/(app)/inbox/` con guard de rol `developer` en su `layout.tsx`, siguiendo el patrón de `(app)/admin/layout.tsx`. Item de navegación visible solo para devs. _DoD: un PM que entra a mano a `/inbox` no la ve._
+  - **El admin tampoco la ve**, y es una decisión, no un olvido: no tiene reservas propias que responder, así que su bandeja estaría vacía para siempre. Responder por otro es delegación, explícitamente fuera del MVP (`spec.md` §5).
+  - `AppShell` pasó de `isAdmin: boolean` a `role: UserRole`. Con `005` ya son dos los roles que abren navegación propia, y un booleano por rol se multiplica con cada feature.
+- [x] **T4.2** — La lista (AC-1.1): pendientes del dev ordenadas por `starts_at`, con proyecto, cliente, franja y la nota del PM. Filas de 36px. _DoD: los cuatro estados de datos de `DESIGN.md` §9._
+  - **`getPendingBookingsForDev()` no recorta por rango**, a diferencia de todo lo demás del calendario: una pendiente de dentro de tres meses sigue necesitando respuesta, y esconderla porque no cae en la ventana visible es exactamente cómo se pierde una.
+  - **"Sin resultados de filtro" no se implementa porque no puede ocurrir**: la bandeja no es filtrable. Fingir ese estado sería inventar un control que no existe. Los otros tres están: `loading.tsx`, el vacío, y el error boundary de la ruta.
+  - El vacío rompe el "botón con verbo" de §9 a propósito y como dice `plan.md` §6: acá el vacío es buena noticia, y el dev no tiene ningún verbo que ejercer sobre una lista vacía. Queda un link al calendario, que sí es un destino honesto.
+  - La fila avisa cuando la reserva cae fuera de la jornada o en día no laborable, reusando `describeBookingWarnings()` — la misma advertencia que ve el PM al crearla, palabra por palabra. Importa más acá que en el diálogo: sin recorte por rango, una pendiente puede caer fuera de la tabla de feriados cargada, y esa función ya sabe qué contestar en ese caso.
+- [x] **T4.3** — Aprobar: un clic, sin diálogo. `Aprobar` es la acción primaria de la vista; `Rechazar` secundaria con texto en `--danger` (`DESIGN.md` §7).
+- [x] **T4.4** — Diálogo de rechazo con comentario **obligatorio**. Validar al usar el botón, no deshabilitándolo — misma decisión que `004` T3.1.
+- [x] **T4.5** — `Aprobar` / `Rechazar` en el popover del bloque del calendario cuando el que mira es el dev asignado y la reserva está `pending`. Reusa `BookingActionsProvider`. _DoD: el PM sigue viendo `Editar` / `Cancelar` y nada más._
+  - **Provider propio (`BookingResponseProvider`) en vez de sumarlo a `BookingActionsProvider`.** Son dos permisos distintos —el PM administra, el dev se compromete— y, sobre todo, la bandeja necesita solo este: fusionarlos la habría obligado a arrastrar el formulario de alta y sus opciones de proyecto y desarrollador, que no usa.
+  - Las dos acciones van en **su propia fila** del popover, separadas de `Editar` / `Cancelar`: un admin que además es el dev asignado ve las dos cosas, y no son lo mismo.
+- [x] **T4.6** — Estado de conflicto y de carrera en la UI: el 409 del constraint muestra la reserva que bloquea (componente de `004`); el 409 de `expectedUpdatedAt` dice que la reserva cambió y refresca la bandeja. _DoD: el motivo siempre en palabras, nunca solo color._
+  - `ConflictNotice` salió de `booking-dialog.tsx` a `booking-conflict.tsx` para poder reusarlo. **El título es parametrizable porque el conflicto se le cuenta distinto a cada uno:** al PM, "Malena ya tiene una reserva aprobada en esa franja"; al dev que está aprobando la suya, "Ya tenés aprobada otra reserva en esa franja". Es la misma fila de la base y la tercera persona sonaría a que el problema es de otro.
+  - Los dos errores son **diálogos y no un cartel al pie** porque la respuesta se puede disparar desde el popover del calendario, que se cierra al hacer clic: un error renderizado ahí adentro desaparecería con él.
+  - El caso "la reserva cambió" refresca además de avisar. No es cortesía: el próximo intento tiene que salir con el `updated_at` nuevo o vuelve a rebotar por lo mismo.
+- [x] **T4.7** — E2E: el dev entra a la bandeja, aprueba una, rechaza otra con comentario, y el PM ve los dos estados en el calendario. Más el caso de la carrera.
+  - `tests/e2e/approvals.spec.ts`, cuatro tests. Fechas propias en mayo de 2027 —`bookings.spec.ts` usa abril— y calentamiento de la ruta de respuesta en cada test, como en `004` T4.5.
+  - El de rechazo **intenta primero sin motivo**: es lo único que prueba que la validación es al usar el botón y no deshabilitándolo. Con un botón apagado no habría nada que clickear ni mensaje que leer.
+  - El de la carrera mueve la reserva por debajo del navegador con `service_role` (`moveBooking()`): lo que hace falta es que `updated_at` avance, no volver a ejercitar el camino de escritura del PM.
+
+> **Estado de la fase:** escrita, con `pnpm typecheck`, `pnpm lint` y `pnpm test:unit` (140) en verde local. **Los E2E solo corren en CI.** Falta la revisión visual en ambos temas y a los tres anchos, que es T5.5 y necesita ojos humanos.
 
 ## Phase 5 — Docs & handoff
 

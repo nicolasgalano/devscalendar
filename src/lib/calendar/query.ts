@@ -1,10 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type {
-  BookingStatus,
-  CalendarFilters,
-  ProjectPriority,
-} from "@/lib/validation/calendar";
+import type { BookingStatus, CalendarFilters, ProjectPriority } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
 
 import type { FacetRow } from "./facets";
@@ -16,6 +12,13 @@ export type CalendarBooking = {
   id: string;
   startsAt: string;
   endsAt: string;
+  /**
+   * Optimistic-concurrency token for the developer's answer (`005`, plan §5).
+   * Travels back as `expectedUpdatedAt` so an answer written against a booking
+   * the PM has since moved is refused instead of committing the developer to a
+   * slot they never saw.
+   */
+  updatedAt: string;
   status: BookingStatus;
   note: string | null;
   ticketRef: string | null;
@@ -55,6 +58,7 @@ const BOOKING_COLUMNS = `
   id,
   starts_at,
   ends_at,
+  updated_at,
   status,
   note,
   ticket_ref,
@@ -114,39 +118,70 @@ export async function getBookingsInRange(
   supabase: Client,
   { range, filters }: { range: CalendarRange; filters: CalendarFilters },
 ): Promise<CalendarBooking[]> {
-  const { data, error } = await bookingsQuery(
-    supabase,
-    BOOKING_COLUMNS,
-    range,
-    filters,
-  );
+  const { data, error } = await bookingsQuery(supabase, BOOKING_COLUMNS, range, filters);
   if (error) throw error;
+  return (data ?? []).map(toCalendarBooking);
+}
 
-  // No casts on the embeds on purpose: the generated types already infer their
-  // shape from the select string, so a schema change surfaces here as a type
-  // error instead of a null at runtime.
-  return (data ?? []).map((row): CalendarBooking => {
-    const { dev, project } = row;
+/**
+ * The row type is *derived from the select string*, never written by hand: the
+ * generated types infer the shape of the embeds from `BOOKING_COLUMNS`, so a
+ * schema change surfaces as a type error in the mapper instead of a null at
+ * runtime. That property belonged to the old inline `.map()` and survives here.
+ */
+type BookingRow = NonNullable<
+  Awaited<ReturnType<typeof bookingsQuery<typeof BOOKING_COLUMNS>>>["data"]
+>[number];
 
-    return {
-      id: row.id,
-      startsAt: row.starts_at,
-      endsAt: row.ends_at,
-      status: row.status as BookingStatus,
-      note: row.note,
-      ticketRef: row.ticket_ref,
-      // Falling back to the email keeps a block readable for a teammate who
-      // signed in with Google but has no display name yet.
-      dev: { id: dev.id, name: dev.full_name ?? dev.email },
-      project: {
-        id: project.id,
-        name: project.name,
-        priority: project.priority as ProjectPriority,
-        pmId: project.pm_id,
-        client: project.client,
-      },
-    };
-  });
+function toCalendarBooking(row: BookingRow): CalendarBooking {
+  const { dev, project } = row;
+
+  return {
+    id: row.id,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    updatedAt: row.updated_at,
+    status: row.status as BookingStatus,
+    note: row.note,
+    ticketRef: row.ticket_ref,
+    // Falling back to the email keeps a block readable for a teammate who
+    // signed in with Google but has no display name yet.
+    dev: { id: dev.id, name: dev.full_name ?? dev.email },
+    project: {
+      id: project.id,
+      name: project.name,
+      priority: project.priority as ProjectPriority,
+      pmId: project.pm_id,
+      client: project.client,
+    },
+  };
+}
+
+/**
+ * AC-1.1 — la bandeja del desarrollador: sus reservas `pending`, ordenadas por
+ * fecha de inicio.
+ *
+ * **Es una vista, no un permiso** (Q-5). La RLS deja al dev leer el calendario
+ * entero; esto acota lo que se le muestra, no lo que puede ver. Por eso el
+ * filtro por `dev_id` vive acá y no en una policy.
+ *
+ * Sin recorte por rango, a diferencia del calendario: una reserva pendiente de
+ * dentro de tres meses sigue necesitando respuesta, y esconderla porque no cae
+ * en la ventana visible es exactamente cómo se pierde una.
+ */
+export async function getPendingBookingsForDev(
+  supabase: Client,
+  devId: string,
+): Promise<CalendarBooking[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(BOOKING_COLUMNS)
+    .eq("dev_id", devId)
+    .eq("status", "pending")
+    .order("starts_at");
+
+  if (error) throw error;
+  return (data ?? []).map(toCalendarBooking);
 }
 
 /**
@@ -170,14 +205,12 @@ export async function getDayLoad(
   if (spansResult.error) throw spansResult.error;
 
   return {
-    spans: (spansResult.data ?? []).map(
-      (row): BookingSpan => ({
-        id: row.id,
-        devId: row.dev_id,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-      }),
-    ),
+    spans: (spansResult.data ?? []).map((row): BookingSpan => ({
+      id: row.id,
+      devId: row.dev_id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+    })),
     devCount,
   };
 }
