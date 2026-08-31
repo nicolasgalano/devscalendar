@@ -84,16 +84,31 @@ describe("bookings developer response RLS", () => {
     }
   });
 
+  /**
+   * Cada reserva se lleva **su propia franja**, y no es cosmético: varias
+   * terminan `approved` y viven hasta el `afterAll`, así que reusar el horario
+   * hace que la siguiente aprobación del mismo dev choque contra el constraint.
+   *
+   * La primera versión de este archivo reusaba 09:00–13:00 y CI lo agarró: el
+   * test de auditoría del approve encontraba cero filas —el update habia muerto
+   * con un `23P01` que nadie miraba— y el de Q-E pasaba sin probar nada, porque
+   * la reserva seguía pendiente con las dos columnas ya en null.
+   */
+  let slot = 0;
+
   /** Una reserva pendiente recien nacida, sembrada con `service_role`. */
   async function pendingBooking(devId: string = dev.id) {
+    const from = slot * 2;
+    slot += 1;
+
     const { data, error } = await adminClient()
       .from("bookings")
       .insert({
         project_id: projectId,
         dev_id: devId,
         created_by: pm.id,
-        starts_at: at(9),
-        ends_at: at(13),
+        starts_at: at(from),
+        ends_at: at(from + 1),
         status: "pending",
         note: "Migracion del checkout",
         ticket_ref: "WEB-142",
@@ -161,8 +176,8 @@ describe("bookings developer response RLS", () => {
   // a TypeScript qué columna se está tocando, y con eso se pierde justamente la
   // verificación de que el nombre existe en la tabla.
   const guarded: { column: GuardedColumn; patch: () => BookingUpdate }[] = [
-    { column: "starts_at", patch: () => ({ starts_at: at(15) }) },
-    { column: "ends_at", patch: () => ({ ends_at: at(20) }) },
+    { column: "starts_at", patch: () => ({ starts_at: at(100) }) },
+    { column: "ends_at", patch: () => ({ ends_at: at(105) }) },
     { column: "note", patch: () => ({ note: "me reescribo el pedido" }) },
     { column: "ticket_ref", patch: () => ({ ticket_ref: "WEB-999" }) },
   ];
@@ -243,12 +258,12 @@ describe("bookings developer response RLS", () => {
 
     const { error } = await client
       .from("bookings")
-      .update({ starts_at: at(15), ends_at: at(17) })
+      .update({ starts_at: at(100), ends_at: at(102) })
       .eq("id", booking.id);
     expect(error).toBeNull();
 
     const row = await readBack(booking.id);
-    expect(Date.parse(row!.starts_at)).toBe(Date.parse(at(15)));
+    expect(Date.parse(row!.starts_at)).toBe(Date.parse(at(100)));
   });
 
   /**
@@ -259,15 +274,19 @@ describe("bookings developer response RLS", () => {
   it("clears the answer when the booking goes back to pending", async () => {
     const booking = await pendingBooking();
     const devClient = await signInClient(dev.email, password);
-    await devClient
+    // Se afirma que la aprobación entró: si fallara, la reserva se quedaría
+    // pendiente con las dos columnas ya en null y las tres aserciones de abajo
+    // pasarían sin haber probado nada.
+    const { error: approveError } = await devClient
       .from("bookings")
       .update({ status: "approved", response_note: "dale" })
       .eq("id", booking.id);
+    expect(approveError).toBeNull();
 
     const pmClient = await signInClient(pm.email, password);
     const { error } = await pmClient
       .from("bookings")
-      .update({ starts_at: at(15), ends_at: at(17), status: "pending" })
+      .update({ starts_at: at(100), ends_at: at(102), status: "pending" })
       .eq("id", booking.id);
     expect(error).toBeNull();
 
@@ -294,10 +313,20 @@ describe("bookings developer response RLS", () => {
       return data ?? [];
     }
 
+    /**
+     * Todos estos afirman primero que la transición entró. Sin eso, un update
+     * que muere —contra el constraint, por ejemplo— deja el `audit_log` vacío
+     * con toda razón, y el test acusa al trigger de auditoría por un problema
+     * que está en otro lado. Fue exactamente lo que pasó en la primera corrida.
+     */
     it("records the approval with who, from and to", async () => {
       const booking = await pendingBooking();
       const client = await signInClient(dev.email, password);
-      await client.from("bookings").update({ status: "approved" }).eq("id", booking.id);
+      const { error } = await client
+        .from("bookings")
+        .update({ status: "approved" })
+        .eq("id", booking.id);
+      expect(error).toBeNull();
 
       const rows = await auditRowsFor(booking.id);
       expect(rows).toHaveLength(1);
@@ -313,10 +342,11 @@ describe("bookings developer response RLS", () => {
     it("records the rejection together with its reason", async () => {
       const booking = await pendingBooking();
       const client = await signInClient(dev.email, password);
-      await client
+      const { error } = await client
         .from("bookings")
         .update({ status: "rejected", response_note: "No llego" })
         .eq("id", booking.id);
+      expect(error).toBeNull();
 
       const rows = await auditRowsFor(booking.id);
       expect(rows).toHaveLength(1);
@@ -335,7 +365,11 @@ describe("bookings developer response RLS", () => {
     it("records the cancellation by the PM too", async () => {
       const booking = await pendingBooking();
       const client = await signInClient(pm.email, password);
-      await client.from("bookings").update({ status: "cancelled" }).eq("id", booking.id);
+      const { error } = await client
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", booking.id);
+      expect(error).toBeNull();
 
       const rows = await auditRowsFor(booking.id);
       expect(rows).toHaveLength(1);
@@ -348,7 +382,11 @@ describe("bookings developer response RLS", () => {
     it("writes nothing when the status is not what changed", async () => {
       const booking = await pendingBooking();
       const client = await signInClient(pm.email, password);
-      await client.from("bookings").update({ note: "aclaro el pedido" }).eq("id", booking.id);
+      const { error } = await client
+        .from("bookings")
+        .update({ note: "aclaro el pedido" })
+        .eq("id", booking.id);
+      expect(error).toBeNull();
 
       expect(await auditRowsFor(booking.id)).toEqual([]);
     });
