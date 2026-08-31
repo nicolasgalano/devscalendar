@@ -14,7 +14,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 002 | Entities admin (users, clients, projects) | done | 001 | §3, §10 |
 | 003 | Calendar UI (day/month/year + grouping + filters) | done | 001, 002 | §4 |
 | 004 | Bookings CRUD | done | 001, 002, 003 | §5, §9 |
-| 005 | Approval flow (dev approve/reject) | planned — `plan.md` + `tasks.md` listos | 004 | §6, §9 |
+| 005 | Approval flow (dev approve/reject) | done | 004 | §6, §9 |
 | 006 | Priority & reallocation | draft | 004, 005 | §7 |
 | 007 | Google Calendar push integration | draft | 005 | §8.1 |
 | 008 | Jira integration | draft | 004 | §8.2 |
@@ -49,8 +49,8 @@ Ninguna bloquea la implementación: todas tienen un default ya aplicado en el c�
 | Q-A | ¿Un proyecto puede tener varios PMs? | Un PM primario obligatorio. Colaboradores quedan para Fase 2. | `projects.pm_id` (not null) | `006-priority-reallocation` |
 | Q-B | ¿Un dev puede trabajar para varios clientes a la vez? | Sí, el dev es transversal; la reserva lo asigna a un proyecto. | Sin restricción en el modelo; el select de `BookingDialog` lista a todos los devs activos | Ya salió así en `004`. Confirmar antes de cargar datos reales: restringirlo después invalidaría reservas existentes |
 | Q-2 | ¿Dos niveles de prioridad o esquema numérico P0–P3? | Dos niveles (`común` / `prioritario`), como pidió el cliente. | `projects.priority` + tokens en `DESIGN.md` §3 | `006-priority-reallocation` |
-| Q-6 | ¿La realocación por prioridad saltea también la aprobación del dev? | Recomendación de la spec funcional §6: saltea al PM anterior, **no** al dev. | Todavía sin implementar | `006-priority-reallocation` — `005` sale con el default (el dev siempre aprueba), así que la pregunta es de quien construya la realocación |
-| Q-5 | ¿El desarrollador ve el calendario global o solo su propia agenda? | Global en modo lectura (spec funcional §11). | RLS de `bookings`: `select` para quien tenga rol asignado (`current_user_role() is not null`), no para todo `authenticated` | `005-approval-flow`. La bandeja de `005` es una **vista**, no un permiso: acota lo que se muestra, no lo que se puede leer |
+| Q-6 | ¿La realocación por prioridad saltea también la aprobación del dev? | Recomendación de la spec funcional §6: saltea al PM anterior, **no** al dev. | Todavía sin implementar. `005` salió con el default: el dev siempre aprueba, y el trigger lo impone sin mirar el rol (ADR 0009) | `006-priority-reallocation` — **y ahora es cara de cambiar**: si la realocación saltea al dev, `006` tiene que abrirle una excepción al guard de columnas, no solo escribir `status` |
+| ~~Q-5~~ | ~~¿El desarrollador ve el calendario global o solo su propia agenda?~~ | **Cerrada el 2026-08-31 con `005`: global en modo lectura, y la bandeja es una vista sobre eso.** El filtro por `dev_id` de `/inbox` vive en el query, no en una policy — acota lo que se muestra, nunca lo que se puede leer. | `getPendingBookingsForDev()` y la RLS de `bookings`, que da `select` a quien tenga rol asignado | — cerrada |
 | Q-10 | Multi-timezone: ¿el calendario se muestra en la TZ del viewer o en una fija? | TZ del navegador. En DB siempre `timestamptz` (UTC), que es correcto en cualquier caso. | `src/lib/calendar/range.ts` (único punto de conversión) | `007-google-calendar` |
 | Q-C | ¿Hace falta vista Semana además de día/mes/año? | No en el MVP; la spec funcional no la pide. | Sin implementar | Fase 2 |
 | ~~Q-F~~ | ~~¿Cuál es la jornada laboral y qué días no se trabaja?~~ | **Respondida el 2026-08-05: jornada fija 09:00–17:00; no se trabaja fines de semana ni feriados argentinos.** | `src/lib/calendar/workdays.ts` y `load.ts` | — cerrada |

@@ -2,7 +2,7 @@
 
 - **ID:** 005-approval-flow
 - **Plan reference:** `./plan.md`
-- **Status:** fases 1-4 escritas. 1-3 verdes en CI; la 4 corre sus E2E en la próxima corrida. T1.3 bloqueada por credenciales.
+- **Status:** fases 1-5 cerradas salvo T5.5 (revisión visual, necesita ojos humanos) y T1.3 (bloqueada por credenciales). Todo verde en CI.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -110,13 +110,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Phase 5 — Docs & handoff
 
-- [ ] **T5.1** — `CLAUDE.md`: sumar a la sección "Reservas" que el dev ya escribe, acotado a `status` y `response_note` **por trigger, no por policy**, y por qué.
-- [ ] **T5.2** — `DESIGN.md` §14: lo que `005` aplique del sistema.
-- [ ] **T5.3** — `specs/features/README.md`: `005` a `done`. Cerrar Q-5 y dejar Q-6 apuntando a `006`.
-- [ ] **T5.4** — ADR solo si aparece algo transversal. **Candidato probable:** que la autorización por columna se resuelva con trigger porque la RLS de Postgres no la expresa — lo heredan `006` (realocación escribe `status`) y `010`.
-- [ ] **T5.5** — Revisión visual en ambos temas, a 1280 / 1440 / <1024px. Necesita ojos humanos.
-
----
+- [x] **T5.1** — `CLAUDE.md`: sumar a la sección "Reservas" que el dev ya escribe, acotado a `status` y `response_note` **por trigger, no por policy**, y por qué.
+  - Con la advertencia que más importa para quien venga después: **leyendo solo las policies se concluye lo contrario.** Más las dos consecuencias prácticas: la whitelist puede romperse con una columna nueva, y el admin no es atajo para aprobar.
+  - Se sumó también `expectedUpdatedAt`, que es una convención del camino de escritura y no solo un detalle de `005`.
+  - Actualizado además el estado de features, el árbol del repo (`inbox/`) y el "Próxima", que ahora apunta a `006` con la advertencia de que va a chocar con el mismo guard.
+- [x] **T5.2** — `DESIGN.md` §14: lo que `005` aplique del sistema.
+  - Seis entradas. Las dos que valen por encima del resto son **las dos veces que `005` se apartó del sistema y por qué**: el cuarto estado de datos que no se implementa porque no puede ocurrir, y el empty state sin verbo. Un `DESIGN.md` que solo registre los cumplimientos no sirve para decidir el próximo caso raro.
+- [x] **T5.3** — `specs/features/README.md`: `005` a `done`. Cerrar Q-5 y dejar Q-6 apuntando a `006`.
+  - Q-5 cerrada: la bandeja es una vista, el filtro por `dev_id` vive en el query y no en una policy.
+  - **Q-6 quedó anotada como más cara de lo que era.** Antes era "decidir si la realocación saltea al dev"; ahora, si la respuesta es que sí, `006` tiene que abrirle una excepción al guard de columnas de ADR 0009, no solo escribir `status`.
+- [x] **T5.4** — ADR solo si aparece algo transversal. **Candidato probable:** que la autorización por columna se resuelva con trigger porque la RLS de Postgres no la expresa — lo heredan `006` (realocación escribe `status`) y `010`.
+  - Escrito: `docs/adr/0009-autorizacion-por-columna-con-trigger.md`. Se confirmó que era transversal y no una nota de implementación: `006` escribe `status` para desplazar y va a chocar con la misma función.
+  - Documenta las tres partes de la decisión —un solo trigger, whitelist en vez de lista negra, y policy + guard en la misma migration— y las tres alternativas descartadas, incluida la que parece obvia: **una segunda policy no puede acotar a la primera, porque las policies del mismo comando se combinan con OR.**
+- [!] **T5.5** — Revisión visual en ambos temas, a 1280 / 1440 / <1024px. Necesita ojos humanos.
+  - **Es lo único que queda abierto de la feature.** Corresponde a los puntos 5 y 15 de la checklist de `DESIGN.md` §13; los otros trece se verificaron y están reportados. Todo sale de tokens, así que no debería fallar, pero "no debería" no es haberlo mirado.
 
 ## Blocked / follow-ups
 

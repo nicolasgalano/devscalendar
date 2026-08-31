@@ -4,7 +4,7 @@
 
 > Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
 
-**Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin`, `003-calendar-ui` y `004-bookings` terminadas.
+**Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin`, `003-calendar-ui`, `004-bookings` y `005-approval-flow` terminadas.
 
 ---
 
@@ -69,12 +69,13 @@ devscalendar/
 │   │   │   ├── error.tsx             # error boundary de la app
 │   │   │   ├── page.tsx              # redirige a /calendar
 │   │   │   ├── calendar/             # pantalla principal (día/mes/año)
+│   │   │   ├── inbox/                # bandeja del dev: sus reservas pendientes
 │   │   │   └── admin/                # ABM de maestros (solo admin)
 │   │   │       ├── layout.tsx        # guard de rol
 │   │   │       ├── clients/          # page + loading + tabla (client)
 │   │   │       ├── projects/
 │   │   │       └── users/
-│   │   ├── api/                      # route handlers (clients/projects/users)
+│   │   ├── api/                      # route handlers (bookings/clients/projects/users)
 │   │   ├── login/                    # login page + button (client)
 │   │   ├── pending-access/           # usuarios autenticados sin rol
 │   │   └── auth/
@@ -202,6 +203,10 @@ Scripts útiles:
 - **Cancelar una reserva es un `update` de `status`, nunca un `delete`.** No hay borrado físico y `authenticated` no tiene el grant: la reserva cancelada sigue visible en el calendario con su tratamiento propio (`DESIGN.md` §8) y es el rastro que después audita `010`. La API no expone `DELETE` a propósito.
 - **El anti doble-booking está en dos capas y ninguna reemplaza a la otra** (ADR 0008): el `exclusion constraint` es la garantía dura, y el chequeo de `findConflictingBooking()` existe para responder un 409 con la reserva que bloquea. El constraint solo excluye entre `approved`, así que **en un alta nunca se dispara** — toda reserva nace `pending`. Cualquier camino de escritura nuevo tiene que hacer el mismo chequeo.
 - **Aprobar y rechazar no son del PM.** El trigger `bookings_enforce_status_transition` lo hace cumplir en la base, no solo en la API. `service_role` queda exento para que seeds y fixtures puedan sembrar estados directamente.
+- **El desarrollador escribe sus propias reservas, pero solo `status` y `response_note` — y eso lo impone un trigger, no la policy** (ADR 0009). La policy `bookings: developer responds` es amplia a propósito: la RLS de Postgres no sabe expresar "solo estas columnas", porque `using` mira la fila vieja y `with check` la nueva, y ninguna las compara. **Quien lea solo las policies va a concluir que el dev puede reescribir cualquier columna, y va a estar equivocado:** lo que lo impide es el guard dentro de `enforce_booking_status_transition()`, que compara `to_jsonb(new) - whitelist` contra `to_jsonb(old) - whitelist`. Dos consecuencias prácticas:
+  - **La whitelist es de lo escribible, no de lo prohibido.** Una columna que agregue una feature futura nace protegida; abrirla exige nombrarla ahí. El precio es que **una migration que agregue una columna a `bookings` puede romper la respuesta del dev** si esa columna viaja en el mismo `update`, y el síntoma es un `23514` inesperado.
+  - **El admin no es un atajo para aprobar.** Es el único lugar de la app donde el rol admin no alcanza: el trigger compara `auth.uid()` contra `dev_id` sin mirar el rol. Aprobar no es una operación administrativa, es un compromiso sobre el tiempo de una persona. Un admin que además _es_ el dev asignado sí puede: el chequeo es de identidad.
+- **La respuesta del dev viaja con `expectedUpdatedAt`, y el handler lo compara antes de escribir** (`005/plan.md` §5). Es la protección contra la carrera entre la edición del PM y la aprobación: sin ella, el dev aprueba un horario que el PM ya movió y queda comprometido con algo que nunca vio. Se ataja en dos lugares —una comparación temprana y un `.eq("updated_at", …)` en el `update`— y el segundo es el que cierra la ventana entre la lectura y la escritura.
 - **La jornada no se valida nunca.** Reservar fuera de 09:00–17:00 o en un día no laborable es excepcional pero está permitido (Q-G): se advierte en la UI con `describeBookingWarnings()` y jamás bloquea. Los schemas de Zod no conocen la jornada a propósito, para que nadie convierta la advertencia en error.
 
 ### Estado en la URL
@@ -235,4 +240,5 @@ Ver `specs/features/README.md` para el índice completo y estado.
 - **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Quedan Q-A y Q-B por confirmar con el cliente antes de `006-priority-reallocation` — ver `specs/features/002-entities-admin/tasks.md`.
 - **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Creó la tabla `bookings` de solo lectura.
 - **004-bookings** — done. `bookings` ya es escribible: `exclusion constraint` anti doble-booking, policies para el PM del proyecto y el admin, API de alta / edición / cancelación, y el diálogo que se abre desde el botón o desde un click en la grilla. El anti doble-booking quedó en dos capas (ADR 0008). Q-E aplicada: mover el horario o el desarrollador de una reserva aprobada la devuelve a `pending`.
-- **Próxima:** `005-approval-flow`. El desarrollador todavía no puede escribir: le falta su policy acotada a `status` sobre sus propias reservas. El trigger de transiciones ya está listo para recibirla, y al aprobar va a chocar contra el constraint — ese `23P01` hay que traducirlo (ADR 0008). Hereda además el race entre edición y aprobación (F1).
+- **005-approval-flow** — done. El desarrollador ya escribe: policy propia sobre sus reservas, acotada a `status` y `response_note` **por un guard en el trigger, no por la policy** (ADR 0009). Bandeja en `/inbox` con guard de rol, respuesta también desde el popover del calendario, comentario obligatorio al rechazar, y las tres traducciones de error de la API — `23P01` a 409 con la reserva que bloquea, `check_violation` a 403, y `expectedUpdatedAt` desajustado a 409. Cada cambio de estado deja su fila en `audit_log`. Salió **sin notificaciones** por decisión del 2026-08-12: el dev se entera entrando a la app, y AC-1.2 / AC-3.1 se difieren a `010`.
+- **Próxima:** `006-priority-reallocation`. Escribe `status` para desplazar, así que va a chocar con el mismo guard de columnas de ADR 0009 — conviene leerlo antes. Necesita Q-A y Q-2 respondidas, y hereda Q-6 (¿la realocación saltea la aprobación del dev?), que `005` dejó con el default de que el dev siempre aprueba.

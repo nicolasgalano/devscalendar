@@ -38,3 +38,4 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 | 0006 | Tailwind v4 (CSS-first), shadcn sobre Base UI, y DESIGN.md como autoridad | accepted |
 | 0007 | Calendario propio sobre CSS grid, en vez de una librería | accepted |
 | 0008 | El anti doble-booking vive en dos capas, no en una | accepted |
+| 0009 | La autorización por columna se resuelve con trigger, no con RLS | accepted |
