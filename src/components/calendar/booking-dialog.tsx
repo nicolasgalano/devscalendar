@@ -1,8 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import Link from "next/link";
-import { CircleAlertIcon, TriangleAlertIcon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,18 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ConflictNotice } from "@/components/calendar/booking-conflict";
 import type { BookingConflict } from "@/lib/bookings/conflicts";
-import {
-  optionalField,
-  toInstants,
-  type BookingFormValues,
-} from "@/lib/bookings/form";
+import { optionalField, toInstants, type BookingFormValues } from "@/lib/bookings/form";
 import type { BookingFormOptions } from "@/lib/bookings/options";
 import { isReschedule, type BookingSnapshot } from "@/lib/bookings/transitions";
 import { describeBookingWarnings } from "@/lib/bookings/warnings";
-import { formatTimeRange } from "@/lib/calendar/format";
-import { instantToIsoDate } from "@/lib/calendar/range";
-import { calendarHref } from "@/lib/calendar/url";
 import type { CalendarParams } from "@/lib/validation/calendar";
 
 /** What the dialog is doing. Editing carries the row it is editing. */
@@ -103,9 +96,7 @@ export function BookingDialog({
   // El texto del trigger se resuelve a mano: `SelectValue` sin hijos imprime el
   // valor crudo, y acá el valor es un uuid. Misma razón que en la barra de
   // filtros, donde el centinela terminaba en pantalla como `__all__`.
-  const selectedProject = options.projects.find(
-    (project) => project.id === form.projectId,
-  );
+  const selectedProject = options.projects.find((project) => project.id === form.projectId);
   const selectedDev = options.devs.find((dev) => dev.id === form.devId);
 
   const missingPrerequisite =
@@ -223,9 +214,7 @@ export function BookingDialog({
                     {selectedDev ? (
                       <span className="truncate">{selectedDev.name}</span>
                     ) : (
-                      <span className="text-muted-foreground">
-                        Elegí un desarrollador
-                      </span>
+                      <span className="text-muted-foreground">Elegí un desarrollador</span>
                     )}
                   </SelectValue>
                 </SelectTrigger>
@@ -279,7 +268,7 @@ export function BookingDialog({
             {/* AC-1.4: advertencias, nunca bloqueo. El botón de guardar sigue
                 activo con cualquiera de ellas en pantalla. */}
             {(warnings.length > 0 || willNeedReapproval) && (
-              <ul className="flex flex-col gap-1 text-caption text-attention">
+              <ul className="text-caption text-attention flex flex-col gap-1">
                 {warnings.map((warning) => (
                   <li
                     key={warning.id}
@@ -293,8 +282,8 @@ export function BookingDialog({
                 {willNeedReapproval && (
                   <li data-warning="reapproval" className="flex items-start gap-1.5">
                     <CircleAlertIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-                    La reserva vuelve a quedar pendiente: el desarrollador tiene que aprobarla
-                    de nuevo.
+                    La reserva vuelve a quedar pendiente: el desarrollador tiene que aprobarla de
+                    nuevo.
                   </li>
                 )}
               </ul>
@@ -337,62 +326,11 @@ export function BookingDialog({
           <DialogClose render={<Button variant="outline" />}>Volver</DialogClose>
           {!missingPrerequisite && (
             <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting
-                ? "Guardando…"
-                : isEdit
-                  ? "Guardar cambios"
-                  : "Crear reserva"}
+              {submitting ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear reserva"}
             </Button>
           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * DESIGN.md §8, primer uso del estado de conflicto: icono `alert-triangle`,
- * texto en `--danger` y **el motivo siempre en palabras**. El color no porta
- * ninguna información que no esté también escrita.
- *
- * El link no es decorativo: sin él, "hay una reserva que bloquea" obliga al PM a
- * salir a buscarla por el calendario a mano.
- */
-function ConflictNotice({
-  conflict,
-  params,
-  tz,
-}: {
-  conflict: BookingConflict;
-  params: CalendarParams;
-  tz: string;
-}) {
-  const date = instantToIsoDate(conflict.startsAt, tz);
-
-  return (
-    <div
-      role="alert"
-      data-slot="booking-conflict"
-      className="flex gap-2 rounded-lg bg-danger-bg p-2.5 text-ui text-danger"
-    >
-      <TriangleAlertIcon aria-hidden="true" className="mt-px size-4 shrink-0" />
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="font-medium">
-          {conflict.devName} ya tiene una reserva aprobada en esa franja
-        </p>
-        <p>
-          {conflict.projectName},{" "}
-          <span className="font-data">
-            {formatTimeRange(conflict.startsAt, conflict.endsAt, tz)}
-          </span>
-        </p>
-        <Link
-          href={calendarHref(params, { view: "day", date })}
-          className="w-fit underline underline-offset-3 hover:no-underline"
-        >
-          Ver ese día en el calendario
-        </Link>
-      </div>
-    </div>
   );
 }

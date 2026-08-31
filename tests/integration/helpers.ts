@@ -139,7 +139,18 @@ export async function createBookingRows(
 
 export async function cleanupBookings(projectIds: string[]) {
   if (projectIds.length === 0) return;
-  await adminClient().from("bookings").delete().in("project_id", projectIds);
+  const admin = adminClient();
+
+  // Every status change left a row in `audit_log` (005), which points at the
+  // booking by id and without a FK. The ids have to be read before the delete,
+  // or there is no way left to tell which rows belonged to this test.
+  const { data } = await admin.from("bookings").select("id").in("project_id", projectIds);
+  const bookingIds = (data ?? []).map((row) => row.id);
+
+  await admin.from("bookings").delete().in("project_id", projectIds);
+  if (bookingIds.length > 0) {
+    await admin.from("audit_log").delete().in("entity_id", bookingIds);
+  }
 }
 
 /** Removes rows created by a test, children first to respect the FKs. */

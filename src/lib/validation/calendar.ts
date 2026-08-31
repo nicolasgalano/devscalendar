@@ -20,13 +20,27 @@ export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 export type ProjectPriority = z.infer<typeof projectPrioritySchema>;
 
 /**
- * Terminal states are hidden by default: showing every cancelled and rejected
- * booking clutters the grid with time nobody is going to work. The status
- * filter brings them back when someone asks for them.
+ * What the calendar shows unless someone asks for more. The status filter
+ * brings the rest back.
+ *
+ * Only `cancelled` is hidden. The rule used to be "hide the terminal states",
+ * which put `rejected` on the same side as `cancelled` — harmless while nothing
+ * in the app could reach it, since only the seed produced rejections.
+ *
+ * `005` made it reachable and the omission became a hole: with notifications
+ * deferred to `010`, a PM had no way to learn their booking was turned down
+ * except by switching on a filter they had no reason to know they needed. It
+ * also contradicted `DESIGN.md` §8, which puts rejected and displaced in the
+ * same class — the two that force the PM to reassign — while this list showed
+ * one and hid the other.
+ *
+ * A cancellation is different, and stays hidden: it was the PM's own decision,
+ * so nobody has to be told about it.
  */
 export const DEFAULT_STATUSES: readonly BookingStatus[] = [
   "pending",
   "approved",
+  "rejected",
   "displaced",
 ];
 
@@ -113,7 +127,10 @@ export function parseCalendarParams(
       devId: optionalUuid.parse(first(raw.dev) ?? null),
       pmId: optionalUuid.parse(first(raw.pm) ?? null),
       statuses: parseStatuses(first(raw.status)),
-      priority: projectPrioritySchema.nullable().catch(null).parse(first(raw.priority) ?? null),
+      priority: projectPrioritySchema
+        .nullable()
+        .catch(null)
+        .parse(first(raw.priority) ?? null),
     },
   };
 }

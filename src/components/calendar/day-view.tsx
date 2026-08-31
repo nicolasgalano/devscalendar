@@ -1,10 +1,19 @@
 import { BookingBlock } from "@/components/calendar/booking-block";
 import { DayGridSlots } from "@/components/calendar/day-grid-slots";
-import { canManageProject, type BookingViewer } from "@/lib/bookings/permissions";
+import {
+  canManageProject,
+  canRespondToBooking,
+  type BookingViewer,
+} from "@/lib/bookings/permissions";
 import { formatMinuteOfDay } from "@/lib/calendar/format";
 import { assignColumns, groupIntoLanes, rowCount, toGridRows } from "@/lib/calendar/layout";
 import type { CalendarBooking } from "@/lib/calendar/query";
-import { MINUTES_PER_ROW, minutesOfDay, visibleDayWindow, zonedToInstant } from "@/lib/calendar/range";
+import {
+  MINUTES_PER_ROW,
+  minutesOfDay,
+  visibleDayWindow,
+  zonedToInstant,
+} from "@/lib/calendar/range";
 import { addDays } from "@/lib/calendar/range";
 import { isWorkday, WORKDAY_END_HOUR, WORKDAY_START_HOUR } from "@/lib/calendar/workdays";
 import { cn } from "@/lib/utils";
@@ -54,7 +63,10 @@ export function DayView({
     };
   }
 
-  const slots = Array.from({ length: rows }, (_, index) => window.startMinute + index * MINUTES_PER_ROW);
+  const slots = Array.from(
+    { length: rows },
+    (_, index) => window.startMinute + index * MINUTES_PER_ROW,
+  );
 
   return (
     // `pb-3` deja lugar a la etiqueta de cierre, que sobresale 8px por debajo
@@ -79,16 +91,16 @@ export function DayView({
         }}
       >
         {/* Lane headers — sticky so they survive the vertical scroll (§6). */}
-        <div className="sticky top-0 z-20 h-8 border-b border-border bg-background" />
+        <div className="border-border bg-background sticky top-0 z-20 h-8 border-b" />
         {lanes.map((lane) => (
           <div
             key={lane.id}
             // Gancho estable para los tests: engancharse a clases de Tailwind
             // las convierte en API y rompe el día que cambie el estilo.
             data-lane-header={lane.id}
-            className="sticky top-0 z-20 flex h-8 items-center border-b border-l border-border bg-background px-2"
+            className="border-border bg-background sticky top-0 z-20 flex h-8 items-center border-b border-l px-2"
           >
-            <span className="truncate text-caption font-medium text-muted-foreground">
+            <span className="text-caption text-muted-foreground truncate font-medium">
               {lane.name}
             </span>
           </div>
@@ -99,7 +111,7 @@ export function DayView({
           {slots.map((minute, index) => (
             <div key={minute} className="relative">
               {minute % 60 === 0 && (
-                <span className="absolute -top-2 right-2 font-data text-caption text-muted-foreground">
+                <span className="font-data text-caption text-muted-foreground absolute -top-2 right-2">
                   {formatMinuteOfDay(minute)}
                 </span>
               )}
@@ -107,7 +119,7 @@ export function DayView({
                   without this the grid would end on an unnumbered line — and
                   that line is meaningful: it is where the workday closes. */}
               {index === slots.length - 1 && (
-                <span className="absolute -bottom-2 right-2 font-data text-caption text-muted-foreground">
+                <span className="font-data text-caption text-muted-foreground absolute right-2 -bottom-2">
                   {formatMinuteOfDay(window.endMinute)}
                 </span>
               )}
@@ -121,7 +133,7 @@ export function DayView({
           return (
             <div
               key={lane.id}
-              className="relative grid border-l border-border"
+              className="border-border relative grid border-l"
               style={{ gridTemplateRows: `repeat(${rows}, ${ROW_HEIGHT}px)` }}
             >
               {slots.map((minute) => {
@@ -129,9 +141,7 @@ export function DayView({
                 // normal day reads at a glance: working past 17:00 is
                 // exceptional (Q-G) and has to look like it.
                 const outsideWorkday =
-                  !workday ||
-                  minute < WORKDAY_START_HOUR * 60 ||
-                  minute >= WORKDAY_END_HOUR * 60;
+                  !workday || minute < WORKDAY_START_HOUR * 60 || minute >= WORKDAY_END_HOUR * 60;
 
                 return (
                   <div
@@ -167,6 +177,7 @@ export function DayView({
                   colorKey={group === "dev" ? item.dev.id : item.project.id}
                   tz={tz}
                   canManage={canManageProject(viewer, item.project)}
+                  canRespond={canRespondToBooking(viewer, item)}
                 />
               ))}
             </div>

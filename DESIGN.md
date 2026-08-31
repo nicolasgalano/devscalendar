@@ -409,6 +409,15 @@ Aplicado en la feature `004-bookings`:
 - **Advertencias sin bloqueo** (§8, la excepción de Q-G) — jornada y día no laborable se advierten en `--attention` con `circle-alert`, nunca en `--danger` y nunca deshabilitando guardar. `alert-triangle` queda reservado para el conflicto, que sí impide seguir.
 - **Diálogo de confirmación destructivo** (§7) — cancelar una reserva es terminal, así que pasa por confirmación; es el único lugar donde el botón destructivo lleva fondo propio.
 
+Aplicado en la feature `005-approval-flow`:
+
+- **Cuatro estados de datos con una excepción anotada** (§9) — la bandeja `/inbox` implementa cargando, vacío y error, y **omite "sin resultados de filtro" porque no puede ocurrir**: no es una vista filtrable. Fingir ese estado sería inventar un control que no existe.
+- **Un vacío sin verbo, a propósito** (§9) — el empty state de la bandeja rompe la regla del "botón con verbo" y deja un link al calendario. Acá el vacío es buena noticia, no una carencia, y el desarrollador no tiene ningún verbo que ejercer sobre una lista vacía; un botón inventado sería peor que el link.
+- **Una sola acción primaria, repetida por fila** (§7) — `Aprobar` es la primaria de la vista y aparece en cada fila; `Rechazar` la acompaña como fantasma con texto en `--danger`. Un botón destructivo con fondo propio sigue reservado al diálogo de confirmación.
+- **Precedencia en el estado activo del nav** (§7) — `Calendario` y el atajo `Pendientes del equipo` del admin viven los dos en `/calendar`, y la determinación de activo es por segmento de ruta. Sin una regla nueva, o se encendían los dos o el atajo no se encendía nunca. Ahora un item puede declarar los search params que representa y gana sobre el que solo mira la ruta: **el activo sigue siendo uno solo**, que es lo que la sección pide.
+- **`rejected` entra a los estados visibles por default** — la regla dejó de ser "ocultar lo terminal" y pasó a ser "ocultar lo que el propio PM decidió". Una reserva rechazada obliga a reasignar (§8) y por eso no puede estar escondida detrás de un filtro; una cancelada la decidió el PM, así que no hay a quién avisarle. Ver F7 en `005/tasks.md`.
+- **Advertencia sin bloqueo, reusada** (§8) — la bandeja avisa cuando la reserva cae fuera de la jornada o en día no laborable con el mismo texto que ve el PM al crearla (`describeBookingWarnings()`), en `circle-alert` sobre `--attention`, sin tocar los botones.
+
 Pendiente, por depender de features todavía no construidas:
 
 - **Navegación por teclado en filas** (§7) — cuando exista una vista de detalle a la que abrir.

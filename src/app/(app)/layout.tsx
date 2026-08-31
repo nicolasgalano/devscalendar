@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell isAdmin={profile.role === "admin"} userLabel={profile.full_name ?? profile.email}>
+    <AppShell role={profile.role} userLabel={profile.full_name ?? profile.email}>
       {children}
     </AppShell>
   );

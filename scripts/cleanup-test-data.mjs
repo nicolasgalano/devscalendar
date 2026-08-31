@@ -133,13 +133,31 @@ async function main() {
   // ── Hijos primero ─────────────────────────────────────────────────────────
   // Las reservas cuelgan del proyecto y del desarrollador, y las dos FK son
   // `restrict`: si queda una sola reserva, el borrado del padre falla.
-  if (projectIds.length > 0) {
-    const { error } = await admin.from("bookings").delete().in("project_id", projectIds);
-    if (error) fail(`No se pudieron borrar las reservas: ${error.message}`);
+  //
+  // Los ids se leen antes de borrar: desde 005 cada cambio de estado deja su
+  // fila en `audit_log`, que referencia la reserva por id y sin FK. Una vez
+  // borrada la reserva no hay manera de saber qué filas eran suyas.
+  const bookingIds = new Set();
+  for (const [column, ids] of [
+    ["project_id", projectIds],
+    ["dev_id", profileIds],
+  ]) {
+    if (ids.length === 0) continue;
+
+    const { data, error } = await admin.from("bookings").select("id").in(column, ids);
+    if (error) fail(`No se pudieron listar las reservas: ${error.message}`);
+    for (const row of data ?? []) bookingIds.add(row.id);
+
+    const { error: deleteError } = await admin.from("bookings").delete().in(column, ids);
+    if (deleteError) fail(`No se pudieron borrar las reservas: ${deleteError.message}`);
   }
-  if (profileIds.length > 0) {
-    const { error } = await admin.from("bookings").delete().in("dev_id", profileIds);
-    if (error) fail(`No se pudieron borrar las reservas del dev: ${error.message}`);
+
+  if (bookingIds.size > 0) {
+    const { error } = await admin
+      .from("audit_log")
+      .delete()
+      .in("entity_id", [...bookingIds]);
+    if (error) fail(`No se pudo limpiar audit_log de las reservas: ${error.message}`);
   }
 
   if (projectIds.length > 0) {
