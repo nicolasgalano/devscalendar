@@ -37,6 +37,7 @@ const PROJECT_NAME = testName(`E2E aprob proyecto ${suffix}`);
 
 let pm: TestUser;
 let dev: TestUser;
+let admin: TestUser;
 let fixture: { clientId: string; projectId: string };
 
 /** `2027-05-12T09:00` en hora argentina (UTC-3) → 12:00Z. */
@@ -47,6 +48,7 @@ function at(day: string, hour: number): string {
 test.beforeAll(async () => {
   pm = await createUser("pm");
   dev = await createUser("developer");
+  admin = await createUser("admin");
   fixture = await createProjectFor(pm.userId, {
     client: CLIENT_NAME,
     project: PROJECT_NAME,
@@ -59,6 +61,7 @@ test.afterAll(async () => {
   } finally {
     await deleteUser(pm.userId);
     await deleteUser(dev.userId);
+    await deleteUser(admin.userId);
   }
 });
 
@@ -157,19 +160,17 @@ test("a developer rejects with a mandatory comment", async ({ context, page }) =
   await expect(inboxRow(page, PROJECT_NAME)).toHaveCount(0, AFTER_WRITE);
 
   /**
-   * El PM la ve rechazada — **pero hay que pedir el estado en la URL.**
+   * El PM la ve rechazada **sin tocar ningún filtro**, que es la mitad que
+   * importa: el rechazo es lo que lo manda a reasignar (`DESIGN.md` §8), y si
+   * hubiera que prender un filtro para verlo, no se enteraría.
    *
-   * `DEFAULT_STATUSES` (003) es `pending, approved, displaced`: los terminales
-   * se ocultan para no llenar la grilla de tiempo que nadie va a trabajar. Con
-   * `rejected` adentro de esa lista de ocultos, una reserva rechazada
-   * desaparece del calendario por default.
-   *
-   * El test lo pide explícito en vez de asumirlo, que es lo que hacía en la
-   * primera corrida y por eso falló. Que esa sea la conducta correcta del
-   * producto es otra discusión, anotada como F7.
+   * La URL va pelada a propósito. Este `goto` sin `status` es lo que sostiene
+   * F7: la primera corrida de CI falló acá porque `rejected` estaba fuera de
+   * `DEFAULT_STATUSES`, y si algún día vuelve a salir, este test se cae de
+   * nuevo en vez de dejarlo pasar.
    */
   await authenticate(context, pm);
-  await page.goto(`/calendar?view=day&date=${REJECT_DAY}&status=pending,approved,rejected`);
+  await page.goto(`/calendar?view=day&date=${REJECT_DAY}`);
   await expect(blockWithStatus(page, "Rechazada")).toBeVisible(AFTER_WRITE);
 });
 
@@ -226,4 +227,33 @@ test("a PM has no inbox, by link or by URL", async ({ context, page }) => {
 
   await page.goto("/inbox");
   await expect(page).toHaveURL(/\/calendar/);
+});
+
+/**
+ * El admin no tiene bandeja —no puede aprobar nada— pero sí un atajo a lo que
+ * está esperando respuesta, que es el calendario filtrado.
+ *
+ * La parte que importa del test es **cuál item queda activo**: los dos apuntan
+ * a `/calendar`, y sin la precedencia por search params de `findActive` se
+ * encenderían los dos a la vez. `DESIGN.md` §7 pide uno solo.
+ */
+test("an admin gets a shortcut to the team's pending bookings, not an inbox", async ({
+  context,
+  page,
+}) => {
+  await authenticate(context, admin);
+  await page.goto("/calendar");
+
+  await expect(page.getByRole("link", { name: "Pendientes", exact: true })).toHaveCount(0);
+
+  const shortcut = page.getByRole("link", { name: "Pendientes del equipo" });
+  await shortcut.click();
+
+  await expect(page).toHaveURL(/status=pending/);
+  await expect(shortcut).toHaveAttribute("aria-current", "page");
+  // Y "Calendario" cede el activo, en vez de quedar encendido junto al atajo.
+  await expect(page.getByRole("link", { name: "Calendario" })).not.toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });

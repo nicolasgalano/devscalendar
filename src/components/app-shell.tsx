@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2Icon,
   CalendarDaysIcon,
@@ -22,7 +22,21 @@ import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
 
-type NavItem = { href: string; label: string; Icon: LucideIcon };
+type NavItem = {
+  href: string;
+  label: string;
+  Icon: LucideIcon;
+  /**
+   * Search params que el item representa, cuando apunta a una vista filtrada de
+   * una ruta que ya tiene su propio item.
+   *
+   * Existe por el atajo de `005`: `Calendario` y `Pendientes del equipo` viven
+   * los dos en `/calendar`, y la determinación de activo de `DESIGN.md` §7 es
+   * por segmento de ruta. Sin esto, o se encienden los dos o el atajo no se
+   * enciende nunca.
+   */
+  match?: Record<string, string>;
+};
 type NavGroup = { label: string | null; items: NavItem[] };
 
 // El calendario es la pantalla principal del producto (spec funcional §4), así
@@ -57,22 +71,59 @@ const DEVELOPER_NAV_ITEM: NavItem = {
 };
 
 /**
+ * El admin no tiene bandeja —no puede aprobar nada, y el trigger de la base lo
+ * hace cumplir sin mirar el rol— pero sí necesita ver qué está esperando
+ * respuesta. Eso ya existe: es el calendario filtrado por estado.
+ *
+ * Un atajo y no una pantalla nueva, a propósito: una lista global de solo
+ * lectura duplicaría lo que el calendario hace mejor —agrupación, filtros
+ * combinables, link compartible— y encima se llamaría "bandeja" sin tener
+ * acciones. La pregunta de supervisión que este atajo **no** contesta es "hace
+ * cuánto que está esperando", y esa es de `010` (F5, F6).
+ */
+const TEAM_PENDING_ITEM: NavItem = {
+  href: "/calendar?status=pending",
+  label: "Pendientes del equipo",
+  Icon: InboxIcon,
+  match: { status: "pending" },
+};
+
+/**
  * DESIGN.md §7: el item activo se determina por coincidencia de segmento, no por
  * igualdad exacta — `/admin/projects/42` mantiene activo `Proyectos`.
  * `/` es la excepción: solo coincide de forma exacta.
  */
-function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+function matchesPath(pathname: string, href: string) {
+  const path = href.split("?")[0]!;
+  if (path === "/") return pathname === "/";
+  return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-function labelForPath(pathname: string, nav: NavGroup[]) {
-  for (const group of nav) {
-    for (const item of group.items) {
-      if (isActive(pathname, item.href)) return item.label;
-    }
-  }
-  return null;
+function matchesQuery(params: URLSearchParams, item: NavItem) {
+  if (!item.match) return true;
+  return Object.entries(item.match).every(([key, value]) => params.get(key) === value);
+}
+
+/**
+ * **Un solo item activo, siempre.** Gana el más específico: primero el que
+ * declara los search params que representa, y recién si ninguno matchea, el que
+ * mira solo la ruta.
+ *
+ * Sin esta precedencia, en `/calendar?status=pending` se encenderían a la vez
+ * `Calendario` y `Pendientes del equipo`, y dos items en `--primary` con su
+ * barra a la izquierda no dicen dónde está parado el usuario: dicen que el nav
+ * está roto.
+ */
+function findActive(pathname: string, params: URLSearchParams, nav: NavGroup[]): NavItem | null {
+  const candidates = nav
+    .flatMap((group) => group.items)
+    .filter((item) => matchesPath(pathname, item.href));
+
+  return (
+    candidates.find((item) => item.match && matchesQuery(params, item)) ??
+    candidates.find((item) => !item.match) ??
+    null
+  );
 }
 
 export function AppShell({
@@ -87,14 +138,19 @@ export function AppShell({
   userLabel: string;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Cada rol suma su propio destino sobre el calendario: el dev su bandeja, el
+  // admin el atajo a lo que está esperando respuesta.
+  const extras: NavItem[] =
+    role === "developer" ? [DEVELOPER_NAV_ITEM] : role === "admin" ? [TEAM_PENDING_ITEM] : [];
+
   const nav: NavGroup[] = [
-    {
-      label: null,
-      items:
-        role === "developer" ? [...BASE_NAV[0]!.items, DEVELOPER_NAV_ITEM] : BASE_NAV[0]!.items,
-    },
+    { label: null, items: [...BASE_NAV[0]!.items, ...extras] },
     ...(role === "admin" ? [ADMIN_NAV] : []),
   ];
+
+  const activeItem = findActive(pathname, searchParams, nav);
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -115,7 +171,7 @@ export function AppShell({
     });
   }
 
-  const currentLabel = labelForPath(pathname, nav);
+  const currentLabel = activeItem?.label ?? null;
 
   return (
     <div className="flex h-full">
@@ -162,7 +218,7 @@ export function AppShell({
               )}
               <ul className="flex flex-col gap-0.5">
                 {group.items.map(({ href, label, Icon }) => {
-                  const active = isActive(pathname, href);
+                  const active = activeItem?.href === href;
                   return (
                     <li key={href}>
                       <Link

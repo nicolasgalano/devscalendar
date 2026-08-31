@@ -247,6 +247,33 @@ describe("bookings developer response RLS", () => {
   });
 
   /**
+   * **Un admin tampoco aprueba por otro**, y es el único lugar de la app donde
+   * el rol admin no alcanza para algo.
+   *
+   * El primer bloque del trigger compara `auth.uid()` contra `dev_id` sin mirar
+   * el rol: aprobar no es una operación administrativa, es un compromiso sobre
+   * el tiempo de una persona. Si el admin pudiera aprobar por el dev, el "sí"
+   * del dev dejaría de significar algo, que es todo lo que esta feature vende.
+   *
+   * El test existe porque la pregunta se hizo en voz alta (2026-08-31, sobre si
+   * el admin debía tener bandeja) y el límite no estaba pineado por nada: había
+   * un test del PM y uno del admin editando, ninguno de esto.
+   */
+  it("stops an admin from approving on someone else's behalf", async () => {
+    const booking = await pendingBooking();
+    const client = await signInClient(adminDev.email, password);
+
+    const { error } = await client
+      .from("bookings")
+      .update({ status: "approved" })
+      .eq("id", booking.id);
+    expect(error?.code).toBe("23514");
+
+    const row = await readBack(booking.id);
+    expect(row?.status).toBe("pending");
+  });
+
+  /**
    * El guard del dev pregunta `not can_manage_booking(...)`, asi que a un admin
    * no lo alcanza aunque sea el dev asignado: sigue editando como admin. Si
    * esto se rompiera, un admin desarrollador perderia la mitad de su rol sin

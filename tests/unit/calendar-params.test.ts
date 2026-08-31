@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DEFAULT_STATUSES,
-  hasActiveFilters,
-  parseCalendarParams,
-} from "@/lib/validation/calendar";
+import { DEFAULT_STATUSES, hasActiveFilters, parseCalendarParams } from "@/lib/validation/calendar";
 
 const today = "2026-08-05";
 const parse = (raw: Record<string, string | string[] | undefined>) =>
@@ -105,9 +101,12 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(parse({ status: "cancelled" }).filters)).toBe(true);
   });
 
+  // La lista se arma desde `DEFAULT_STATUSES` y se desordena, en vez de
+  // escribirla a mano: así el test prueba que el orden no importa y no queda
+  // atado a *cuáles* son los estados por default, que ya cambiaron una vez
+  // (`005` sumó `rejected` — ver F7).
   it("ignores the order of the status list", () => {
-    expect(hasActiveFilters(parse({ status: "approved,displaced,pending" }).filters)).toBe(
-      false,
-    );
+    const shuffled = [...DEFAULT_STATUSES].reverse().join(",");
+    expect(hasActiveFilters(parse({ status: shuffled }).filters)).toBe(false);
   });
 });
