@@ -63,5 +63,35 @@ export const updateBookingSchema = z
     },
   );
 
+/**
+ * La respuesta del desarrollador: aprobar o rechazar, y nada más (`plan.md` §4).
+ *
+ * Tres decisiones que conviene leer juntas:
+ *
+ * - **`status` solo admite `approved` o `rejected`.** Cancelar es del PM y
+ *   desplazar es de `006`; que el enum los excluya evita que esta ruta se
+ *   convierta con el tiempo en un segundo camino para escribir cualquier estado.
+ * - **El comentario es obligatorio al rechazar** (acordado con el usuario el
+ *   2026-08-12) y opcional al aprobar. Un rechazo sin motivo deja al PM sin nada
+ *   que hacer salvo preguntar por otro canal, que es justo lo que la app viene a
+ *   evitar. `optionalText` ya convirtió `""` y los espacios en `null`, así que
+ *   "escribí algo" no se satisface con una barra espaciadora.
+ * - **`expectedUpdatedAt` es requerido, no opcional.** Es la mitad de la
+ *   protección contra la carrera de `plan.md` §5, y un campo opcional se omite
+ *   sin querer: si alguien construye la request a mano y lo saltea, la respuesta
+ *   tiene que fallar con un 400 visible, no comprometer al dev en silencio.
+ */
+export const respondBookingSchema = z
+  .object({
+    status: z.enum(["approved", "rejected"]),
+    note: optionalText,
+    expectedUpdatedAt: isoInstant,
+  })
+  .refine((body) => body.status !== "rejected" || Boolean(body.note), {
+    message: "Al rechazar hay que explicar el motivo",
+    path: ["note"],
+  });
+
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type UpdateBookingInput = z.infer<typeof updateBookingSchema>;
+export type RespondBookingInput = z.infer<typeof respondBookingSchema>;

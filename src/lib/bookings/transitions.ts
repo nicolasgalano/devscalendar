@@ -40,10 +40,7 @@ export function isReschedule(current: BookingSnapshot, edit: BookingEdit): boole
  * The rule only applies to `approved`. A `pending` booking edited stays
  * pending — there is no approval to invalidate.
  */
-export function nextStatusAfterEdit(
-  current: BookingSnapshot,
-  edit: BookingEdit,
-): BookingStatus {
+export function nextStatusAfterEdit(current: BookingSnapshot, edit: BookingEdit): BookingStatus {
   if (current.status === "approved" && isReschedule(current, edit)) return "pending";
   return current.status;
 }
@@ -67,9 +64,53 @@ export function canEdit(status: BookingStatus): boolean {
   return status === "pending" || status === "approved";
 }
 
-/** Human reason for refusing an edit or a cancellation, for the API response. */
+/**
+ * The two answers the developer can give. Cancelling and displacing move a
+ * booking too, but the first belongs to the PM and the second to the
+ * reallocation of `006`.
+ */
+export type BookingResponse = Extract<BookingStatus, "approved" | "rejected">;
+
+/**
+ * `plan.md` §3.3: only a booking that is still `pending` is answered.
+ *
+ * `approved -> rejected` would be the developer taking back a commitment the PM
+ * already planned around, and `rejected -> approved` contradicts the functional
+ * spec §5.2, where a rejection becomes a *new* booking instead of a pending one
+ * again. Both are a conversation with the PM, not a button (F3).
+ */
+export function canRespond(status: BookingStatus): boolean {
+  return status === "pending";
+}
+
+/**
+ * The status a booking lands on once the developer answers, or `null` when the
+ * answer does not apply to it.
+ *
+ * Sibling of `nextStatusAfterEdit`, and it exists for the same reason: the rule
+ * about which transitions are legal lives in one pure function a unit test can
+ * exhaust, instead of spread across a handler. The database enforces the same
+ * rule inside `enforce_booking_status_transition()` — this is the copy that can
+ * answer with a 409 instead of letting a raised exception become a 500.
+ */
+export function nextStatusAfterResponse(
+  current: BookingStatus,
+  response: BookingResponse,
+): BookingStatus | null {
+  return canRespond(current) ? response : null;
+}
+
+/**
+ * Postgres `check_violation` — the errcode `enforce_booking_status_transition()`
+ * raises, both for the column guard of `005` and for the "approving is not the
+ * PM's call" rule of `004`. It means the caller asked for something the database
+ * refuses on principle, so it translates to 403 and never to 500.
+ */
+export const TRANSITION_VIOLATION = "23514";
+
+/** Human reason for refusing an edit, a cancellation or a response. */
 export function explainBlockedAction(
-  action: "edit" | "cancel",
+  action: "edit" | "cancel" | "respond",
   status: BookingStatus,
 ): string {
   const labels: Record<BookingStatus, string> = {
@@ -80,7 +121,7 @@ export function explainBlockedAction(
     displaced: "desplazada",
   };
 
-  return action === "cancel"
-    ? `Una reserva ${labels[status]} no se puede cancelar`
-    : `Una reserva ${labels[status]} no se puede editar`;
+  const verbs = { edit: "editar", cancel: "cancelar", respond: "responder" } as const;
+
+  return `Una reserva ${labels[status]} no se puede ${verbs[action]}`;
 }
