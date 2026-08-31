@@ -48,7 +48,7 @@ alter table public.bookings
 ```
 
 - **`response_note` es del dev, y `note` sigue siendo del PM.** Reusar `note` para el motivo del rechazo pisaría el encargo original justo cuando el PM más lo necesita: para entender qué pidió y por qué se lo rechazaron.
-- **`responded_at`** separa "todavía no respondió" de "respondió hace un rato". `updated_at` no sirve para eso: lo mueve cualquier edición del PM.
+- **`responded_at`** separa "todavía no respondió" de "respondió hace un rato". `updated_at` no sirve para eso: lo mueve cualquier edición del PM. **La escribe el trigger, nunca el cliente** — ver §3.2.
 
 ### 3.2 La policy del dev, y por qué sola no alcanza
 
@@ -66,18 +66,14 @@ create policy "bookings: developer responds"
 RLS no puede expresarlo: `with check` solo ve la fila nueva, y no existe un `with check` por columna que compare contra la vieja. Se resuelve **extendiendo el trigger que `004` ya dejó puesto**:
 
 ```sql
--- Dentro de enforce_booking_status_transition(), además del guard actual:
+-- Dentro de enforce_booking_status_transition(), además del guard actual.
+-- `responder_writable` se declara arriba: array['status', 'response_note', 'updated_at'].
 if auth.uid() is not null
    and auth.uid() = old.dev_id
    and not public.can_manage_booking(old.project_id)
 then
   -- El dev solo responde. Todo lo demás es del PM.
-  if new.project_id  is distinct from old.project_id
-     or new.dev_id    is distinct from old.dev_id
-     or new.starts_at is distinct from old.starts_at
-     or new.ends_at   is distinct from old.ends_at
-     or new.note      is distinct from old.note
-     or new.ticket_ref is distinct from old.ticket_ref
+  if (to_jsonb(new) - responder_writable) is distinct from (to_jsonb(old) - responder_writable)
   then
     raise exception 'El desarrollador solo puede aprobar o rechazar una reserva'
       using errcode = 'check_violation';
@@ -86,6 +82,12 @@ end if;
 ```
 
 El `not can_manage_booking(...)` importa: un admin que además es el dev asignado sigue pudiendo editar como admin.
+
+**La lista es de lo que se puede escribir, no de lo que no** (decisión de implementación, 2026-08-26). Enumerar las columnas prohibidas —`starts_at`, `ends_at`, `dev_id`, `note`, `ticket_ref`— deja abiertas las que nadie nombró: `id`, `created_by`, `created_at`, y sobre todo **las que agregue una feature futura**, que nacerían escribibles por el dev sin que nadie lo decida. Con la forma de arriba nacen protegidas, y abrir una es nombrarla acá — o sea una revisión, no un olvido. `updated_at` está en la lista porque es de `bookings_set_updated_at`: hoy ese trigger corre después de este por orden alfabético, y ninguna regla de seguridad debería depender de que eso siga siendo cierto.
+
+`responded_at` no está en la lista porque **no se escribe, se deriva**: el mismo trigger lo pone en `now()` cuando la reserva pasa de `pending` a `approved` / `rejected`, y lo borra —junto con `response_note`— cuando Q-E la devuelve a `pending`. Una respuesta a un horario que ya cambió no describe nada, y dejarla haría que la bandeja mostrara una reserva pendiente que dice haber sido respondida. Ni la API ni el cliente mandan la columna nunca.
+
+La regla de §3.3 —solo se responde lo que sigue `pending`— quedó también **dentro del trigger**, en la misma rama del dev, y no solo en `canRespond()`. Es lo que F3 ya daba por hecho al decir que relajarla toca "`nextStatusAfterResponse` y el trigger".
 
 ### 3.3 Transiciones válidas
 
@@ -108,21 +110,25 @@ create trigger bookings_log_status_change
 
 con `entity = 'booking'`, `action = 'status_change'` y `diff = { from, to, response_note }`.
 
+**Se registra todo cambio de estado, no solo la respuesta del dev** (decisión de implementación, 2026-08-26): la cancelación del PM y el regreso a `pending` de Q-E son exactamente el historial del que `007` y `010` van a colgarse, y un trigger que discrimine cuál transición merece rastro es un trigger que hay que volver a tocar en cada feature.
+
 Hoy `audit_log` solo lo lee el admin. Que el PM vea el historial de su reserva es de `010`; acá el rastro se escribe y nada más.
+
+**Consecuencia en la limpieza:** `audit_log` referencia la entidad por id y sin FK, así que borrar una reserva deja sus filas huérfanas. `scripts/cleanup-test-data.mjs`, `tests/integration/helpers.ts` y `tests/e2e/session.ts` ahora leen los ids de las reservas **antes** de borrarlas — después no hay forma de saber cuáles eran suyas.
 
 ---
 
 ## 4. API surface
 
-| Método | Ruta | Body | Response | Auth |
-| :---- | :---- | :---- | :---- | :---- |
-| PATCH | `/api/bookings/[id]/response` | `{ status: "approved" \| "rejected", note?, expectedUpdatedAt }` | `Booking` | El dev asignado |
+| Método | Ruta                          | Body                                                             | Response  | Auth            |
+| :----- | :---------------------------- | :--------------------------------------------------------------- | :-------- | :-------------- |
+| PATCH  | `/api/bookings/[id]/response` | `{ status: "approved" \| "rejected", note?, expectedUpdatedAt }` | `Booking` | El dev asignado |
 
 **Ruta propia, no un `status` más en el PATCH del PM.** Los dos caminos comparten la tabla y nada más: distinto guard (`dev_id = auth.uid()` vs. `requireBookingAccess(projectId)`), distinta validación (el comentario obligatorio solo existe acá) y distinto manejo de conflicto. Meterlos en un handler daría un body que significa cosas distintas según quién llame — la clase de ambigüedad que después nadie se anima a tocar.
 
 ### Tres errores que hay que traducir
 
-1. **`23P01` → 409 con la reserva en conflicto.** Es la obligación que ADR 0008 le dejó anotada a esta feature: el constraint recién se activa acá, cuando dos `pending` superpuestas intentan volverse `approved`. Se reusa `findConflictingBooking()` de `004`. El mensaje es para el dev, no para el PM: *"Ya tenés aprobada otra reserva en esa franja"*.
+1. **`23P01` → 409 con la reserva en conflicto.** Es la obligación que ADR 0008 le dejó anotada a esta feature: el constraint recién se activa acá, cuando dos `pending` superpuestas intentan volverse `approved`. Se reusa `findConflictingBooking()` de `004`. El mensaje es para el dev, no para el PM: _"Ya tenés aprobada otra reserva en esa franja"_.
 2. **`check_violation` del trigger → 403**, con el motivo en palabras.
 3. **`expectedUpdatedAt` que no coincide → 409** (ver §5).
 
@@ -132,7 +138,7 @@ Hoy `audit_log` solo lo lee el admin. Que el PM vea el historial de su reserva e
 
 Hoy no existe porque el dev no puede escribir. **Esta feature la crea**, así que le toca resolverla.
 
-El escenario: el dev abre la bandeja y ve *"martes 09:00–13:00, Portal de reservas"*. Mientras decide, el PM mueve la reserva a *"jueves 14:00–18:00"* — Q-E la devuelve a `pending`, así que sigue en la bandeja, con el mismo aspecto. El dev aprueba. **Sin protección, acaba de comprometerse a un horario que nunca vio.**
+El escenario: el dev abre la bandeja y ve _"martes 09:00–13:00, Portal de reservas"_. Mientras decide, el PM mueve la reserva a _"jueves 14:00–18:00"_ — Q-E la devuelve a `pending`, así que sigue en la bandeja, con el mismo aspecto. El dev aprueba. **Sin protección, acaba de comprometerse a un horario que nunca vio.**
 
 **Solución: concurrencia optimista sobre `updated_at`.** La bandeja entrega el `updated_at` de cada reserva, la respuesta lo devuelve en `expectedUpdatedAt`, y el handler compara antes de escribir. Si no coincide, `409` con la reserva actualizada y un mensaje que dice que cambió.
 
@@ -151,7 +157,7 @@ Ruta nueva bajo el route group `(app)`, con su item de navegación **visible sol
 
 - Lista de reservas `pending` del dev ordenadas por `starts_at` (AC-1.1), en filas de 36px según la densidad de `DESIGN.md` §5.
 - Cada fila: proyecto, cliente, día y franja, la nota del PM si la hay, y las dos acciones.
-- **Los cuatro estados de datos** (§9). El vacío acá es buena noticia, no una carencia: *"Sin reservas para responder"*, con link al calendario en lugar de un verbo inventado.
+- **Los cuatro estados de datos** (§9). El vacío acá es buena noticia, no una carencia: _"Sin reservas para responder"_, con link al calendario en lugar de un verbo inventado.
 - El badge con la cantidad de pendientes en el nav es de `010`: saber cuántas hay sin entrar ya es media notificación.
 
 ### Respuesta desde el calendario
@@ -184,13 +190,13 @@ Ninguna. El push a Google Calendar del approve (AC-2.1) es `007`; la notificaci�
 
 ## 9. Riesgos y mitigaciones
 
-| # | Riesgo | Mitigación |
-| :---- | :---- | :---- |
+| #   | Riesgo                                                                                                                                                 | Mitigación                                                                                                                                                                           |
+| :-- | :----------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R-1 | **La policy del dev le abre además la edición de sus propias horas.** Las policies se combinan con OR, y `with check` no compara contra la fila vieja. | El guard de columnas del §3.2, dentro del trigger que `004` ya dejó. Test de integración explícito: el dev intenta mover su `starts_at` y falla. **Es el test que no puede faltar.** |
-| R-2 | Race entre edición y aprobación (F1 de `004`). | Concurrencia optimista sobre `updated_at` (§5), con test de integración de dos escrituras intercaladas. |
-| R-3 | El `23P01` sale como 500 al aprobar sobre una franja ya aprobada. | Traducción a 409 con la reserva en conflicto (§4). Es la deuda que ADR 0008 dejó nombrada. |
-| R-4 | Dos aprobaciones en paralelo sobre franjas superpuestas. | El constraint las resuelve; se verifica con el mismo patrón de concurrencia real de `004` (T4.4), **en paralelo, no en serie**. |
-| R-5 | La bandeja se toma por frontera de seguridad y alguien filtra solo en el cliente. | La bandeja es una **vista**, no un permiso: por Q-5 el dev lee el calendario global. Lo que protege es la policy de escritura, y eso se testea contra la RLS. |
+| R-2 | Race entre edición y aprobación (F1 de `004`).                                                                                                         | Concurrencia optimista sobre `updated_at` (§5), con test de integración de dos escrituras intercaladas.                                                                              |
+| R-3 | El `23P01` sale como 500 al aprobar sobre una franja ya aprobada.                                                                                      | Traducción a 409 con la reserva en conflicto (§4). Es la deuda que ADR 0008 dejó nombrada.                                                                                           |
+| R-4 | Dos aprobaciones en paralelo sobre franjas superpuestas.                                                                                               | El constraint las resuelve; se verifica con el mismo patrón de concurrencia real de `004` (T4.4), **en paralelo, no en serie**.                                                      |
+| R-5 | La bandeja se toma por frontera de seguridad y alguien filtra solo en el cliente.                                                                      | La bandeja es una **vista**, no un permiso: por Q-5 el dev lee el calendario global. Lo que protege es la policy de escritura, y eso se testea contra la RLS.                        |
 
 ---
 

@@ -7,7 +7,7 @@
 -- you can hardcode ids while debugging:
 --
 --   …0011/0012 PMs · …0021–0023 developers · …0031/0032 clients
---   …0041/0042 projects · …0051–0059 bookings
+--   …0041/0042 projects · …0051–005e bookings
 --
 -- The auth users below exist only to satisfy the profiles FK: they have no
 -- usable password, because the real login is Google OAuth. To give *your*
@@ -93,7 +93,7 @@ values
 on conflict (id) do nothing;
 
 -- ─────────────────────────────────────────────────────────────
--- 3. Bookings (feature 003-calendar-ui)
+-- 3. Bookings (features 003-calendar-ui / 005-approval-flow)
 -- ─────────────────────────────────────────────────────────────
 -- Anchored to the Monday of the current week, so every seed run lands on a
 -- populated day view without editing dates by hand. Wall-clock times are built
@@ -104,13 +104,19 @@ on conflict (id) do nothing;
 --   · a booking on a high-priority project         → priority marker (AC-2.3)
 --   · one booking in each of the 5 states          → functional spec §5.2
 --   · one outside 09:00–17:00 and one on a Saturday → Q-F / Q-G
--- The last two are rare in production, which is exactly why they belong in the
+--   · four pendings of the same developer on four different days → the inbox of
+--     005, which is a list ordered by date and needs more than one date to
+--     prove that it orders anything
+-- Most of this is rare in production, which is exactly why it belongs in the
 -- seed: nobody remembers to test by hand what almost never happens.
 do $$
 declare
   tz constant text := 'America/Argentina/Buenos_Aires';
   monday constant date := date_trunc('week', current_date)::date;
   tuesday constant date := (date_trunc('week', current_date)::date) + 1;
+  wednesday constant date := (date_trunc('week', current_date)::date) + 2;
+  thursday constant date := (date_trunc('week', current_date)::date) + 3;
+  friday constant date := (date_trunc('week', current_date)::date) + 4;
   saturday constant date := (date_trunc('week', current_date)::date) + 5;
 
   pm_paula constant uuid := '00000000-0000-4000-8000-000000000011';
@@ -122,40 +128,54 @@ declare
   proj_portal constant uuid := '00000000-0000-4000-8000-000000000042';
 begin
   insert into public.bookings
-    (id, project_id, dev_id, created_by, starts_at, ends_at, status, note, ticket_ref)
+    (id, project_id, dev_id, created_by, starts_at, ends_at, status, note, ticket_ref,
+     response_note, responded_at)
   values
     -- Monday, normal working hours.
     ('00000000-0000-4000-8000-000000000051', proj_website, dev_cristian, pm_paula,
      (monday + time '09:00') at time zone tz, (monday + time '13:00') at time zone tz,
-     'approved', 'Migración del checkout', 'WEB-142'),
+     'approved', 'Migración del checkout', 'WEB-142',
+     null, now()),
     -- Overlaps the one above in time, different developer → parallel lanes.
     ('00000000-0000-4000-8000-000000000052', proj_website, dev_malena, pm_paula,
      (monday + time '09:00') at time zone tz, (monday + time '12:00') at time zone tz,
-     'pending', 'Revisión de diseño responsive', 'WEB-155'),
-    -- High-priority project, spans most of the day.
+     'pending', 'Revisión de diseño responsive', 'WEB-155',
+     null, null),
+    -- High-priority project, spans most of the day. Approved *with* a remark:
+    -- the note is optional when approving, and only mandatory on a rejection.
     ('00000000-0000-4000-8000-000000000053', proj_portal, dev_rodrigo, pm_diego,
      (monday + time '10:00') at time zone tz, (monday + time '17:00') at time zone tz,
-     'approved', 'Integración de pagos', 'POR-7'),
+     'approved', 'Integración de pagos', 'POR-7',
+     'Arranco después del daily', now()),
     ('00000000-0000-4000-8000-000000000054', proj_portal, dev_cristian, pm_diego,
      (monday + time '14:00') at time zone tz, (monday + time '17:00') at time zone tz,
-     'pending', null, 'POR-11'),
+     'pending', null, 'POR-11',
+     null, null),
+    -- Rejected with a reason. The reason lives in `response_note`, which is the
+    -- developer's field; `note` stays the PM's ask, so both the calendar and the
+    -- inbox can show what was asked *and* why it did not happen (005 §3.1).
     ('00000000-0000-4000-8000-000000000055', proj_website, dev_malena, pm_paula,
      (monday + time '13:00') at time zone tz, (monday + time '15:00') at time zone tz,
-     'rejected', 'No llega, ya está con otro cliente', null),
+     'rejected', 'Ajustes de accesibilidad del carrito', null,
+     'No llega, ya está con otro cliente', now()),
     ('00000000-0000-4000-8000-000000000056', proj_website, dev_rodrigo, pm_paula,
      (monday + time '09:00') at time zone tz, (monday + time '10:00') at time zone tz,
-     'cancelled', null, null),
+     'cancelled', null, null,
+     null, null),
     ('00000000-0000-4000-8000-000000000057', proj_website, dev_cristian, pm_paula,
      (monday + time '15:00') at time zone tz, (monday + time '16:00') at time zone tz,
-     'displaced', 'Desplazada por Portal de reservas', null),
+     'displaced', 'Desplazada por Portal de reservas', null,
+     null, null),
     -- Outside the 09:00–17:00 workday: exceptional, allowed, never hidden (Q-G).
     ('00000000-0000-4000-8000-000000000058', proj_portal, dev_malena, pm_diego,
      (monday + time '18:00') at time zone tz, (monday + time '20:00') at time zone tz,
-     'approved', 'Ventana de deploy', 'POR-19'),
+     'approved', 'Ventana de deploy', 'POR-19',
+     null, now()),
     -- Saturday: non-working day, so the month view flags it as over capacity.
     ('00000000-0000-4000-8000-000000000059', proj_website, dev_rodrigo, pm_paula,
      (saturday + time '10:00') at time zone tz, (saturday + time '14:00') at time zone tz,
-     'approved', 'Migración de base, ventana de fin de semana', 'WEB-160'),
+     'approved', 'Migración de base, ventana de fin de semana', 'WEB-160',
+     null, now()),
     -- Two back-to-back approved bookings for the same developer. This is the
     -- edge of the anti double-booking constraint (004): tstzrange defaults to
     -- [), so 13:00 closes the first and opens the second without colliding.
@@ -164,10 +184,29 @@ begin
     -- the seed itself would fail.
     ('00000000-0000-4000-8000-00000000005a', proj_website, dev_malena, pm_paula,
      (tuesday + time '09:00') at time zone tz, (tuesday + time '13:00') at time zone tz,
-     'approved', 'Refactor del carrito', 'WEB-171'),
+     'approved', 'Refactor del carrito', 'WEB-171',
+     null, now()),
     ('00000000-0000-4000-8000-00000000005b', proj_website, dev_malena, pm_paula,
      (tuesday + time '13:00') at time zone tz, (tuesday + time '17:00') at time zone tz,
-     'approved', 'Continuación, mismo día', 'WEB-171')
+     'approved', 'Continuación, mismo día', 'WEB-171',
+     null, now()),
+    -- Cristian's inbox (005, AC-1.1). With …0054 on Monday these make four
+    -- pendings on four different days, one per shape the list has to render:
+    -- with a note and a ticket, with neither, and one outside the workday so the
+    -- warning of 004 also shows up here. None of them overlaps another of his,
+    -- so each one can be approved by hand without running into the constraint.
+    ('00000000-0000-4000-8000-00000000005c', proj_website, dev_cristian, pm_paula,
+     (wednesday + time '09:00') at time zone tz, (wednesday + time '13:00') at time zone tz,
+     'pending', 'Accesibilidad del checkout: foco y lectores de pantalla', 'WEB-180',
+     null, null),
+    ('00000000-0000-4000-8000-00000000005d', proj_portal, dev_cristian, pm_diego,
+     (thursday + time '10:00') at time zone tz, (thursday + time '12:00') at time zone tz,
+     'pending', null, null,
+     null, null),
+    ('00000000-0000-4000-8000-00000000005e', proj_portal, dev_cristian, pm_diego,
+     (friday + time '18:00') at time zone tz, (friday + time '21:00') at time zone tz,
+     'pending', 'Ventana de migración, fuera de horario', 'POR-31',
+     null, null)
   -- Idempotent on purpose: re-running the seed refreshes the
   -- dates to the current week instead of failing on the primary key.
   on conflict (id) do update set
@@ -178,5 +217,10 @@ begin
     ends_at = excluded.ends_at,
     status = excluded.status,
     note = excluded.note,
-    ticket_ref = excluded.ticket_ref;
+    ticket_ref = excluded.ticket_ref,
+    -- Listed like the rest: without these two, re-seeding a database where
+    -- somebody answered a booking by hand would keep the answer next to a state
+    -- the seed has just overwritten.
+    response_note = excluded.response_note,
+    responded_at = excluded.responded_at;
 end $$;

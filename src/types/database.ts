@@ -61,6 +61,8 @@ export type Database = {
           id: string
           note: string | null
           project_id: string
+          responded_at: string | null
+          response_note: string | null
           starts_at: string
           status: string
           ticket_ref: string | null
@@ -74,6 +76,8 @@ export type Database = {
           id?: string
           note?: string | null
           project_id: string
+          responded_at?: string | null
+          response_note?: string | null
           starts_at: string
           status?: string
           ticket_ref?: string | null
@@ -87,6 +91,8 @@ export type Database = {
           id?: string
           note?: string | null
           project_id?: string
+          responded_at?: string | null
+          response_note?: string | null
           starts_at?: string
           status?: string
           ticket_ref?: string | null

@@ -166,7 +166,19 @@ export async function seedBooking(booking: {
 /** Reservas, proyecto y cliente en ese orden: las FK son `restrict`. */
 export async function deleteProjectFixture(ids: { clientId: string; projectId: string }) {
   const admin = serviceClient();
+
+  // Los ids se leen antes de borrar: desde 005 cada cambio de estado deja su
+  // fila en `audit_log`, que apunta a la reserva por id y sin FK.
+  const { data: bookings } = await admin
+    .from("bookings")
+    .select("id")
+    .eq("project_id", ids.projectId);
+  const bookingIds = (bookings ?? []).map((row) => row.id);
+
   await admin.from("bookings").delete().eq("project_id", ids.projectId);
+  if (bookingIds.length > 0) {
+    await admin.from("audit_log").delete().in("entity_id", bookingIds);
+  }
   await admin.from("audit_log").delete().eq("entity_id", ids.projectId);
   await admin.from("projects").delete().eq("id", ids.projectId);
   await admin.from("clients").delete().eq("id", ids.clientId);
