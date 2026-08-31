@@ -18,7 +18,8 @@ export default defineConfig({
           include: ["tests/unit/**/*.test.ts"],
         },
       },
-      // Against the *test* Supabase project (never the dev one — see tests/env.ts):
+      // Against the ephemeral stack that lives and dies inside the CI job — not
+      // against any hosted project, and `tests/env.ts` refuses a non-local URL:
       // RLS, triggers and the query layer.
       {
         resolve: { alias },
