@@ -156,9 +156,20 @@ test("a developer rejects with a mandatory comment", async ({ context, page }) =
 
   await expect(inboxRow(page, PROJECT_NAME)).toHaveCount(0, AFTER_WRITE);
 
-  // El PM la ve rechazada, que es la señal que lo manda a reasignar (§8).
+  /**
+   * El PM la ve rechazada — **pero hay que pedir el estado en la URL.**
+   *
+   * `DEFAULT_STATUSES` (003) es `pending, approved, displaced`: los terminales
+   * se ocultan para no llenar la grilla de tiempo que nadie va a trabajar. Con
+   * `rejected` adentro de esa lista de ocultos, una reserva rechazada
+   * desaparece del calendario por default.
+   *
+   * El test lo pide explícito en vez de asumirlo, que es lo que hacía en la
+   * primera corrida y por eso falló. Que esa sea la conducta correcta del
+   * producto es otra discusión, anotada como F7.
+   */
   await authenticate(context, pm);
-  await page.goto(`/calendar?view=day&date=${REJECT_DAY}`);
+  await page.goto(`/calendar?view=day&date=${REJECT_DAY}&status=pending,approved,rejected`);
   await expect(blockWithStatus(page, "Rechazada")).toBeVisible(AFTER_WRITE);
 });
 
