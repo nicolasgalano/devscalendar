@@ -2,7 +2,7 @@
 
 - **ID:** 005-approval-flow
 - **Plan reference:** `./plan.md`
-- **Status:** fases 1-3 escritas (T1.3 bloqueada por credenciales). T3.1 pasa local; T3.2-T3.6 sin verificar hasta la primera corrida de CI.
+- **Status:** fases 1-3 cerradas y verificadas en CI (run 33406711842, verde). T1.3 sigue bloqueada por credenciales. Próxima: fase 4 (UI).
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -12,7 +12,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Phase 1 — Escritura del desarrollador
 
-- [~] **T1.1** — Migration `00000000000007_booking_responses.sql`, en un solo archivo (`plan.md` §12: separar la policy del guard abre una ventana en la que cualquier dev puede reescribir sus reservas):
+- [x] **T1.1** — Migration `00000000000007_booking_responses.sql`, en un solo archivo (`plan.md` §12: separar la policy del guard abre una ventana en la que cualquier dev puede reescribir sus reservas):
   - Columnas `response_note text` y `responded_at timestamptz`, ambas nullable.
   - Policy `bookings: developer responds` (`plan.md` §3.2).
   - **Guard de columnas dentro de `enforce_booking_status_transition()`**, extendiendo la función de `004` en vez de agregar un trigger nuevo: dos triggers `before update` sobre la misma tabla se ejecutan por orden alfabético de nombre, y hacer depender una regla de seguridad de eso es pedirla prestada al azar.
@@ -20,14 +20,14 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
   - El guard quedó como lista de lo escribible y no de lo prohibido, `responded_at` lo deriva el trigger, y la regla de `§3.3` también vive ahí. Los tres cambios respecto del sketch del plan están anotados en `plan.md` §3.1 / §3.2.
   - **Aplicada al proyecto de desarrollo el 2026-08-26, antes que CI, por decisión explícita del usuario.** El SQL corre limpio contra una base real —incluida la resta de `jsonb` del guard—, que era la duda grande. Lo que sigue faltando es el **comportamiento**: que la policy y el guard hagan lo que dicen no lo prueba `db push`, lo prueba T3.2. El DoD sigue abierto hasta entonces.
   - De paso salió que el remoto estaba **dos migrations atrás**: `00000000000006` (el camino de escritura de `004`) tampoco se había aplicado nunca. Ahora está.
-- [~] **T1.2** — Trigger `bookings_log_status_change` → `audit_log` (`plan.md` §3.4). Mismo patrón que `projects_log_priority_change`: `security definer`, sin `grant insert` para nadie. _DoD: T3.5._
+- [x] **T1.2** — Trigger `bookings_log_status_change` → `audit_log` (`plan.md` §3.4). Mismo patrón que `projects_log_priority_change`: `security definer`, sin `grant insert` para nadie. _DoD: T3.5._
   - Registra **todo** cambio de estado, no solo la respuesta del dev (`plan.md` §3.4). Como `audit_log` apunta a la entidad sin FK, los tres caminos de limpieza —`scripts/cleanup-test-data.mjs`, `tests/integration/helpers.ts`, `tests/e2e/session.ts`— ahora leen los ids de las reservas antes de borrarlas.
 - [!] **T1.3** — `pnpm db:types`. _DoD: `pnpm typecheck` limpio._
   - **El comando no se pudo correr (2026-08-26), y los tipos se parchearon a mano.** `src/types/database.ts` tiene `responded_at` y `response_note` en `Row` / `Insert` / `Update` de `bookings`, escritas a mano en el orden alfabético que usa el generador y con la nulabilidad que informa PostgREST. Es un archivo generado: **hay que regenerarlo y confirmar que el diff da vacío** apenas se pueda.
   - Por qué no se pudo: `db:types` es `gen types --linked`, que va por la Management API, y el token guardado del CLI es de **otra cuenta** (`projects list` devuelve cero proyectos y la API contesta "your account does not have the necessary privileges"). Las otras dos formas —`--db-url` y `--local`— levantan un contenedor para introspeccionar, y no hay Docker. **La secret key no sirve para esto**: es credencial de PostgREST, no de la Management API.
   - Para destrabarlo hace falta **un personal access token de la cuenta dueña del proyecto** (Dashboard → Account → Access Tokens): `supabase login`, o `SUPABASE_ACCESS_TOKEN=sbp_…`.
 - [~] **T1.4** — Ampliar `seed.sql` con reservas pendientes del dev del seed, para que la bandeja tenga contenido apenas se levanta el entorno. Mantener la idempotencia (`on conflict`), que ahora es requisito y no comodidad: el seed se corre sobre bases que ya tienen datos. _DoD: el stack efímero de CI queda con al menos tres pendientes de fechas distintas, y `pnpm db:seed` sobre el proyecto remoto corrido dos veces seguidas no falla ni duplica._
-  - Cuatro pendientes de Cristian Soto (…0054 el lunes, …005c/…005d/…005e miércoles a viernes), una con nota y ticket, una sin nada y una fuera de horario. Ninguna se superpone con otra suya, así que se pueden aprobar a mano sin chocar contra el constraint. De paso, el motivo del rechazo de …0055 se mudó de `note` a `response_note`, que es donde vive desde ahora. La segunda mitad del DoD —dos `db:seed` seguidos— queda con T1.3, por la misma credencial.
+  - Cuatro pendientes de Cristian Soto (…0054 el lunes, …005c/…005d/…005e miércoles a viernes), una con nota y ticket, una sin nada y una fuera de horario. Ninguna se superpone con otra suya, así que se pueden aprobar a mano sin chocar contra el constraint. De paso, el motivo del rechazo de …0055 se mudó de `note` a `response_note`, que es donde vive desde ahora. La segunda mitad del DoD —dos `db:seed` seguidos— queda con T1.3, por la misma credencial. **La primera mitad quedó verificada en CI** (run 33406711842): el paso `Aplicar migrations y seed desde cero` reconstruye la base con `seed.sql` y pasó, así que el stack efímero arranca con las cuatro pendientes.
 
 ## Phase 2 — Reglas y API
 
@@ -54,29 +54,33 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 - [x] **T3.1** — Unit: transiciones de respuesta y schema Zod. Caso central: **rechazar sin comentario falla, aprobar sin comentario no**. _DoD: corren sin Supabase._
   - Once tests nuevos en `tests/unit/booking-transitions.test.ts` (140 en total, verde local). Cubren `canRespond`, `nextStatusAfterResponse` —las dos vueltas atrás de `plan.md` §3.3 incluidas—, `explainBlockedAction("respond", …)` y `respondBookingSchema`.
   - Uno de ellos fija que `expectedUpdatedAt` acepta **el formato exacto que devuelve PostgREST** (`2026-08-26T12:34:56.789123+00:00`, con microsegundos y offset). Si el `z.string().datetime({ offset: true })` no lo tragara, la bandeja fallaría con un 400 en cada respuesta y el motivo sería invisible.
-- [~] **T3.2** — **Integración, el test que no puede faltar (R-1):** el dev **no** puede cambiar `starts_at`, `ends_at`, `dev_id`, `note` ni `ticket_ref` de su propia reserva, y **sí** puede cambiar `status` y `response_note`.
+- [x] **T3.2** — **Integración, el test que no puede faltar (R-1):** el dev **no** puede cambiar `starts_at`, `ends_at`, `dev_id`, `note` ni `ticket_ref` de su propia reserva, y **sí** puede cambiar `status` y `response_note`.
   - Verificar **leyendo la fila de vuelta**, no solo por el error: si algún día la policy denegara en vez de tirar, la RLS convierte el `update` en un no-op silencioso y un test que solo mire el error pasaría por la razón equivocada (la lección de `004` T4.2).
   - Más: el dev responde la suya; **no** responde la de otro; el PM sigue sin poder aprobar (regresión del guard de `004`); un admin que además es el dev asignado **sí** puede editar.
   - Escrito en `tests/integration/bookings-response-rls.test.ts`. Las cuatro columnas prohibidas van por `it.each` y se afirman de las dos formas: `23514` **y** la fila leída de vuelta.
   - **`dev_id` se afirma por resultado y no por código de error**, a diferencia de las otras cuatro: ahí pueden hablar dos mecanismos —el guard del trigger y el `with check` de la policy, que deja de matchear cuando la fila cambia de dueño— y cuál gane depende del orden en que Postgres los evalúa. Fijar ese orden sería atarse a un detalle de implementación; lo que importa es que la reserva no cambia de manos.
   - **Test de más, no pedido por el plan:** que volver a `pending` limpie `responded_at` y `response_note` (Q-E). El trigger deriva las dos columnas y no había nada que lo cubriera; sin esto, la bandeja podría mostrar una reserva pendiente que dice haber sido contestada.
-- [~] **T3.3** — Integración del conflicto: aprobar sobre una franja ya aprobada del mismo dev → `23P01`, y la API lo devuelve como 409 **con la reserva que bloquea**. Es la primera vez que el constraint de `004` se dispara de verdad.
+- [x] **T3.3** — Integración del conflicto: aprobar sobre una franja ya aprobada del mismo dev → `23P01`, y la API lo devuelve como 409 **con la reserva que bloquea**. Es la primera vez que el constraint de `004` se dispara de verdad.
   - En `tests/integration/bookings-response-conflict.test.ts`. La mitad del `23P01` se prueba directo contra la base.
   - **La mitad de "con la reserva que bloquea" se prueba llamando a `findConflictingBooking()` contra el stack real**, con el cliente del **dev** y no con `service_role`: así se verifica de paso que su RLS le alcanza para ver la fila que lo bloquea, que es lo que el 409 promete devolverle. El 409 HTTP entero es de T4.6 / T4.7 — a este nivel se prueban sus dos ingredientes.
   - Incluye el borde `[)`: dos franjas que solo se tocan no son conflicto, y aprobar encadenado funciona.
-- [~] **T3.4** — Integración de la carrera (R-2): el PM edita, el dev responde con el `expectedUpdatedAt` viejo, la respuesta es 409 y **la reserva sigue `pending`**.
+- [x] **T3.4** — Integración de la carrera (R-2): el PM edita, el dev responde con el `expectedUpdatedAt` viejo, la respuesta es 409 y **la reserva sigue `pending`**.
   - Reproduce el `.eq("updated_at", …)` del handler tal cual: cero filas, **sin error**, y la reserva intacta. Eso es exactamente lo que el handler traduce al 409.
   - **Con su contraparte positiva**, que no es decorativa: sin ella, el test pasaría igual si el `.eq()` estuviera fallando siempre y nadie se enteraría de que la respuesta nunca entra.
-- [~] **T3.5** — Integración de auditoría: aprobar y rechazar escriben su fila en `audit_log` con `from`, `to` y el motivo.
+- [x] **T3.5** — Integración de auditoría: aprobar y rechazar escriben su fila en `audit_log` con `from`, `to` y el motivo.
   - Vive dentro de `bookings-response-rls.test.ts` y no en `audit-log.test.ts`: necesita exactamente las mismas fixtures (proyecto, dev asignado, reserva pendiente, sesión del dev) y duplicarlas era pagar un `beforeAll` entero por cuatro asserts. `audit-log.test.ts` sigue siendo el de `002`, sobre el trigger de prioridad.
   - Cubre además **la cancelación del PM**, porque el trigger registra *todo* cambio de estado (`plan.md` §3.4) y no solo la respuesta del dev — y el caso negativo: tocar la nota no escribe nada.
-- [~] **T3.6** — **Concurrencia (R-4):** dos aprobaciones en paralelo sobre franjas superpuestas del mismo dev; exactamente una persiste. _DoD: en paralelo, no en serie — en serie pasa hasta un check aplicativo._
+- [x] **T3.6** — **Concurrencia (R-4):** dos aprobaciones en paralelo sobre franjas superpuestas del mismo dev; exactamente una persiste. _DoD: en paralelo, no en serie — en serie pasa hasta un check aplicativo._
   - Tres aprobaciones simultáneas con `Promise.all`, una sola sobrevive, y se verifica contra la base que quedó una sola aprobada — no que la API haya filtrado.
   - Es también la justificación del "sin chequeo previo" de T2.4: acá el árbitro tiene que ser el constraint.
 
-> **Estado de la fase:** T3.1 corre y pasa en esta máquina. **T3.2 a T3.6 están escritos pero sin verificar**: necesitan el stack efímero y solo corren en CI (`docs/testing.md` §1). Hasta que el PR esté en verde, el guard de columnas de T1.1 sigue siendo una promesa.
+> **Estado de la fase: verde en CI** (run `33406711842`, rama `005-approval-flow`). 140 unitarios, 74 de integración, 7 de smoke y 21 E2E. De esos, 21 son de `005`: 15 en `bookings-response-rls` y 6 en `bookings-response-conflict`. Con esto el guard de columnas de T1.1 deja de ser una promesa.
 >
 > Los dos archivos nuevos usan **fechas ancla distintas** (`2026-10-12` y `2026-12-07`) porque los archivos corren en paralelo y los dos aprueban reservas.
+>
+> **Lo que encontró la primera corrida, que vale más que el verde:** todas las reservas de `bookings-response-rls` nacían en la misma franja del mismo dev, y varias terminan `approved` y viven hasta el `afterAll`. La segunda aprobación de esa franja moría contra el constraint. El test que falló fue el de auditoría —acusando al trigger por un update que nunca había entrado— pero el daño real estaba al lado: **el test de Q-E pasaba sin probar nada**, porque su aprobación moría igual y dejaba la reserva pendiente con las dos columnas ya en `null`, que es exactamente lo que después afirmaba.
+>
+> De ahí salieron tres reglas para esta suite, en `b64158e`: cada reserva se lleva su propia franja; los horarios fijos a los que otros tests mueven reservas viven fuera del rango del contador; y **todo update del que dependa una aserción posterior chequea su propio error primero**. Un update que muere en silencio no puede volver a parecerse a un test que pasa.
 
 ## Phase 4 — UI
 
