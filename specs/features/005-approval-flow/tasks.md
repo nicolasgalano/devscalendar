@@ -2,7 +2,7 @@
 
 - **ID:** 005-approval-flow
 - **Plan reference:** `./plan.md`
-- **Status:** fases 1-5 cerradas salvo T5.5 (revisión visual, necesita ojos humanos) y T1.3 (bloqueada por credenciales). Todo verde en CI.
+- **Status:** fases 1-5 cerradas. Queda solo T5.5 (revisión visual, necesita ojos humanos). B1/B2 diferidos por decisión del 2026-08-31: no bloquean. Todo verde en CI.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -127,8 +127,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Blocked / follow-ups
 
-- [!] **B1** — **`pnpm db:types` sigue sin poder correr: falta un personal access token de la cuenta dueña del proyecto.** No bloquea la fase 2 —los tipos están parcheados a mano (T1.3)—, pero sí deja una diferencia posible entre el archivo generado y el escrito. Cuando aparezca el token: `supabase login` → `pnpm exec supabase link --project-ref gnasmpblvarluuwtjprq` → `pnpm db:types` → **el diff tiene que dar vacío**. Si no da vacío, gana el generado.
-- [ ] **B2** — **`seed.sql` nunca se corrió contra el remoto.** `db push` aplica migrations, no el seed; para eso es `pnpm db:seed`, y con él se cierra la segunda mitad del DoD de T1.4 (dos corridas seguidas sin fallar ni duplicar). Ojo: el seed reescribe las reservas `…0051–005e` a la semana actual, así que se lleva puesto cualquier cambio hecho a mano sobre esas filas.
+- [ ] **B1** — **`pnpm db:types` sigue sin poder correr: falta un personal access token de la cuenta dueña del proyecto.** **Diferido a propósito el 2026-08-31: no bloquea el cierre de `005`.** Los tipos están parcheados a mano (T1.3) y `pnpm typecheck` pasa limpio, así que lo único que queda abierto es una diferencia posible entre el archivo generado y el escrito.
+  - Cómo destrabarlo, cuando aparezca el token: `pnpm exec supabase login` **en una terminal normal** —el flujo abre el browser y no funciona sin TTY— después `pnpm exec supabase link --project-ref gnasmpblvarluuwtjprq`, y recién ahí `pnpm db:types`. **El diff tiene que dar vacío; si no da vacío, gana el generado.**
+  - Es una PAT de cuenta (`sbp_…`), de Dashboard → Account Settings → Access Tokens. **Ninguna de las keys del proyecto sirve**: la anon y la service_role son credenciales de PostgREST, y `db:types` va por la Management API.
+  - **Lo hereda `006` T1.4.** Si sigue sin resolverse cuando esa feature toque el esquema, el problema se arrastra otra vez.
+- [ ] **B2** — **`seed.sql` nunca se corrió contra el remoto.** `db push` aplica migrations, no el seed; para eso es `pnpm db:seed`, y con él se cierra la segunda mitad del DoD de T1.4 (dos corridas seguidas sin fallar ni duplicar). Necesita la misma credencial que B1, así que viaja con ella. Ojo: el seed reescribe las reservas `…0051–005e` a la semana actual, así que se lleva puesto cualquier cambio hecho a mano sobre esas filas.
 - [ ] **F1** — **Notificaciones (AC-1.2, AC-2.1 parcial, AC-3.1).** Diferidas a `010` por decisión del 2026-08-12. Hasta entonces el dev se entera entrando a la app. **No simularlas con un toast:** dejaría la ilusión de que la otra persona se enteró. Hereda también el badge de pendientes en el nav.
 - [ ] **F2** — **Push a Google Calendar al aprobar** (AC-2.1) — es `007`. `005` deja el evento en `audit_log`, que es de donde `007` puede colgarse.
 - [ ] **F3** — **Deshacer una respuesta.** Hoy solo se responde una reserva `pending` (`plan.md` §3.3). Que el dev se desdiga es una conversación con el PM, no un botón; si el cliente lo pide después de usarlo, la regla se relaja en `nextStatusAfterResponse` y en el trigger, no en el modelo.

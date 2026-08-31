@@ -15,7 +15,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 003 | Calendar UI (day/month/year + grouping + filters) | done | 001, 002 | §4 |
 | 004 | Bookings CRUD | done | 001, 002, 003 | §5, §9 |
 | 005 | Approval flow (dev approve/reject) | done | 004 | §6, §9 |
-| 006 | Priority & reallocation | draft | 004, 005 | §7 |
+| 006 | Priority & reallocation | planned — `plan.md` + `tasks.md` listos | 004, 005 | §7 |
 | 007 | Google Calendar push integration | draft | 005 | §8.1 |
 | 008 | Jira integration | draft | 004 | §8.2 |
 | 009 | Slack integration | draft | 004, 005 | §8.3 |
