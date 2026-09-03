@@ -418,6 +418,12 @@ Aplicado en la feature `005-approval-flow`:
 - **`rejected` entra a los estados visibles por default** — la regla dejó de ser "ocultar lo terminal" y pasó a ser "ocultar lo que el propio PM decidió". Una reserva rechazada obliga a reasignar (§8) y por eso no puede estar escondida detrás de un filtro; una cancelada la decidió el PM, así que no hay a quién avisarle. Ver F7 en `005/tasks.md`.
 - **Advertencia sin bloqueo, reusada** (§8) — la bandeja avisa cuando la reserva cae fuera de la jornada o en día no laborable con el mismo texto que ve el PM al crearla (`describeBookingWarnings()`), en `circle-alert` sobre `--attention`, sin tocar los botones.
 
+Aplicado en la feature `006-priority-reallocation`:
+
+- **El conflicto que se puede desplazar no se pinta como el que impide seguir** (§8) — `ConflictNotice` toma un `tone`: `alert-triangle` sobre `--danger` cuando no hay salida, `circle-alert` sobre `--attention` cuando el proyecto es prioritario y puede desplazar. Es la misma distinción que separa la advertencia de jornada del conflicto, un escalón más arriba: acá hay un camino hacia adelante, y pintarlo de rojo enseñaría a ignorar el rojo. El layout, el link al día y el texto no cambian — cambia si hay algo que ofrecer.
+- **Diálogo de confirmación para lo irreversible** (§7) — desplazar pasa por confirmación por lo mismo que cancelar, y con una razón de más: **le pasa por encima a alguien que no está en la pantalla.** El texto nombra la reserva, el proyecto y el PM, y dice las dos cosas que nadie diría solo — que la desplazada no se restaura sola, y que todavía no hay avisos automáticos.
+- **Advertencia sin bloqueo en la bandeja del dev** (§8) — cuando una pendiente común se superpone con una prioritaria pendiente, la fila avisa en `circle-alert` sobre `--attention` y **no toca los botones**. Aprobar la común no es un error, es una decisión; lo que faltaba era que el dev supiera que la estaba tomando. Se marca solo donde hay choque real, no en toda reserva prioritaria: avisar en todas es ruido, y el ruido se aprende a ignorar.
+
 Pendiente, por depender de features todavía no construidas:
 
 - **Navegación por teclado en filas** (§7) — cuando exista una vista de detalle a la que abrir.

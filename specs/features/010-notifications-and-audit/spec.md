@@ -66,7 +66,9 @@ Notificaciones y auditoría son requisitos no funcionales que aparecen en múlti
 
 ## 6. Dependencias
 
-- Se puede empezar en paralelo con **004-bookings** — pero las tablas y helpers tienen que estar antes de que **005-approval-flow** y **006-priority-reallocation** entren.
+- **Va después de `005` y de `006`, no antes.** Esta línea decía lo contrario —que las tablas y helpers tenían que estar antes de que esas dos features entraran— y se corrigió el 2026-09-03: `005` ya salió sin avisos por decisión del 2026-08-12, y `006` sale igual. El motivo es que `010` necesita que sus eventos existan para no escribir adapters a ciegas; el último en aparecer es `displaced`, que lo crea `006`.
+- **`audit_log` ya existe** desde la migration `…0003` (ADR 0005) y `005` escribe una fila por cada cambio de estado. Lo que queda de esta feature es la otra mitad: la tabla `notifications`, la bandeja in-app con Realtime, los adapters de canal y el filtrado del admin (AC-3.1).
+- Lo que hereda: AC-1.2 y AC-3.1 de `005`, y AC-2.1 de `006` (avisarle al PM desplazado).
 - **009-slack-integration** consume esta infraestructura como canal.
 
 ---

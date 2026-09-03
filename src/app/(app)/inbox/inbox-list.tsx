@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { fromBooking } from "@/lib/bookings/form";
+import { outrankedByPending } from "@/lib/bookings/priority";
 import { describeBookingWarnings } from "@/lib/bookings/warnings";
 import { capitalize, formatLongDate, formatTimeRange } from "@/lib/calendar/format";
 import type { CalendarBooking } from "@/lib/calendar/query";
@@ -60,6 +61,11 @@ export function InboxList({
     );
   }
 
+  // R-2, mitigación (a): las pendientes que le cuestan la franja a un proyecto
+  // prioritario si se aprueban primero. Se calcula sobre la lista entera porque
+  // es una relación entre reservas, no una propiedad de una sola.
+  const outranked = outrankedByPending(bookings);
+
   return (
     <BookingResponseProvider params={params} tz={tz}>
       <Table>
@@ -74,7 +80,12 @@ export function InboxList({
         </TableHeader>
         <TableBody>
           {bookings.map((booking) => (
-            <InboxRow key={booking.id} booking={booking} tz={tz} />
+            <InboxRow
+              key={booking.id}
+              booking={booking}
+              tz={tz}
+              outranked={outranked.has(booking.id)}
+            />
           ))}
         </TableBody>
       </Table>
@@ -82,7 +93,15 @@ export function InboxList({
   );
 }
 
-function InboxRow({ booking, tz }: { booking: CalendarBooking; tz: string }) {
+function InboxRow({
+  booking,
+  tz,
+  outranked,
+}: {
+  booking: CalendarBooking;
+  tz: string;
+  outranked: boolean;
+}) {
   const date = instantToIsoDate(booking.startsAt, tz);
   const isHighPriority = booking.project.priority === "high";
 
@@ -116,6 +135,7 @@ function InboxRow({ booking, tz }: { booking: CalendarBooking; tz: string }) {
         <span className="flex items-center gap-1.5">
           {formatTimeRange(booking.startsAt, booking.endsAt, tz)}
           <BookingWarnings booking={booking} tz={tz} />
+          {outranked && <OutrankedWarning />}
         </span>
       </TableCell>
 
@@ -170,6 +190,37 @@ function BookingWarnings({ booking, tz }: { booking: CalendarBooking; tz: string
         {warnings.length === 1 && warnings[0]!.id === "outside-hours"
           ? "Fuera de horario"
           : "Revisar"}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * R-2, mitigación (a) — la reserva se superpone con una pendiente de un
+ * proyecto prioritario.
+ *
+ * La regla de prioridad solo juega al crear, no al aprobar: dos pendientes
+ * sobre la misma franja conviven porque el exclusion constraint no las mira, y
+ * el orden en que el dev responde decide cuál sobrevive. Aprobar esta deja a la
+ * prioritaria sin poder aprobarse, y hasta acá eso pasaba sin que nadie lo
+ * viera.
+ *
+ * **Advierte y no bloquea** (§8): `circle-alert` sobre `--attention`, y los
+ * botones de responder quedan intactos. La decisión sigue siendo del dev — no
+ * es un error aprobar la común, es una elección, y lo único que faltaba era que
+ * supiera que la estaba haciendo.
+ */
+function OutrankedWarning() {
+  const message =
+    "Se superpone con una reserva pendiente de un proyecto prioritario. Si aprobás esta, esa otra ya no va a poder aprobarse.";
+
+  return (
+    <span className="text-attention inline-flex items-center gap-1" data-slot="booking-warning">
+      <CircleAlertIcon aria-hidden="true" className="size-3.5 shrink-0" />
+      {/* El motivo siempre en palabras, nunca solo el color (checklist 12). */}
+      <span className="sr-only">{message}</span>
+      <span aria-hidden="true" className="text-caption" title={message}>
+        Choca con una prioritaria
       </span>
     </span>
   );

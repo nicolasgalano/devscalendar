@@ -119,7 +119,12 @@ export async function deleteInvite(email: string) {
  */
 export async function createProjectFor(
   pmId: string,
-  names: { client: string; project: string },
+  names: {
+    client: string;
+    project: string;
+    /** `006`: la realocación necesita un proyecto de cada lado de la regla. */
+    priority?: "normal" | "high";
+  },
 ): Promise<{ clientId: string; projectId: string }> {
   const admin = serviceClient();
 
@@ -132,7 +137,12 @@ export async function createProjectFor(
 
   const { data: project, error: projectError } = await admin
     .from("projects")
-    .insert({ name: names.project, client_id: client.id, pm_id: pmId })
+    .insert({
+      name: names.project,
+      client_id: client.id,
+      pm_id: pmId,
+      priority: names.priority ?? "normal",
+    })
     .select("id")
     .single();
   if (projectError) throw projectError;

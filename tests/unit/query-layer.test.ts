@@ -188,7 +188,11 @@ describe("findConflictingBooking", () => {
           starts_at: "2026-08-10T13:00:00.000Z",
           ends_at: "2026-08-10T17:00:00.000Z",
           dev: { full_name: null, email: "cristian@example.com" },
-          project: { name: "Website revamp" },
+          project: {
+            name: "Website revamp",
+            priority: "normal",
+            pm: { full_name: "Lucía Fernández", email: "lucia@example.com" },
+          },
         },
       },
     });
@@ -199,7 +203,32 @@ describe("findConflictingBooking", () => {
       endsAt: "2026-08-10T17:00:00.000Z",
       projectName: "Website revamp",
       devName: "cristian@example.com",
+      projectPriority: "normal",
+      pmName: "Lucía Fernández",
     });
+  });
+
+  // 006 T2.2: without the priority of the project holding the slot, the UI
+  // cannot tell a conflict it may displace from one it may not, and would have
+  // to offer the same dead end for both.
+  it("carries the priority of the project holding the slot", async () => {
+    const mock = createSupabaseMock({
+      bookings: {
+        data: {
+          id: "b9",
+          starts_at: "2026-08-10T13:00:00.000Z",
+          ends_at: "2026-08-10T17:00:00.000Z",
+          dev: { full_name: "Cristian Soto", email: "cristian@example.com" },
+          project: { name: "Portal de reservas", priority: "high", pm: null },
+        },
+      },
+    });
+
+    const conflict = await findConflictingBooking(mock.client, slot);
+
+    expect(conflict?.projectPriority).toBe("high");
+    // A deactivated or removed PM leaves the conflict standing, without a name.
+    expect(conflict?.pmName).toBeNull();
   });
 });
 

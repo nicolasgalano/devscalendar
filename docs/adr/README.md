@@ -39,3 +39,4 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 | 0007 | Calendario propio sobre CSS grid, en vez de una librería | accepted |
 | 0008 | El anti doble-booking vive en dos capas, no en una | accepted |
 | 0009 | La autorización por columna se resuelve con trigger, no con RLS | accepted |
+| 0010 | Una escritura que cruza proyectos se resuelve con una función `security definer` | accepted |

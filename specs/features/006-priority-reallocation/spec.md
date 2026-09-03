@@ -1,7 +1,7 @@
 # Spec — Priority & reallocation
 
 - **ID:** 006-priority-reallocation
-- **Estado:** draft
+- **Estado:** done — 2026-09-03, salvo AC-2.1 (notificar al PM desplazado), diferido a `010`
 - **Referencias en la spec funcional:** §7 (jerarquía de prioridad y realocación)
 
 ---

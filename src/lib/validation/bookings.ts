@@ -21,19 +21,49 @@ const optionalText = z
  * `src/lib/calendar/workdays.ts`; este schema no las conoce a propósito, para
  * que nadie las convierta en error más adelante.
  */
+const bookingFields = {
+  projectId: z.string().uuid(),
+  devId: z.string().uuid(),
+  startsAt: isoInstant,
+  endsAt: isoInstant,
+  note: optionalText,
+  ticketRef: optionalText,
+};
+
+const endsAfterStarts = {
+  message: "La reserva tiene que terminar después de empezar",
+  path: ["endsAt"],
+};
+
 export const createBookingSchema = z
+  .object(bookingFields)
+  .refine((body) => Date.parse(body.endsAt) > Date.parse(body.startsAt), endsAfterStarts);
+
+/**
+ * El alta que desplaza (`006`, `plan.md` §4). Mismos campos que el alta normal
+ * más `confirmedDisplacing`, y esa lista es la diferencia importante.
+ *
+ * **Requerida y no vacía**, por dos motivos distintos:
+ *
+ * - **El PM tiene que nombrar lo que acepta pisar.** Es la misma idea que el
+ *   `expectedUpdatedAt` de `005`: entre que ve el conflicto y confirma, el mundo
+ *   puede cambiar. Si en el momento de escribir aparece una reserva que no está
+ *   en esta lista, la operación se rechaza — desplazar algo que el PM nunca vio
+ *   es exactamente lo que esta feature no puede hacer. Quien cierra la ventana
+ *   de verdad es `reallocate_booking()`, que lo compara adentro de la misma
+ *   transacción en la que escribe; esto es la mitad que responde 400 temprano.
+ * - **Una lista vacía significaría "no hay nada que desplazar"**, y ese caso es
+ *   el alta normal. Sin el `nonempty` esta ruta sería un segundo camino de alta
+ *   que se saltea el chequeo de conflictos del primero.
+ */
+export const reallocateBookingSchema = z
   .object({
-    projectId: z.string().uuid(),
-    devId: z.string().uuid(),
-    startsAt: isoInstant,
-    endsAt: isoInstant,
-    note: optionalText,
-    ticketRef: optionalText,
+    ...bookingFields,
+    confirmedDisplacing: z.array(z.string().uuid()).nonempty({
+      message: "Hay que confirmar qué reservas se desplazan",
+    }),
   })
-  .refine((body) => Date.parse(body.endsAt) > Date.parse(body.startsAt), {
-    message: "La reserva tiene que terminar después de empezar",
-    path: ["endsAt"],
-  });
+  .refine((body) => Date.parse(body.endsAt) > Date.parse(body.startsAt), endsAfterStarts);
 
 /**
  * Edición y cancelación comparten el PATCH. `status` solo admite `cancelled`:
@@ -93,5 +123,6 @@ export const respondBookingSchema = z
   });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+export type ReallocateBookingInput = z.infer<typeof reallocateBookingSchema>;
 export type UpdateBookingInput = z.infer<typeof updateBookingSchema>;
 export type RespondBookingInput = z.infer<typeof respondBookingSchema>;

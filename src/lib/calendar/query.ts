@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { comparePendingBookings } from "@/lib/bookings/priority";
 import type { BookingStatus, CalendarFilters, ProjectPriority } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
 
@@ -158,8 +159,8 @@ function toCalendarBooking(row: BookingRow): CalendarBooking {
 }
 
 /**
- * AC-1.1 — la bandeja del desarrollador: sus reservas `pending`, ordenadas por
- * fecha de inicio.
+ * AC-1.1 — la bandeja del desarrollador: sus reservas `pending`, **lo
+ * prioritario primero y después por fecha** (`006` T2.5).
  *
  * **Es una vista, no un permiso** (Q-5). La RLS deja al dev leer el calendario
  * entero; esto acota lo que se le muestra, no lo que puede ver. Por eso el
@@ -168,6 +169,12 @@ function toCalendarBooking(row: BookingRow): CalendarBooking {
  * Sin recorte por rango, a diferencia del calendario: una reserva pendiente de
  * dentro de tres meses sigue necesitando respuesta, y esconderla porque no cae
  * en la ventana visible es exactamente cómo se pierde una.
+ *
+ * El orden final se arma en JS y no en PostgREST: `priority` vive en el embed
+ * de `projects`, y ordenar la tabla padre por una columna embebida no es algo
+ * que PostgREST haga. El `.order("starts_at")` se queda igual porque define el
+ * desempate y deja la respuesta estable; sobre eso, el comparador reordena. Son
+ * las pendientes de una persona, no un dataset.
  */
 export async function getPendingBookingsForDev(
   supabase: Client,
@@ -181,7 +188,7 @@ export async function getPendingBookingsForDev(
     .order("starts_at");
 
   if (error) throw error;
-  return (data ?? []).map(toCalendarBooking);
+  return (data ?? []).map(toCalendarBooking).sort(comparePendingBookings);
 }
 
 /**

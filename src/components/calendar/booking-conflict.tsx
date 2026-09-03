@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { TriangleAlertIcon } from "lucide-react";
+import { CircleAlertIcon, TriangleAlertIcon } from "lucide-react";
 
 import type { BookingConflict } from "@/lib/bookings/conflicts";
 import { formatTimeRange } from "@/lib/calendar/format";
@@ -26,23 +27,42 @@ import type { CalendarParams } from "@/lib/validation/calendar";
 export function ConflictNotice({
   conflict,
   title,
+  tone = "blocking",
+  action,
   params,
   tz,
 }: {
   conflict: BookingConflict;
   title?: string;
+  /**
+   * `006` T4.1. **El conflicto que se puede desplazar no se pinta como el que
+   * impide seguir** (§8): `circle-alert` sobre `--attention` en vez de
+   * `alert-triangle` sobre `--danger`, porque acá hay un camino hacia adelante
+   * y el rojo enseñaría a ignorar el rojo. Lo mismo que separa la advertencia
+   * de jornada del conflicto, aplicado un escalón más arriba.
+   */
+  tone?: "blocking" | "displaceable";
+  /** La salida, cuando la hay: el botón que ofrece desplazar. */
+  action?: ReactNode;
   params: CalendarParams;
   tz: string;
 }) {
   const date = instantToIsoDate(conflict.startsAt, tz);
+  const displaceable = tone === "displaceable";
+  const Icon = displaceable ? CircleAlertIcon : TriangleAlertIcon;
 
   return (
     <div
       role="alert"
       data-slot="booking-conflict"
-      className="bg-danger-bg text-ui text-danger flex gap-2 rounded-lg p-2.5"
+      data-tone={tone}
+      className={
+        displaceable
+          ? "bg-attention-bg text-ui text-attention flex gap-2 rounded-lg p-2.5"
+          : "bg-danger-bg text-ui text-danger flex gap-2 rounded-lg p-2.5"
+      }
     >
-      <TriangleAlertIcon aria-hidden="true" className="mt-px size-4 shrink-0" />
+      <Icon aria-hidden="true" className="mt-px size-4 shrink-0" />
       <div className="flex min-w-0 flex-col gap-1">
         <p className="font-medium">
           {title ?? `${conflict.devName} ya tiene una reserva aprobada en esa franja`}
@@ -59,6 +79,7 @@ export function ConflictNotice({
         >
           Ver ese día en el calendario
         </Link>
+        {action}
       </div>
     </div>
   );
