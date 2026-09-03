@@ -131,7 +131,15 @@ Antes del primer run necesitás:
 6. **Generar types:** `pnpm db:types`.
 7. **Arrancar Next.js:** `pnpm dev`.
 
-Ese proyecto es **solo de desarrollo**, para trabajar y probar a mano. Los tests automáticos no lo tocan nunca: corren contra un stack efímero en CI. Ver "Tests y bases de datos" más abajo.
+> **Ojo con esto: ese proyecto (`gnasmpblvarluuwtjprq`) es también el que usa el deploy de Vercel.** No hay una base de producción aparte. Al 2026-09-03 la app está deployada pero todavía no en uso —se publicó para que los PMs la vean— así que no hay datos que cuidar; el dato estructural sí vale igual:
+>
+> - **`pnpm dev` en tu máquina escribe en la misma base que sirve el sitio.** Lo que crees probando a mano lo ve cualquiera que entre al deploy.
+> - **`pnpm db:push` es una operación sobre la base del deploy**, no un comando de desarrollo. Conviene que la migration esté verde en CI antes.
+> - **`pnpm db:seed` inserta datos de ficción y reescribe las reservas `…0051–005e`.** Mientras la base esté vacía es inofensivo y útil; en cuanto haya datos de gente, no se corre más.
+>
+> Cuando aparezca un proyecto de producción separado, esta advertencia se reemplaza por la separación de verdad.
+
+Los tests automáticos no tocan nada de esto: corren contra un stack efímero en CI, y `tests/env.ts` rechaza cualquier URL que no sea local. Ver "Tests y bases de datos" más abajo.
 
 Scripts útiles:
 
@@ -167,6 +175,16 @@ Scripts útiles:
 
 ---
 
+## Deploy
+
+**El deploy lo dispara el push a `main`.** Vercel está enlazado al repo por su integración de GitHub: no hay comando que correr ni credencial que tener de este lado.
+
+**Lo que Vercel no hace es aplicar migrations.** Buildea y sirve la app, nada más. Una feature que agrega una migration necesita `pnpm db:push` aparte, contra el proyecto de Supabase — que hoy es el mismo para desarrollo y para el sitio. **Primero la migration, después el deploy**, o el código nuevo sale a buscar algo que todavía no existe.
+
+Las variables de entorno viven en Vercel → Settings → Environment Variables. `.env.local` no viaja nunca.
+
+---
+
 ## Tests y bases de datos
 
 > **Leé `docs/testing.md` antes de tocar tests, migrations o cualquier código que hable con Supabase.** Acá va solo lo obligatorio.
@@ -177,7 +195,7 @@ Scripts útiles:
 - **Integración, smoke y E2E usan el stack efímero de Supabase en CI**, que se levanta y se descarta dentro del job. No se pueden correr local, y está bien que así sea.
 - **Los mocks no reemplazan tests de integración.** Una policy de RLS o un embed de PostgREST verificados contra un mock no están verificados.
 - **No se agregan campos de testing al esquema productivo.** Los datos de prueba se identifican por convención sobre campos existentes (`[test:<runId>]`, `test-<runId>-…@example.com`); ver `tests/run-id.ts`.
-- **El proyecto remoto es solo para pruebas manuales.** Si dejás datos, limpialos con `node scripts/cleanup-test-data.mjs --run-id=<id>`, que exige el identificador y borra únicamente esa corrida. Nunca limpiezas globales ni truncados.
+- **El proyecto remoto sirve a la vez para pruebas manuales y para el deploy de Vercel** (ver la advertencia en "Cómo correr localmente"). Si dejás datos de prueba, limpialos con `node scripts/cleanup-test-data.mjs --run-id=<id>`, que exige el identificador y borra únicamente esa corrida. Nunca limpiezas globales ni truncados — y desde que el sitio está publicado, con más razón: lo que quede ahí lo ve cualquiera que entre.
 - **No existe `db:reset`, y es a propósito:** resetear apuntando a un proyecto alojado borra la base entera.
 - Antes de dar un cambio por terminado: `pnpm typecheck`, `pnpm lint` y `pnpm test:unit`. El resto lo verifica CI.
 
