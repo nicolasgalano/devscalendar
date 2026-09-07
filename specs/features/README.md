@@ -20,6 +20,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 008 | Jira integration | draft | 004 | §8.2 |
 | 009 | Slack integration | draft | 004, 005 | §8.3 |
 | 010 | Notifications & audit log | draft | 004, 005, 006 | §7, §12 |
+| 011 | Planning view (grilla semanal de carga) | draft | 003, 004, 005, 006 | §4, §12 |
 
 ## Orden sugerido de implementación
 
@@ -35,6 +36,7 @@ Basado en dependencias y valor incremental:
 8. **007-google-calendar** — se activa cuando ya hay approvals reales que empujar.
 9. **008-jira-integration** — asociación de tickets, se puede hacer en paralelo desde que existan bookings.
 10. **009-slack-integration** — última porque combina lo de notifications con la asociación de canales.
+11. **011-planning-view** — vista de planificación semanal (grilla cliente > proyecto > dev × días). **Paralelizable con las integraciones** porque solo lee bookings y no depende de `010`. Va después de `006` porque consume el estado `displaced` en el popover, pero no lo bloquea.
 
 Este orden se revisa cuando haya feedback del cliente o cambien las prioridades.
 
