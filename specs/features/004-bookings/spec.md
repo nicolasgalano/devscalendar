@@ -100,8 +100,10 @@ Antes de arrancar, verificar que el schema que quedó en la migration de `003` c
 
 ## 7. Preguntas abiertas
 
-- **Q-8** (de spec §11) — Unidad de reserva: ¿franja libre o bloques fijos? **Recomendación por defecto:** franja libre (start/end), como Google Calendar.
-- **Q-10** (de spec §11) — Multi-timezone: fechas siempre en UTC en DB. **Bloquea:** confirmar TZ del proyecto para display si es multi-TZ.
+**Todas cerradas.** Ver el índice en `specs/features/README.md`.
+
+- **Q-8** (de spec §11) — ~~Unidad de reserva: ¿franja libre o bloques fijos?~~ **Respondida el 2026-09-07: franja libre** (inicio–fin), como Google Calendar. Cambiarla afectaría el formulario, no el modelo.
+- **Q-10** (de spec §11) — ~~Multi-timezone: ¿en qué TZ se muestra?~~ **Respondida el 2026-09-07: TZ del navegador**, con las fechas siempre en UTC en la base. Ver `003/spec.md`.
 - **Q-E** — ~~¿La edición de una reserva `approved` invalida la aprobación o solo notifica?~~ **Respondida el 2026-08-06:** cambios de horario o de desarrollador la devuelven a `pending`; cambios de nota o ticket no la tocan. Ver `plan.md` §4 y AC-2.2.
 - **Q-G** — ~~(nueva, derivada de Q-F) ¿Qué hace el formulario si un PM quiere reservar fuera de 09:00–17:00 o en un día no laborable?~~ **Respondida por el cliente el 2026-08-05: solo advertencia, nunca bloqueo**, en los dos casos (día no laborable y horario fuera de la jornada). Ver AC-1.4.
 

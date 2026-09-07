@@ -80,9 +80,11 @@ Es la pantalla donde los PMs pasan la mayor parte del tiempo. La spec pide expl�
 
 ## 7. Preguntas abiertas
 
-- **Q-5** (de spec §11) — Determina si el dev ve el calendario global o solo el propio. **Impacta:** el default de filtros y la lógica de RLS del query.
-- **Q-10** (de spec §11) — Multi-timezone: si los equipos son distribuidos, ¿el calendario se muestra en la TZ del viewer o en una TZ fija del proyecto? **Recomendación por defecto:** TZ del viewer, con badge indicando la del dev asignado si difiere. **Bloquea:** almacenamiento de fechas (siempre en UTC en DB, sí).
-- **Q-C** — ¿Se necesita vista Semana? La spec funcional no la lista pero es el default de Google Calendar. **Recomendación por defecto:** no en MVP; agregar en Fase 2 si el cliente la pide.
+**Todas cerradas.** Ver el índice en `specs/features/README.md`.
+
+- **Q-5** (de spec §11) — ~~¿El dev ve el calendario global o solo el propio?~~ **Cerrada el 2026-08-31 con `005`: global en modo lectura.**
+- **Q-10** (de spec §11) — ~~Multi-timezone: ¿TZ del viewer o TZ fija del proyecto?~~ **Respondida el 2026-09-07: TZ del navegador.** En DB siempre `timestamptz` (UTC), que es correcto en cualquier caso, y `src/lib/calendar/range.ts` es el único punto de conversión. **`007` hereda esta decisión:** el evento que se empuje a Google Calendar sale con la misma referencia.
+- **Q-C** — ~~¿Se necesita vista Semana?~~ **Respondida el 2026-09-07: no una vista Semana tipo Google Calendar.** El paneo semanal lo cubre `011-planning-view` por otro camino —una grilla de 4 semanas con cliente > proyecto > dev en filas—, que es la planilla que el equipo ya usa. No hay código que sacar: la vista Semana nunca se implementó.
 - **Q-D** — ~~Elección de librería de calendario (FullCalendar, react-big-calendar, Schedule-X, custom).~~ **Resuelta en `plan.md` §9:** grilla propia sobre CSS grid; las alternativas con vista de recursos son de licencia paga y sus estilos pelean con `DESIGN.md`. Se documenta en ADR 0007.
 - **Q-F** — (nueva, surgida al planificar) ¿Cuál es la jornada laboral y qué días no se trabaja? **Impacta:** el cálculo de ocupación de las vistas Mes y Año, y el rango visible de la vista Día. **Respondida por el cliente el 2026-08-05:** jornada fija de 09:00 a 17:00; no se trabaja fines de semana ni feriados argentinos. Ver `plan.md` §6.2 y §6.3.
 

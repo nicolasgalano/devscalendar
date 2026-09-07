@@ -74,8 +74,10 @@ Es la feature 0 del MVP: sin identidad no hay reservas, ni filtros, ni auditorí
 
 ## 7. Preguntas abiertas
 
-- **Q-5** (de spec §11) — ¿El dev ve el calendario global o solo el suyo? **Recomendación por defecto:** global en modo lectura. **Bloquea:** RLS policies de `bookings`.
-- **Q-6** (de spec §11) — ¿El rol Cliente accede a la plataforma? **Recomendación por defecto:** Fase 2. **Bloquea:** modelado del enum de roles — se puede dejar el enum extensible.
+**Las dos están cerradas.** Ver el índice en `specs/features/README.md`.
+
+- **Q-5** (de spec §11) — ~~¿El dev ve el calendario global o solo el suyo?~~ **Cerrada el 2026-08-31 con `005`: global en modo lectura**, y la bandeja de `/inbox` es una vista sobre eso. El filtro por `dev_id` vive en el query, no en una policy.
+- **Q-6** (de spec §11) — ~~¿El rol Cliente accede a la plataforma?~~ **Respondida el 2026-09-07: no accede.** El enum `user_role` queda en `admin`, `pm` y `developer`; el rol Cliente es Fase 2. **Se responde junto con D-09** (`docs/deuda-tecnica.md`), que ya reescribe ese enum para roles múltiples: sumar un cuarto valor después es tocarlo dos veces.
 
 ---
 

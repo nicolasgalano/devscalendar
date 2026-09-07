@@ -74,9 +74,12 @@ Este es el diferenciador de negocio principal después del calendario base: refl
 
 ## 7. Preguntas abiertas
 
-- **Q-1** (de spec §11) — Ya cubierta: dev siempre aprueba, incluso en realocación.
-- **Q-2** (de spec §11) — ¿2 niveles alcanzan o hace falta P0–P3? **Recomendación por defecto:** 2 en MVP; el enum se diseña extensible.
-- **Q-G** — Cuando una reserva se desplaza y luego el prioritario se cancela, ¿la desplazada se restaura? **Recomendación por defecto:** no, el PM anterior decide reasignar manualmente. Documentar bien.
+**Todas cerradas.** Ver el índice en `specs/features/README.md`.
+
+- **Q-1** (de spec §11) — ~~¿La realocación saltea la aprobación del dev?~~ Ya cubierta: el dev siempre aprueba, incluso en realocación.
+- **Q-2** (de spec §11) — ~~¿2 niveles alcanzan o hace falta P0–P3?~~ **Respondida el 2026-09-07: dos niveles.** Con eso, **el empate entre dos prioritarios no se resuelve solo y sigue yendo a los PMs** con el error `DC002` (AC-1.3). Si el empate resulta ser el caso común, la respuesta cambia: es una migration simple sobre el `check` de `priority` (`002/plan.md` §9), pero arrastra `canDisplace()` y el sistema de color de `DESIGN.md` §3.
+- **Q-O** — ~~Cuando una reserva se desplaza y luego la prioritaria se cancela, ¿la desplazada se restaura?~~ **Respondida el 2026-09-07: no se restaura.** El PM anterior decide si reasigna. `reallocate_booking()` no guarda de quién tomó la franja más allá del `audit_log`, y restaurar automáticamente exige saber si la franja sigue libre — o sea, una segunda realocación.
+  - **Se llamaba `Q-G` hasta el 2026-09-07**, que es el identificador de otra pregunta —reservar fuera de la jornada, en `004`, respondida el 2026-08-05—. Renombrada para que el índice no tenga dos preguntas con el mismo nombre.
 
 ---
 

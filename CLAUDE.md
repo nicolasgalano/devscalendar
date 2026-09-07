@@ -4,6 +4,8 @@
 
 > Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
 
+> **Hay deuda técnica registrada, y NO se salda sin OK explícito del usuario.** Vive en `docs/deuda-tecnica.md`: nueve puntos conocidos, con archivo y línea. Leelo antes de tocar autorización o roles, las pantallas de `/admin/*`, o los handlers de `/api/clients`, `/api/projects` y `/api/users`. Si una tarea roza alguno, **decilo y preguntá — no lo arregles de paso**: son decisiones pendientes, no descuidos esperando una mano. Encontrar deuda nueva sí es bienvenido; se anota ahí y en el `tasks.md` de su feature, no se resuelve.
+
 **Estado:** en desarrollo — features `001-auth-and-permissions`, `002-entities-admin`, `003-calendar-ui`, `004-bookings` y `005-approval-flow` terminadas.
 
 ---
@@ -111,6 +113,7 @@ devscalendar/
 │   └── e2e/                          # Playwright (solo CI)
 ├── specs/                            # SDD harness (spec/plan/tasks por feature)
 └── docs/
+    ├── deuda-tecnica.md              # deuda conocida — NO saldarla sin OK explícito
     ├── testing.md                    # estrategia de testing — leer antes de tocar tests
     └── adr/                          # architecture decision records
 ```
@@ -258,11 +261,12 @@ Las vistas filtrables guardan **todo su estado en los search params**, no en Rea
 
 Ver `specs/features/README.md` para el índice completo y estado.
 
-- **001-auth-and-permissions** — done. Google OAuth, roles, RLS base.
-- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Quedan Q-A y Q-B por confirmar con el cliente antes de `006-priority-reallocation` — ver `specs/features/002-entities-admin/tasks.md`.
+- **001-auth-and-permissions** — done. Google OAuth, roles, RLS base. **Deuda D-01, D-02 y D-09** (`docs/deuda-tecnica.md`): `active = false` solo se aplica en la UI —ningún guard de API ni policy lo mira—, el desvío de AC-1.3 nunca se registró, y el rol es un valor único, así que nadie puede ser PM y admin a la vez. D-09 ya tiene decidido cómo se resuelve —**roles múltiples**— y hay que saldarla **antes de `010`**, porque las notificaciones salen hacia un `pm_id` que en ese caso miente. Desde el 2026-09-07 **no tiene prerequisitos**: Q-A y Q-6, las dos preguntas que la trababan, están respondidas, así que lo único que falta es el OK.
+- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Q-A y Q-B **quedaron respondidas el 2026-09-07 con el default que ya estaba aplicado** —un PM primario obligatorio; el dev es transversal— igual que el resto de las preguntas de `001` a `006`; ver `specs/features/README.md`. **Deuda D-03 a D-06** (`docs/deuda-tecnica.md`): `primary_pm_id` quedó a medio implementar, los `<SelectValue>` de `/admin/*` imprimen el valor crudo (`__none__`, uuids, `normal`), falta `readJsonBody()` en los seis handlers, y hay que verificar los permisos de `/admin/*` en el navegador — de D-06 ya se cerró lo automatizable (el E2E corre verde y hay tres tests nuevos de RLS sobre `profiles`); **queda solo la pasada manual**, con su guion en `docs/deuda-tecnica.md`.
 - **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Creó la tabla `bookings` de solo lectura.
 - **004-bookings** — done. `bookings` ya es escribible: `exclusion constraint` anti doble-booking, policies para el PM del proyecto y el admin, API de alta / edición / cancelación, y el diálogo que se abre desde el botón o desde un click en la grilla. El anti doble-booking quedó en dos capas (ADR 0008). Q-E aplicada: mover el horario o el desarrollador de una reserva aprobada la devuelve a `pending`.
 - **005-approval-flow** — done. El desarrollador ya escribe: policy propia sobre sus reservas, acotada a `status` y `response_note` **por un guard en el trigger, no por la policy** (ADR 0009). Bandeja en `/inbox` con guard de rol, respuesta también desde el popover del calendario, comentario obligatorio al rechazar, y las tres traducciones de error de la API — `23P01` a 409 con la reserva que bloquea, `check_violation` a 403, y `expectedUpdatedAt` desajustado a 409. Cada cambio de estado deja su fila en `audit_log`. Salió **sin notificaciones** por decisión del 2026-08-12: el dev se entera entrando a la app, y AC-1.2 / AC-3.1 se difieren a `010`.
 - **006-priority-reallocation** — done. Un proyecto prioritario le toma la franja a uno común: la reserva vieja pasa a `displaced` y la nueva nace `pending`. Todo adentro de `reallocate_booking()`, una función `security definer` atómica (ADR 0010), porque la reserva que se desplaza es de otro PM y la RLS la filtraría **en silencio**. `POST /api/bookings/reallocate` con `confirmedDisplacing`, que obliga al PM a nombrar lo que acepta pisar. El empate entre prioritarios no se resuelve solo (AC-1.3) y se distingue de la prioridad insuficiente por `reason`, no por el texto. Salió **sin avisar al PM desplazado**: se entera mirando el calendario, donde `displaced` es visible por default. AC-2.1 se difiere a `010`.
   - **R-2, la deuda que dejó:** la prioridad juega al crear y no al aprobar. La bandeja del dev ordena por prioridad y advierte el choque (`outrankedByPending()`), pero eso lo hace visible, no lo impide. Ver F4 de `006/tasks.md`.
 - **Próxima:** `010-notifications-and-audit`, y el orden es a propósito (`specs/features/README.md`): cierra a la vez lo que `005` dejó abierto y lo que dejó `006`, y es **gate duro antes del primer deploy con usuarios reales** — hoy a alguien le sacan una reserva confirmada y solo se entera si mira el calendario.
+  - **No es el único gate antes de usuarios reales.** También lo son **D-01** —desactivar a alguien no le saca ningún permiso de API— y **D-06** —los permisos de `/admin/*` sin verificar en el navegador—. Ver `docs/deuda-tecnica.md`; ninguno se salda sin OK explícito.

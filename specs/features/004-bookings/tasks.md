@@ -97,6 +97,33 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 - [ ] **F2** — Notificaciones al dev (AC-2.1, AC-3.1) — son de `010`. En `004` la reserva cambia de estado y nada más. **No simular el aviso con un toast:** dejaría la ilusión de que el dev se enteró.
 - [ ] **F3** — Drag & drop para mover bloques, explícitamente fuera de alcance (`spec.md` §5). La grilla de `003` está preparada: el bloque ya se posiciona por área de grilla, así que mover es recalcular `starts_at`/`ends_at` y hacer el mismo PATCH de T2.5.
 - [ ] **F4** — Q-8 (unidad de reserva: franja libre vs. bloques fijos) sigue con el default de franja libre. Si el cliente pide bloques fijos, cambia el formulario, no el modelo.
-- [ ] **F5** — **`readJsonBody()` falta en las rutas de `002`** (`/api/clients`, `/api/projects`, `/api/users`). Tienen el mismo `await request.json()` directo, así que un body vacío o mal formado les sale como 500 con stack trace en vez de 400. Se arregló solo en las de reservas para no ampliar el alcance de `004`; es un cambio de una línea por handler. Owner: quien toque esas rutas.
-- [ ] **F6** — **`tests/e2e/admin-entities.spec.ts` quedó sin verificar en verde.** Falla dentro de `createUser()` —una llamada directa al auth de Supabase, antes de que entre el navegador— sobre código que `004` no toca. Durante esta sesión el stack estaba degradado (`docker ps` colgado 120s, latencia de Supabase entre 0.29s y 3.5s para la misma request, Chromium cayéndose con `session closed`). **Re-correrlo con la máquina tranquila antes de dar por buena la suite**, y si sigue fallando, tratarlo como bug real de `002`.
+- [~] **F5** — **Movida a `002` como D-05 el 2026-09-07** (`docs/deuda-tecnica.md`): la dueña de esas rutas es esa feature, y "owner: quien toque esas rutas" no fue nadie. Sigue sin arreglarse. **`readJsonBody()` falta en las rutas de `002`** (`/api/clients`, `/api/projects`, `/api/users`). Tienen el mismo `await request.json()` directo, así que un body vacío o mal formado les sale como 500 con stack trace en vez de 400. Se arregló solo en las de reservas para no ampliar el alcance de `004`; es un cambio de una línea por handler. Owner: quien toque esas rutas.
+- [x] **F6** — **`tests/e2e/admin-entities.spec.ts` quedó sin verificar en verde.** Falla dentro de `createUser()` —una llamada directa al auth de Supabase, antes de que entre el navegador— sobre código que `004` no toca. Durante esta sesión el stack estaba degradado (`docker ps` colgado 120s, latencia de Supabase entre 0.29s y 3.5s para la misma request, Chromium cayéndose con `session closed`). **Re-correrlo con la máquina tranquila antes de dar por buena la suite**, y si sigue fallando, tratarlo como bug real de `002`.
+  - **Ascendido de prioridad el 2026-09-07:** es el bloqueante de D-06 de `002`. Uno de los cuatro tests de este archivo es el único que prueba que un no-admin no entra al panel de administración, y mientras el archivo no corra entero, esa garantía no está verificada por nada.
+  - **Cerrado el 2026-09-07: era el ambiente, no el código.** El archivo corrió entero y verde en [run 34140290020](https://github.com/nicolasgalano/devscalendar/actions/runs/34140290020) (28 E2E, 2 workers, 28 passed), con los tres tests del archivo pasando —incluido `redirects a non-admin away from the admin panel` en 7,6s—. No se tocó una línea de `createUser()`: la hipótesis de "stack degradado" era la correcta.
 - [ ] **F7** — El calendario paga **dos queries extra por render** (`getBookingFormOptions`: proyectos + devs) para poder abrir el diálogo sin esperar. Es lo que decidió `plan.md` §5 y en un stack sano cuesta milisegundos. Si algún día pesa, la salida es traerlas al abrir el diálogo, no antes — pero entonces el diálogo necesita su estado de carga.
+
+---
+
+## Deuda registrada (2026-09-07)
+
+Dos asimetrías encontradas auditando esta feature contra `006`. **No se saldan
+sin OK explícito** — registro central en `docs/deuda-tecnica.md`. Las dos son la
+misma omisión que D-01 de `001`, en chico, y conviene saldarlas con ella.
+
+- [ ] **D-07** — **El `PATCH` no chequea el `active` del desarrollador.** El
+      `POST` pide `role, active` y rechaza al desactivado con un 400
+      (`src/app/api/bookings/route.ts:27,38-43`); el `PATCH` pide **solo `role`**
+      (`src/app/api/bookings/[id]/route.ts:100-104`). O sea: no se puede *crear*
+      una reserva para un dev desactivado, pero sí *mover* una existente encima
+      de él.
+- [ ] **D-08** — **Nada impide reservar sobre un proyecto desactivado.**
+      `getBookingOptions()` filtra `.eq("active", true)`
+      (`src/lib/bookings/options.ts:44`), así que el desplegable no los ofrece —
+      pero ni la API ni `can_manage_booking()` (`00000000000006:44`) verifican
+      nada, y con el id a mano se reserva igual. `reallocate_booking()` **sí** lo
+      chequea (`00000000000008:85`, error `DC004`): otra vez el camino más nuevo
+      hace lo correcto y los viejos no.
+  - `002` AC-1.2 pide soft delete en vez de borrado físico justamente porque hay
+    historial que preservar. Que desactivar no impida escribir historia **nueva**
+    sobre esa fila vacía buena parte de esa intención.

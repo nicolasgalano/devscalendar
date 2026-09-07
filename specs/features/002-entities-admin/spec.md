@@ -69,8 +69,10 @@ El calendario y las reservas necesitan estos maestros como precondición. Sin pr
 
 ## 7. Preguntas abiertas
 
-- **Q-A** — ¿Un proyecto puede tener múltiples PMs? La spec funcional habla de "el PM" en singular. **Recomendación por defecto:** un PM primario obligatorio; PMs adicionales como colaboradores (Fase 2).
-- **Q-B** — ¿Un dev puede pertenecer a múltiples "equipos" o clientes simultáneamente? **Recomendación por defecto:** sí, un dev es transversal; las reservas lo asignan a proyectos específicos.
+**Las dos están cerradas.** Ver el índice en `specs/features/README.md`.
+
+- **Q-A** — ~~¿Un proyecto puede tener múltiples PMs?~~ **Respondida el 2026-09-07: un PM primario obligatorio**, como está implementado. Los colaboradores quedan para Fase 2. `projects.pm_id` sigue `not null` y sigue siendo la puerta de `can_manage_booking()` y de `reallocate_booking()`. **Con esto D-09 deja de tener prerequisitos de producto** (`docs/deuda-tecnica.md`).
+- **Q-B** — ~~¿Un dev puede pertenecer a múltiples "equipos" o clientes simultáneamente?~~ **Respondida el 2026-09-07: sí, el dev es transversal**; las reservas lo asignan a proyectos específicos. No hay restricción en el modelo, y agregarla más adelante invalidaría reservas ya cargadas.
 
 ---
 

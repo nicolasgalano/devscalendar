@@ -30,7 +30,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 - [x] **T3.1** — Instalar shadcn/ui on-demand (F3 de `001`): `Button`, `Dialog`, `Input`, `Select`, `Table`, `DropdownMenu`, más `Label`, `Badge`, `Checkbox`. **Nota importante:** el `shadcn init` actual (preset Nova) genera CSS pensado para Tailwind v4; el repo tenía Tailwind v3. Se decidió con el usuario migrar el proyecto entero a **Tailwind CSS 4** (CSS-first, sin `tailwind.config.ts`) en vez de parchear el output — `CLAUDE.md` actualizado. Componentes basados en Base UI (`@base-ui/react`), no Radix.
 - [x] **T3.2** — `/admin/clients` — listado + alta/edición/desactivación de clientes.
 - [x] **T3.3** — `/admin/projects` — listado + alta/edición de proyectos (cliente, PM, prioridad, integraciones).
-- [x] **T3.4** — `/admin/users` — listado + alta de usuarios (email + rol) + edición de rol/`primary_pm_id`.
+- [x] **T3.4** — `/admin/users` — listado + alta de usuarios (email + rol) + edición de rol/`primary_pm_id`. **Cerrada de más:** el ABM quedó completo, pero la segunda mitad de AC-3.2 nunca se implementó y la pantalla arrastra dos defectos. Ver D-03 y D-04 en "Deuda registrada", abajo.
 - [x] **T3.5** — Guard de ruta: `/admin/*` solo accesible con `role = 'admin'` (layout server-side, mismo patrón que `pending-access`).
 
 **Validación end-to-end (Fase 3):** sin acceso a Claude in Chrome en esta sesión (herramientas de navegador deshabilitadas), se verificó el flujo completo simulando una sesión admin real contra el Supabase local (usuario de prueba + cookie de sesión `sb-127-auth-token`, con la codificación exacta que usa `@supabase/ssr`): `/admin/clients`, `/admin/projects` y `/admin/users` renderizan con datos reales; `POST /api/clients`, `POST /api/projects`, `PATCH .../priority` y el flujo de confirmación de desactivación (AC-1.2) funcionaron end-to-end contra RLS real; el trigger de `audit_log` (T1.3) quedó confirmado insertando la fila esperada. Datos y usuarios de prueba borrados al terminar. **Pendiente:** verificación visual real en navegador (screenshots) — recomendable correrla con Claude in Chrome habilitado antes de dar la feature por cerrada.
@@ -62,6 +62,7 @@ El test de regresión se validó revirtiendo la FK en la DB y confirmando que fa
 - [x] **T5.2** — ADRs escritos: [0004](../../../docs/adr/0004-profile-invites.md) (invitación por email), [0005](../../../docs/adr/0005-audit-log-minimo.md) (`audit_log` mínimo) y [0006](../../../docs/adr/0006-tailwind-v4-base-ui-design-system.md) (Tailwind v4 + Base UI + `DESIGN.md`, que reemplaza la parte de estilos de 0003).
 - [x] **T5.3** — `specs/features/README.md`: `002` marcada `done`, más una tabla de preguntas abiertas con el cliente.
 - [x] **T5.4** — Q-A y Q-B documentadas para confirmar, junto con Q-2 y Q-6, en la tabla de `specs/features/README.md`. **No se pueden cerrar desde acá: requieren respuesta del cliente.** Q-2 (escala de prioridad) es la más urgente porque `DESIGN.md` y el modelo de datos hoy asumen dos niveles y `006` necesita resolver empates.
+  - **Cerradas el 2026-09-07:** las cuatro se responden con el default que ya estaba aplicado — un PM primario obligatorio, el dev es transversal, dos niveles de prioridad, y el rol Cliente no accede. Nada que implementar. Lo que sí cambió es que **D-09 se quedó sin prerequisitos**: esperaba a Q-A.
 
 ---
 
@@ -69,3 +70,94 @@ El test de regresión se validó revirtiendo la FK en la DB y confirmando que fa
 
 - [ ] **F1** — Cuando `010-notifications-and-audit` se implemente, migrar `audit_log` mínimo (T1.3) a su forma final (más `entity`/`action` values, tabla de notificaciones asociada). Owner: quien tome `010`.
 - [ ] **F2** — Import masivo (CSV/Sheets) — explícitamente fuera de alcance de `002` (ver spec §5), queda para una feature futura si el cliente lo pide.
+
+---
+
+## Deuda registrada (2026-09-07)
+
+Levantada auditando los AC de esta feature contra el código, más lo que reportó
+el usuario ese día sobre `/admin/users`. **Nada de esto se salda sin OK
+explícito** — el registro central es `docs/deuda-tecnica.md`.
+
+- [ ] **D-03** — **`profiles.primary_pm_id` quedó a medio implementar.** AC-3.2
+      (`spec.md:44`) pide dos cosas y solo se hizo una: la columna existe, se
+      edita y se valida (`00000000000002_profile_invites_and_primary_pm.sql:14`,
+      `src/app/api/users/[id]/route.ts:26-46`), pero **ningún otro código la
+      lee**. `getBookingOptions()` trae todos los devs activos ordenados por
+      nombre sin mirarla (`src/lib/bookings/options.ts:50-54`), y
+      `src/lib/calendar/query.ts:340` igual. O sea que "candidato natural para
+      las reservas de proyectos de ese PM" no ocurre en ninguna parte.
+  - **Y la columna no debería estar en la tabla** (`users-table.tsx:179,199`),
+    decidido con el usuario el 2026-09-07: hoy no alimenta ninguna decisión y le
+    cuesta ancho a la tabla.
+  - Las tres salidas siguen abiertas y **elegir es parte de saldar la deuda**:
+    (1) usarlo como **orden** en `getBookingOptions()` —lo más fiel al AC, y no
+    le impide reservar a nadie—; (2) como **filtro** por defecto en el
+    calendario, más invasivo y a contramano de que hoy se muestre al equipo
+    entero a propósito; (3) **sacarlo entero**, si el equipo no lo usa: es una
+    FK, una validación y un campo de formulario que mantener a cambio de nada.
+- [ ] **D-04** — **`SelectValue` sin hijos imprime el valor crudo.** Es **el mismo
+      bug que `004` T3.1 ya encontró y arregló** en `BookingDialog`; el arreglo
+      nunca volvió sobre las pantallas de `002`, que son donde nació.
+      `SelectValue` es `Select.Value` de Base UI sin hijos
+      (`src/components/ui/select.tsx:21-29`): renderiza el `value`, no el texto
+      del item elegido. Seis lugares:
+
+  | Pantalla | Select | Qué muestra el trigger |
+  | :---- | :---- | :---- |
+  | `/admin/users` | PM primario (`users-table.tsx:308`) | `__none__`, o el uuid crudo del PM |
+  | `/admin/users` | Rol, al editar (`users-table.tsx:291`) | `developer` en vez de `Developer` |
+  | `/admin/users` | Rol, al invitar (`users-table.tsx:263`) | ídem |
+  | `/admin/projects` | Prioridad (`projects-table.tsx:395`) | `normal` / `high` en vez de `Común` / `Prioritario` |
+  | `/admin/projects` | Cliente (`projects-table.tsx:357`) | el placeholder hasta elegir; después, el uuid |
+  | `/admin/projects` | PM responsable (`projects-table.tsx:376`) | ídem |
+
+  - El `__none__` que reportó el usuario es el más visible; el de prioridad es el
+    más grave de los otros cinco, porque `DESIGN.md` §11 pide el vocabulario del
+    PM y no el de la base — y las **opciones** del desplegable ya dicen `Común` /
+    `Prioritario` (`projects-table.tsx:399-400`). Solo el trigger vuelve al
+    vocabulario de la DB.
+  - Al saldarla: resolver el texto a mano dentro de `<SelectValue>`, como ya
+    hacen `booking-dialog.tsx:276,307` y `calendar-filters.tsx:194`.
+    `ROLE_LABEL` y `pmLabel()` ya existen en `users-table.tsx:52,58` y hoy solo
+    se usan para la tabla.
+- [ ] **D-05** — **`readJsonBody()` falta en los seis handlers de esta feature.**
+      Era F5 de `004`; **le corresponde a `002`**, que es la dueña de las rutas.
+      `CLAUDE.md` es explícito: el body se lee con `readJsonBody()` y nunca con
+      `request.json()` directo, porque este tira ante un body vacío o mal formado
+      y eso sale como **500 con stack trace** — un cliente que manda basura queda
+      registrado como una falla del servidor. Siguen los seis con la llamada
+      directa: `api/clients/route.ts:11`, `api/clients/[id]/route.ts:15`,
+      `api/projects/route.ts:11`, `api/projects/[id]/route.ts:15`,
+      `api/users/route.ts:11`, `api/users/[id]/route.ts:15`. Una línea por
+      handler. `004` lo arregló solo en las rutas de reservas para no ampliar su
+      alcance, y quedó esperando "a quien toque esas rutas", que no fue nadie.
+- [ ] **D-06** — **Verificar en el navegador los permisos de `/admin/*`.**
+      Reportado por el usuario el 2026-09-07: que cualquier usuario de la app
+      puede entrar a `/admin/users` y editar roles y usuarios.
+  - **Leyendo el código, eso no es lo que dice.** El guard está en dos capas —
+    `src/app/(app)/admin/layout.tsx:15` redirige a todo lo que no sea admin, y
+    `ADMIN_NAV` solo se arma con `role === "admin"`
+    (`src/components/app-shell.tsx:150`) — los tres handlers pasan por
+    `requireAdmin()`, y hay un E2E que lo cubre
+    (`tests/e2e/admin-entities.spec.ts:140`).
+  - **Pero no alcanza para cerrar el tema, por dos motivos concretos:** (1) ese
+    archivo de E2E **nunca corrió en verde** — es F6 de `004`, falla dentro de
+    `createUser()` antes de que entre el navegador, así que el test que probaría
+    el guard nunca terminó de ejecutarse; y (2) sí hay un agujero real al lado,
+    que es **D-01 de `001`**: el guard mira `role` y no `active`, así que un
+    admin **desactivado** conserva `/admin/*` por API completo.
+  - **En este orden:** re-correr `admin-entities.spec.ts` en CI hasta verlo
+    verde, y después verificar a mano con una sesión de PM y una de developer
+    reales. Si aparece un camino que el código no explica, deja de ser una
+    verificación y pasa a ser un bug de `002` con toda la prioridad.
+  - **Avance del 2026-09-07 — lo automatizable está hecho:** el E2E corrió
+    entero y verde ([run 34140290020](https://github.com/nicolasgalano/devscalendar/actions/runs/34140290020),
+    28 passed), o sea que el motivo (1) era el ambiente y no el código. Y se tapó
+    un hueco que nadie había anotado: la policy `profiles: admin write` —la única
+    garantía real contra la denuncia original— **no la cubría ningún test**, así
+    que `tests/integration/entities-rls.test.ts` sumó tres casos sobre
+    `profiles`. **Queda solo la pasada manual en el navegador**, que ningún test
+    reemplaza porque los E2E plantan la cookie de sesión a mano en vez de entrar
+    por Google. El guion paso a paso está en `docs/deuda-tecnica.md`, D-06.
+  - **Gate: antes del primer usuario real.**

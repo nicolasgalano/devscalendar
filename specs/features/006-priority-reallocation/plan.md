@@ -20,7 +20,7 @@ Toda la feature es, entonces, **una función en la base y la UI que la ofrece**.
 ### Decisiones heredadas que no se re-discuten
 
 - **El dev siempre aprueba** (Q-1 de la spec funcional, Q-6 del índice). Una reserva creada por realocación nace `pending` como cualquier otra (AC-3.1).
-- **La desplazada no se restaura** si la prioritaria después se cancela o se rechaza (AC-3.2, Q-G). El PM anterior reasigna a mano.
+- **La desplazada no se restaura** si la prioritaria después se cancela o se rechaza (AC-3.2, Q-O — que se llamaba Q-G hasta el 2026-09-07). El PM anterior reasigna a mano.
 - **Sin notificaciones**, igual que `005`: AC-2.1 y AC-2.2 dependen de `010`. Ver §7.
 
 ---

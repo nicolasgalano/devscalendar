@@ -2,7 +2,7 @@
 
 - **ID:** 006-priority-reallocation
 - **Plan reference:** `./plan.md`
-- **Status:** done el 2026-09-03, salvo T5.5 (revisión visual, necesita ojos humanos). **Todo verde en CI** ([run 33791620592](https://github.com/nicolasgalano/devscalendar/actions/runs/33791620592)): 159 unitarios, 9 de integración sobre `reallocate_booking()`, y los 2 E2E del flujo de desplazamiento. De Phase 0 siguen abiertas T0.1 (Q-2) y T0.3 (Q-A), que no bloquearon y salieron con su default.
+- **Status:** done el 2026-09-03, salvo T5.5 (revisión visual, necesita ojos humanos). **Todo verde en CI** ([run 33791620592](https://github.com/nicolasgalano/devscalendar/actions/runs/33791620592)): 159 unitarios, 9 de integración sobre `reallocate_booking()`, y los 2 E2E del flujo de desplazamiento. Phase 0 quedó cerrada el 2026-09-07: T0.1 (Q-2) y T0.3 (Q-A) se respondieron confirmando el default con el que ya habían salido.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -14,9 +14,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Phase 0 — Antes de empezar
 
-- [ ] **T0.1** — **Confirmar Q-2 con el cliente** (¿dos niveles o P0–P3?). No bloquea la implementación —AC-1.3 define qué hacer en el empate— pero sí define si el empate es un caso de borde o el caso común. Si pasa a numérico, cambia la regla de `priority.ts`, la migration de `projects.priority` y el sistema de color de `DESIGN.md` §3.
+- [x] **T0.1** — **Confirmar Q-2 con el cliente** (¿dos niveles o P0–P3?). No bloquea la implementación —AC-1.3 define qué hacer en el empate— pero sí define si el empate es un caso de borde o el caso común. Si pasa a numérico, cambia la regla de `priority.ts`, la migration de `projects.priority` y el sistema de color de `DESIGN.md` §3. **Respondida el 2026-09-07: dos niveles**, o sea que el empate entre prioritarios sigue yendo a los PMs con `DC002`.
 - [x] **T0.2** — **R-2 resuelto el 2026-09-03: va la opción (a)** de las tres de `plan.md` §9 — la bandeja del dev se ordena por prioridad y lo advierte; **no** se desplaza al aprobar. Era la única pregunta del plan sin default aplicado. La decisión no cierra el agujero, lo hace visible: el dev sigue pudiendo aprobar primero la común, pero deja de ser un accidente. Lo implementa T2.5 y la deuda queda anotada en F4.
-- [ ] **T0.3** — Confirmar Q-A (¿varios PMs por proyecto?). Impacta poco acá, pero `can_manage_booking` es la puerta de la función nueva y conviene no reescribirla dos veces.
+- [x] **T0.3** — Confirmar Q-A (¿varios PMs por proyecto?). Impacta poco acá, pero `can_manage_booking` es la puerta de la función nueva y conviene no reescribirla dos veces. **Respondida el 2026-09-07: un PM primario obligatorio**, así que `can_manage_booking()` queda como está. Con esto **D-09 deja de tener prerequisitos de producto**.
 
 ## Phase 1 — La base
 
@@ -97,7 +97,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 ## Blocked / follow-ups
 
 - [ ] **F1** — **Notificar al PM desplazado y al dev (AC-2.1).** Es de `010`, y acá **pesa más que en `005`**: ahí el que esperaba era el dev, que entra a la app igual; acá a alguien le sacan una reserva ya confirmada sin pedirle permiso. Mitigación parcial hasta entonces: `displaced` es visible por default y el rastro queda en `audit_log`. **No simularlo con un toast.**
-- [ ] **F2** — **Restaurar la desplazada** si la prioritaria se cancela o el dev la rechaza. Fuera del MVP por AC-3.2 y Q-G. Si el cliente lo pide, la vuelta es de `displaced` a `approved`, y hay que decidir qué pasa si la franja se ocupó mientras tanto.
+- [ ] **F2** — **Restaurar la desplazada** si la prioritaria se cancela o el dev la rechaza. Fuera del MVP por AC-3.2 y Q-O (que se llamaba Q-G hasta el 2026-09-07). Si el cliente lo pide, la vuelta es de `displaced` a `approved`, y hay que decidir qué pasa si la franja se ocupó mientras tanto.
 - [ ] **F3** — **Borrar el evento de Google Calendar de la reserva desplazada.** Es de `007`. Sin eso, el dev tiene en su calendario personal un bloque que ya no existe en el producto.
 - [ ] **F4** — **R-2, opción (b): desplazar también al aprobar.** Descartada del MVP el 2026-09-03 a favor de (a) — ver T0.2 y T2.5. **La deuda que queda, en concreto:** si el dev aprueba primero la común, la prioritaria ya no puede aprobarse —choca contra el exclusion constraint— y el proyecto prioritario pierde la franja sin que nadie haya desplazado nada. (a) lo hace visible; no lo impide. Si aparece en el uso real, (b) mete la realocación adentro del camino de respuesta del dev, que es justo el que ADR 0009 tiene acotado por el guard de columnas, y abre una pregunta de producto que hoy no está contestada: si el dev, al aprobar, puede pisarle la reserva a un tercero.
 - [ ] **F5** — Empate entre prioritarios (Q-2 / R-5). Con dos niveles no se resuelve solo; AC-1.3 lo manda a los PMs.

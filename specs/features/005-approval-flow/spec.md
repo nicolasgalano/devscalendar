@@ -71,9 +71,10 @@ Sin aprobación explícita del dev, una reserva es solo una intención del PM. E
 
 ## 7. Preguntas abiertas
 
-- **Q-1** (de spec §11) — ¿La realocación por prioridad saltea la aprobación del dev? **Recomendación por defecto:** no, el dev siempre aprueba. **Bloquea:** interacción con feature 006.
-- **Q-9** (de spec §11) — Canales de notificación: in-app + Slack + email. **Recomendación por defecto:** in-app + Slack; email opcional. **Bloquea:** feature 010.
-- **Q-F** — ¿Timeout para aprobar? Si el dev no responde en X horas, ¿qué pasa? **Recomendación por defecto:** MVP sin timeout; solo recordatorio pasado X horas. Registrar en tabla de auditoría para métrica.
+- **Q-1** (de spec §11) — ~~¿La realocación por prioridad saltea la aprobación del dev?~~ **Cerrada: no saltea.** La realocada nace `pending` como cualquier otra; el trigger de ADR 0009 lo impondría igual.
+- **Q-9** (de spec §11) — **Abierta.** Canales de notificación: ¿in-app, Slack, email o todas? **Recomendación por defecto:** in-app siempre, Slack como plugin, email diferido a Fase 2. **Bloquea:** feature `010`, que es donde se responde.
+- **Q-N** — ~~¿Timeout para aprobar? Si el dev no responde en X horas, ¿qué pasa?~~ **Respondida el 2026-09-07: sin timeout.** La reserva queda `pending` hasta que el dev responda. El recordatorio que la pregunta imaginaba es material de `010`: hoy no hay ningún job que mire la antigüedad de una `pending`.
+  - **Se llamaba `Q-F` hasta el 2026-09-07**, que es el identificador de otra pregunta —la jornada laboral de `003`, respondida el 2026-08-05—. Renombrada para que el índice no tenga dos preguntas con el mismo nombre.
 
 ---
 

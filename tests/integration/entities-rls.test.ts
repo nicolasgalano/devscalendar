@@ -16,8 +16,13 @@ import { testEmail } from "../run-id";
  * T4.1 — feature 002. Escrituras sobre los maestros son solo de admin; el resto
  * de los autenticados puede leer pero no escribir. `profile_invites` no la ve
  * nadie que no sea admin.
+ *
+ * Los tres casos sobre `profiles` se sumaron el 2026-09-07 por D-06: la única
+ * garantía real contra "cualquiera entra a /admin/users y edita roles" es la
+ * policy `profiles: admin write`, y no la cubría ningún test — ni acá ni en el
+ * E2E, que solo prueba la redirección de la pantalla.
  */
-describe("clients / projects / profile_invites RLS", () => {
+describe("clients / projects / profile_invites / profiles RLS", () => {
   const password = "Test-password-123!";
   let developer: { id: string; email: string };
   let admin: { id: string; email: string };
@@ -140,6 +145,72 @@ describe("clients / projects / profile_invites RLS", () => {
 
     // Sin grant de insert para `authenticated`: solo el trigger escribe acá.
     expect(error).not.toBeNull();
+  });
+
+  /**
+   * Se lee la fila de vuelta con `service_role` a propósito: un update que la
+   * RLS filtra **no falla** —afecta cero filas y devuelve `error: null`—, así
+   * que mirar el error no distingue "lo bloqueó la policy" de "lo escribió".
+   * Es la lección de `004` T4.2 y la misma que exige ADR 0010.
+   */
+  it("prevents a non-admin from editing another profile", async () => {
+    const client = await signInClient(developer.email, password);
+    const { data, error } = await client
+      .from("profiles")
+      .update({ role: "developer", active: false })
+      .eq("id", admin.id)
+      .select();
+
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+
+    const { data: fresh } = await adminClient()
+      .from("profiles")
+      .select("role, active")
+      .eq("id", admin.id)
+      .single();
+    expect(fresh?.role).toBe("admin");
+    expect(fresh?.active).toBe(true);
+  });
+
+  // El caso que importa de verdad: la fila propia sí la ve por `profiles: self
+  // read`, así que el bloqueo tiene que venir de la policy de escritura.
+  it("prevents a non-admin from promoting themselves to admin", async () => {
+    const client = await signInClient(developer.email, password);
+    const { data, error } = await client
+      .from("profiles")
+      .update({ role: "admin" })
+      .eq("id", developer.id)
+      .select();
+
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+
+    const { data: fresh } = await adminClient()
+      .from("profiles")
+      .select("role")
+      .eq("id", developer.id)
+      .single();
+    expect(fresh?.role).toBe("developer");
+  });
+
+  // Control positivo: sin esto, los dos de arriba pasarían igual si `profiles`
+  // fuera de solo lectura para todo el mundo, que no es lo que se quiere probar.
+  it("lets an admin change someone's role", async () => {
+    const client = await signInClient(admin.email, password);
+    try {
+      const { data, error } = await client
+        .from("profiles")
+        .update({ role: "pm" })
+        .eq("id", developer.id)
+        .select("role");
+
+      expect(error).toBeNull();
+      expect(data).toEqual([{ role: "pm" }]);
+    } finally {
+      // Los demás tests del archivo cuentan con que este usuario sea developer.
+      await adminClient().from("profiles").update({ role: "developer" }).eq("id", developer.id);
+    }
   });
 
   it("keeps a user with no role out of the masters", async () => {
