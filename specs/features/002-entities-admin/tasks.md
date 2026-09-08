@@ -132,7 +132,7 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
       `api/users/route.ts:11`, `api/users/[id]/route.ts:15`. Una línea por
       handler. `004` lo arregló solo en las rutas de reservas para no ampliar su
       alcance, y quedó esperando "a quien toque esas rutas", que no fue nadie.
-- [ ] **D-06** — **Verificar en el navegador los permisos de `/admin/*`.**
+- [x] **D-06** — **Verificar en el navegador los permisos de `/admin/*`.**
       Reportado por el usuario el 2026-09-07: que cualquier usuario de la app
       puede entrar a `/admin/users` y editar roles y usuarios.
   - **Leyendo el código, eso no es lo que dice.** El guard está en dos capas —
@@ -160,4 +160,9 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
     `profiles`. **Queda solo la pasada manual en el navegador**, que ningún test
     reemplaza porque los E2E plantan la cookie de sesión a mano en vez de entrar
     por Google. El guion paso a paso está en `docs/deuda-tecnica.md`, D-06.
-  - **Gate: antes del primer usuario real.**
+  - **Cerrada el 2026-09-08.** El usuario recorrió el guion en el navegador con
+    sesiones reales y **todos los pasos dieron lo esperado**: ni la navegación
+    ofrece el panel, ni las tres URLs entran, ni los handlers responden otra cosa
+    que 403. El reporte original era infundado — y la revisión valió igual,
+    porque destapó que el E2E que lo probaba nunca había corrido en verde y que
+    la policy que de verdad lo impide no tenía ningún test.

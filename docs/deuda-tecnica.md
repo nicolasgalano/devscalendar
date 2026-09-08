@@ -15,15 +15,42 @@
 > cambió de dueño.
 >
 > Cuando una deuda ya tiene **decisión tomada** sobre cómo se resuelve, se dice
-> explícitamente — hoy es el caso de D-09, que va por roles múltiples. Decidida
-> no significa habilitada: sigue sin poder tocarse hasta el OK.
+> explícitamente. Decidida no significa habilitada: sigue sin poder tocarse hasta
+> el OK.
 
-## Estado del riesgo hoy
+## Estado: las nueve están saldadas (2026-09-08)
 
-La app está deployada pero **todavía no está en uso** (ver la advertencia de
-`CLAUDE.md`, "Cómo correr localmente"). Ninguna de estas deudas está causando
-daño en este momento. Varias dejan de ser inofensivas **el día que entre la
-primera persona real**, y están marcadas así.
+**El registro quedó en cero.** Las nueve se saldaron en dos días y tres tandas,
+todas con OK explícito:
+
+| Cuándo | Cuáles | Con qué |
+| :---- | :---- | :---- |
+| 2026-09-07 | (verificación de D-06: E2E en verde + tres tests de RLS sobre `profiles`) | — |
+| 2026-09-08 | D-01, D-07, D-09 | `012-multiple-roles-and-active-enforcement` |
+| 2026-09-08 | D-02, D-03, D-04, D-05, D-08 | `013-registered-debt-cleanup` |
+| 2026-09-08 | D-06 | verificación manual del usuario en el navegador |
+
+**Este archivo no se archiva ni se borra.** Sigue siendo el lugar donde se anota
+la deuda nueva, y las entradas de abajo se conservan tachadas a propósito: cada
+una explica **por qué el código es como es**, y esa explicación vale más ahora
+que la deuda no está que cuando estaba. La regla de arriba sigue vigente para
+todo lo que se anote de acá en adelante.
+
+### Contexto que dejó de ser cierto
+
+La versión anterior de esta sección decía que la app estaba deployada pero sin
+uso, y que varias deudas dejaban de ser inofensivas "el día que entre la primera
+persona real". Ese día se acerca y las que importaban ya no están:
+
+- **Backups del proyecto de Supabase: configurados** (confirmado por el usuario
+  el 2026-09-08). Es la red de seguridad que faltaba nombrar mientras la base de
+  desarrollo y la del deploy fueran la misma.
+- **Los datos de ficción del seed se eliminan el 2026-09-08.** A partir de ahí
+  `pnpm db:seed` **no se corre nunca más**: reescribiría sus catorce reservas
+  fijas (`seed.sql:212`, `on conflict (id) do update`) encima de una base con
+  datos de gente.
+- **Lo que sigue abierto no es deuda registrada sino features:** `010`
+  (notificaciones) y R-2 de `006` (la prioridad juega al crear, no al aprobar).
 
 ## Índice
 
@@ -34,7 +61,7 @@ primera persona real**, y están marcadas así.
 | ~~D-03~~ | ~~`profiles.primary_pm_id` quedó a medio implementar~~ → salida (1): orden, no filtro                                                                         | 002     | **saldada 2026-09-08** (`013`)  |
 | ~~D-04~~ | ~~`SelectValue` sin hijos imprime el valor crudo en `/admin/*`~~                                                               | 002     | **saldada 2026-09-08** (`013`)  |
 | ~~D-05~~ | ~~`readJsonBody()` falta en los seis handlers de `002`~~                                                                       | 002     | **saldada 2026-09-08** (`013`)  |
-| D-06     | Verificar en el navegador los permisos de `/admin/*` — **lo único que queda abierto**; los tests ya cubren todo lo automatizable | 002     | **antes de usuarios reales**            |
+| ~~D-06~~ | ~~Verificar en el navegador los permisos de `/admin/*`~~ | 002     | **saldada 2026-09-08** (a mano)            |
 | ~~D-07~~ | ~~El `PATCH` de reservas no chequea el `active` del desarrollador~~                                                        | 004     | **saldada 2026-09-08 con D-01** (`012`) |
 | ~~D-08~~ | ~~Nada impide reservar sobre un proyecto desactivado~~                                                                         | 004     | **saldada 2026-09-08** (`013`)  |
 | ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
@@ -292,6 +319,24 @@ Si algún paso se desvía, deja de ser una verificación y pasa a ser un bug de
 `002` con toda la prioridad. Si todos pasan, D-06 se cierra — y lo que queda de
 riesgo en `/admin/*` es **D-01**, no esto.
 
+### Resultado: pasó limpia (2026-09-08)
+
+**El usuario recorrió el guion en el navegador y todos los pasos dieron lo
+esperado**, con sesiones reales de Google. Ningún camino que el código no
+explicara. Con eso D-06 queda saldada y el registro de deuda en cero.
+
+Vale dejar dicho **qué era y qué no era esta deuda**, porque el nombre engaña:
+nunca fue un bug. Fue un reporte —"cualquier usuario puede entrar a
+`/admin/users` y editar roles"— que el código contradecía, y la respuesta
+correcta no era discutirlo sino comprobarlo. La comprobación encontró dos cosas
+reales de paso: que el E2E que lo probaba **nunca había corrido en verde** (era
+el ambiente, no el código) y que la policy que de verdad lo impide, `profiles:
+admin write`, **no la cubría ningún test**. Las dos se arreglaron. El reporte era
+infundado y la revisión valió igual.
+
+Y el riesgo que quedaba al lado —D-01, el `active` que solo se aplicaba en la
+UI— ya no está: se saldó el mismo día con `012`.
+
 ---
 
 ## D-07 — El `PATCH` de reservas no chequea el `active` del desarrollador
@@ -468,8 +513,8 @@ usuario desactivado— que el E2E nuevo ya cubre automáticamente.
 ## Saldadas — 2026-09-08, segunda tanda
 
 **D-02, D-03, D-04, D-05 y D-08** se saldaron con
-`013-registered-debt-cleanup`, con OK explícito. **Queda D-06 y nada más**, y de
-D-06 queda solo lo que ninguna suite puede hacer.
+`013-registered-debt-cleanup`, con OK explícito. Quedaba D-06 y nada más — y esa
+misma tarde el usuario la cerró a mano, así que **el registro quedó en cero**.
 
 **D-02 y F7 de `003`, que eran la misma cosa.** El desvío de AC-1.3 quedó
 registrado en `001/spec.md`: la sesión sobrevive al login sin alta **a
@@ -506,15 +551,21 @@ congelado también las reservas existentes del proyecto dado de baja — justo l
 que su PM necesita poder cancelar. Desactivar bloquea historia nueva; no congela
 la vieja. Hay un test para cada mitad.
 
-### Lo que queda de D-06
+### Cómo terminó D-06
 
-Solo la pasada manual con una cuenta de Google real. Lo demás está cubierto:
+**Saldada el 2026-09-08**, con la pasada manual del usuario en el navegador —
+todos los pasos como esperado. Ver el resultado completo en la sección de D-06.
+
+Lo que la sostiene de acá en adelante, para que no haya que volver a hacerla a
+mano cada vez que se toque `/admin/*`:
 
 - El E2E de un developer contra `/admin/clients` (verde desde el 2026-09-07).
 - Tres casos de RLS sobre `profiles` (2026-09-07).
 - Un admin **desactivado** que rebota y recibe 403 (`012`).
 - Un **PM** contra las tres pantallas de `/admin/*` y los tres handlers (`013`).
 
-Lo que no se puede automatizar es el login: las fixtures plantan la cookie de
-sesión (`tests/e2e/session.ts`) en vez de pasar por el OAuth de Google. El guion
-paso a paso sigue en la sección de D-06.
+Lo único que esos tests no pueden replicar es el login en sí: las fixtures
+plantan la cookie de sesión (`tests/e2e/session.ts`) en vez de pasar por el OAuth
+de Google. Por eso hizo falta una persona una vez — y por eso, si algún día
+cambia el guard de `/admin/*`, conviene repetir el guion en vez de confiar solo
+en la suite.

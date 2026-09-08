@@ -2,7 +2,7 @@
 
 - **ID:** 013-registered-debt-cleanup
 - **Plan reference:** `./plan.md`
-- **Status:** done el 2026-09-08, salvo T4.5 (revisión visual de los cuatro Select, necesita ojos humanos)
+- **Status:** done el 2026-09-08
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -52,9 +52,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
       zero rows; cancelling an existing booking of that same project works.
 - [x] **T4.4** — E2E that shrinks D-06: a PM bounces off `/admin/users` and
       `/admin/projects` and gets 403 from the three admin handlers.
-- [ ] **T4.5** — Visual review of the four fixed `<SelectValue>` triggers.
+- [x] **T4.5** — Visual review of the four fixed `<SelectValue>` triggers.
       **Needs human eyes:** that a trigger shows the right label is precisely
-      what a text assertion cannot tell you without rendering the screen.
+      what a text assertion cannot tell you without rendering the screen. Done by
+      the user on 2026-09-08: all four read correctly.
 
 ## Phase 5 — Debt bookkeeping
 
@@ -69,7 +70,12 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ## Blocked / follow-ups
 
-- [ ] **F1** — **D-06 keeps its manual half and nothing can take it away.** The
+- [x] **F1** — **D-06 keeps its manual half and nothing can take it away.**
+      **Done on 2026-09-08:** the user walked the script with real Google
+      sessions and every step matched. The point stands for next time — if the
+      `/admin/*` guard changes, repeat the script rather than trusting the suite
+      alone.
+      *(original note)* The
       E2E fixtures plant the session cookie directly (`tests/e2e/session.ts`),
       never going through Google OAuth, so "a real person logs in and sees what
       they should" is not something this suite can answer.

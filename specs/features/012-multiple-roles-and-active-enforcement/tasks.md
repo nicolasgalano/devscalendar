@@ -2,7 +2,7 @@
 
 - **ID:** 012-multiple-roles-and-active-enforcement
 - **Plan reference:** `./plan.md`
-- **Status:** done el 2026-09-08, salvo T5.6 (revisión visual, necesita ojos humanos)
+- **Status:** done el 2026-09-08
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -122,14 +122,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
       this feature as the answer. D-07 and D-08 stay open and say why.
 - [x] **T5.5** — `specs/features/README.md`: add `012`, mark it `done`, and log
       Q-Q1/Q-Q2 in the draft table.
-- [ ] **T5.6** — Visual review of `/admin/users` against the `DESIGN.md`
-      checklist. **Needs human eyes.**
+- [x] **T5.6** — Visual review of `/admin/users` against the `DESIGN.md`
+      checklist. **Needs human eyes.** Done by the user on 2026-09-08: the role
+      checkboxes and the multi-role column read correctly.
 
 ---
 
 ## Blocked / follow-ups
 
-- [ ] **F1** — **The two-phase migration we did not need.** This one drops a
+- [x] **F1** — **The two-phase migration we did not need.** **Promoted to a rule
+      on 2026-09-08**: `CLAUDE.md` §Migrations now opens with the add → deploy →
+      drop sequence, and says outright that `012` did it in one step and broke
+      the deployed site for it. The reason it became a rule that day: the seed
+      data came out and the database started holding real people.
+      *(original note)* This one drops a
       column the deployed code reads, and that is only acceptable because the app
       has no users. The next schema change that lands with people inside has to
       add, coexist, and drop in a later migration. Written down here because the

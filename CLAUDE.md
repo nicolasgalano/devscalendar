@@ -4,9 +4,9 @@
 
 > Antes de crear o modificar cualquier vista, leé DESIGN.md y seguilo al pie de la letra. Al terminar, verificá la checklist final.
 
-> **Hay deuda técnica registrada, y NO se salda sin OK explícito del usuario.** Vive en `docs/deuda-tecnica.md`: nueve puntos levantados, **de los que queda uno solo abierto** —D-06, la verificación manual en el navegador; las otras ocho se saldaron el 2026-09-08 con `012` y `013`—, cada uno con archivo y línea. Leelo antes de tocar autorización o roles, las pantallas de `/admin/*`, o los handlers de `/api/clients`, `/api/projects` y `/api/users`. Si una tarea roza alguno, **decilo y preguntá — no lo arregles de paso**: son decisiones pendientes, no descuidos esperando una mano. Encontrar deuda nueva sí es bienvenido; se anota ahí y en el `tasks.md` de su feature, no se resuelve.
+> **El registro de deuda técnica quedó en cero el 2026-09-08.** Los nueve puntos levantados el 2026-09-07 se saldaron con `012`, `013` y una verificación manual. `docs/deuda-tecnica.md` **no se archiva**: sigue siendo el lugar donde se anota la deuda nueva, y las entradas viejas se conservan tachadas porque explican por qué el código es como es. **La regla sigue vigente para todo lo que se anote de acá en adelante: NO se salda sin OK explícito del usuario.** Leelo antes de tocar autorización o roles, las pantallas de `/admin/*`, o los handlers de `/api/clients`, `/api/projects` y `/api/users`: ahí está escrito **por qué** cada uno quedó como quedó, y varias de esas razones no se deducen del código. **Encontrar deuda nueva es bienvenido; se anota ahí y en el `tasks.md` de su feature, no se resuelve de paso.**
 
-**Estado:** en desarrollo — features `001` a `006` terminadas, más `012` (roles múltiples y `active` aplicado de verdad) y `013` (el resto de la deuda registrada), las dos del 2026-09-08.
+**Estado:** en desarrollo — features `001` a `006` terminadas, más `012` (roles múltiples y `active` aplicado de verdad) y `013` (el resto de la deuda registrada), las dos del 2026-09-08. **El registro de deuda quedó en cero ese mismo día.** Lo que falta para el primer uso real es `010`.
 
 ---
 
@@ -134,13 +134,15 @@ Antes del primer run necesitás:
 6. **Generar types:** `pnpm db:types`.
 7. **Arrancar Next.js:** `pnpm dev`.
 
-> **Ojo con esto: ese proyecto (`gnasmpblvarluuwtjprq`) es también el que usa el deploy de Vercel.** No hay una base de producción aparte. Al 2026-09-03 la app está deployada pero todavía no en uso —se publicó para que los PMs la vean— así que no hay datos que cuidar; el dato estructural sí vale igual:
+> **Ojo con esto: ese proyecto (`gnasmpblvarluuwtjprq`) es también el que usa el deploy de Vercel.** No hay una base de producción aparte, y **desde el 2026-09-08 esa base pasa a tener datos de gente**: se eliminaron los datos de ficción del seed y la app entra en uso. Lo que sigue dejó de ser una precaución teórica.
 >
-> - **`pnpm dev` en tu máquina escribe en la misma base que sirve el sitio.** Lo que crees probando a mano lo ve cualquiera que entre al deploy.
-> - **`pnpm db:push` es una operación sobre la base del deploy**, no un comando de desarrollo. Conviene que la migration esté verde en CI antes.
-> - **`pnpm db:seed` inserta datos de ficción y reescribe las reservas `…0051–005e`.** Mientras la base esté vacía es inofensivo y útil; en cuanto haya datos de gente, no se corre más.
+> - **`pnpm dev` en tu máquina escribe en la misma base que sirve el sitio.** Lo que crees probando a mano lo ve cualquiera que entre al deploy. Si tenés que probar con datos, usá la convención de `tests/run-id.ts` —`[test:<runId>]` en los nombres, `test-<runId>-…@example.com` en los emails— y limpiá con `node scripts/cleanup-test-data.mjs --run-id=<id>`. Sin el identificador no hay por dónde agarrar después.
+> - **`pnpm db:seed` NO se corre más.** Sus catorce reservas de ficción tienen `on conflict (id) do update` (`seed.sql:212`), así que las reescribiría encima de una base con datos reales. El resto del seed es `do nothing` y no borra nada, pero eso no lo vuelve seguro: es un comando para una base vacía y esa base ya no está vacía.
+> - **`pnpm db:push` es una operación sobre la base del deploy**, no un comando de desarrollo. Que la migration esté verde en CI antes es el mínimo; la regla completa está en "Migrations", más abajo, y es que **no rompa**.
 >
-> Cuando aparezca un proyecto de producción separado, esta advertencia se reemplaza por la separación de verdad.
+> **Backups: configurados** (confirmado el 2026-09-08). Es la red de seguridad de todo lo de arriba y la razón por la que una sola base es un riesgo administrable y no una bomba.
+>
+> **Por qué no hay entornos separados, y por qué está bien por ahora** (discutido el 2026-09-08): una segunda base no elimina el riesgo de las migrations —igual hay que aplicarlas en producción algún día— sino que lo mueve. El ensayo ya existe: CI reconstruye la base entera desde las migrations en cada push. Lo que falta no es un entorno, es que las migrations no rompan, y eso se resuelve con las dos fases. Cuando el equipo crezca o el volumen lo justifique, la separación se hace igual — pero como mejora, no como emergencia.
 
 Los tests automáticos no tocan nada de esto: corren contra un stack efímero en CI, y `tests/env.ts` rechaza cualquier URL que no sea local. Ver "Tests y bases de datos" más abajo.
 
@@ -253,6 +255,13 @@ Las vistas filtrables guardan **todo su estado en los search params**, no en Rea
 
 ### Migrations
 
+- **Toda migration va en dos fases, y esto no es negociable desde que hay usuarios.** La base es la misma que sirve el deploy, así que una migration que rompe el código viejo rompe el sitio en el momento en que corre `db:push` — no cuando sale el deploy. La secuencia es:
+  1. **Agregar.** La columna, tabla o función nueva convive con la vieja. El código deployado sigue funcionando sin enterarse.
+  2. **Deployar** el código que usa lo nuevo.
+  3. **Borrar**, en una migration posterior, lo que quedó sin usar.
+
+  `012` se hizo en un solo paso —agregó `profiles.roles` y borró `profiles.role` en la misma migration— y el sitio quedó roto entre el `db:push` y el deploy. Fue aceptable **solo** porque todavía no había nadie adentro. Ya no es el caso.
+
 - **RLS es obligatoria** en toda tabla nueva; la migration falla el review si no la incluye.
 - **Una policy sin `grant` de tabla no alcanza:** hay que otorgar los privilegios a `authenticated` / `service_role` explícitamente, o la policy deniega todo en silencio.
 - **`on delete` explícito en toda FK.** La convención del proyecto:
@@ -271,11 +280,11 @@ Las vistas filtrables guardan **todo su estado en los search params**, no en Rea
 Ver `specs/features/README.md` para el índice completo y estado.
 
 - **001-auth-and-permissions** — done. Google OAuth, roles, RLS base. **D-01 y D-09 se saldaron el 2026-09-08** con `012-multiple-roles-and-active-enforcement`: los roles son un conjunto y `active` se aplica en la base. **D-02 se saldó el 2026-09-08** con `013`, junto con F7 de `003`: el desvío de AC-1.3 quedó registrado —la sesión sobrevive al login sin alta a propósito— y las policies de `select` de `clients` y `projects` dejaron de ser `using (true)`.
-- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Q-A y Q-B **quedaron respondidas el 2026-09-07 con el default que ya estaba aplicado** —un PM primario obligatorio; el dev es transversal— igual que el resto de las preguntas de `001` a `006`; ver `specs/features/README.md`. **D-03, D-04 y D-05 se saldaron el 2026-09-08** con `013`: el PM primario ordena el desplegable de devs (y salió de la tabla), los `<SelectValue>` dicen el texto y no el valor, y los seis handlers usan `readJsonBody()`. **Queda D-06**, y de D-06 solo la pasada manual en el navegador con una cuenta de Google real: todo lo automatizable ya está cubierto. Guion en `docs/deuda-tecnica.md`.
+- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Q-A y Q-B **quedaron respondidas el 2026-09-07 con el default que ya estaba aplicado** —un PM primario obligatorio; el dev es transversal— igual que el resto de las preguntas de `001` a `006`; ver `specs/features/README.md`. **D-03 a D-06 se saldaron el 2026-09-08**: el PM primario ordena el desplegable de devs (y salió de la tabla), los `<SelectValue>` dicen el texto y no el valor, y los seis handlers usan `readJsonBody()` — todo con `013`—; y D-06 se cerró con la verificación manual del usuario en el navegador, que pasó limpia.
 - **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Creó la tabla `bookings` de solo lectura.
 - **004-bookings** — done. `bookings` ya es escribible: `exclusion constraint` anti doble-booking, policies para el PM del proyecto y el admin, API de alta / edición / cancelación, y el diálogo que se abre desde el botón o desde un click en la grilla. El anti doble-booking quedó en dos capas (ADR 0008). Q-E aplicada: mover el horario o el desarrollador de una reserva aprobada la devuelve a `pending`.
 - **005-approval-flow** — done. El desarrollador ya escribe: policy propia sobre sus reservas, acotada a `status` y `response_note` **por un guard en el trigger, no por la policy** (ADR 0009). Bandeja en `/inbox` con guard de rol, respuesta también desde el popover del calendario, comentario obligatorio al rechazar, y las tres traducciones de error de la API — `23P01` a 409 con la reserva que bloquea, `check_violation` a 403, y `expectedUpdatedAt` desajustado a 409. Cada cambio de estado deja su fila en `audit_log`. Salió **sin notificaciones** por decisión del 2026-08-12: el dev se entera entrando a la app, y AC-1.2 / AC-3.1 se difieren a `010`.
 - **006-priority-reallocation** — done. Un proyecto prioritario le toma la franja a uno común: la reserva vieja pasa a `displaced` y la nueva nace `pending`. Todo adentro de `reallocate_booking()`, una función `security definer` atómica (ADR 0010), porque la reserva que se desplaza es de otro PM y la RLS la filtraría **en silencio**. `POST /api/bookings/reallocate` con `confirmedDisplacing`, que obliga al PM a nombrar lo que acepta pisar. El empate entre prioritarios no se resuelve solo (AC-1.3) y se distingue de la prioridad insuficiente por `reason`, no por el texto. Salió **sin avisar al PM desplazado**: se entera mirando el calendario, donde `displaced` es visible por default. AC-2.1 se difiere a `010`.
   - **R-2, la deuda que dejó:** la prioridad juega al crear y no al aprobar. La bandeja del dev ordena por prioridad y advierte el choque (`outrankedByPending()`), pero eso lo hace visible, no lo impide. Ver F4 de `006/tasks.md`.
 - **Próxima:** `010-notifications-and-audit`, y el orden es a propósito (`specs/features/README.md`): cierra a la vez lo que `005` dejó abierto y lo que dejó `006`, y es **gate duro antes del primer deploy con usuarios reales** — hoy a alguien le sacan una reserva confirmada y solo se entera si mira el calendario.
-  - **El otro gate antes de usuarios reales es D-06**, y es lo único que queda del registro de deuda: los permisos de `/admin/*` sin confirmar en el navegador con una cuenta de Google real. Todo lo automatizable ya está cubierto por tests; ver el guion en `docs/deuda-tecnica.md`.
+  - **Y ya es el único gate**: D-01 y D-06, que eran los otros dos, se saldaron el 2026-09-08. El registro de `docs/deuda-tecnica.md` quedó en cero.

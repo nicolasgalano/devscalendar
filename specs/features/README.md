@@ -51,16 +51,19 @@ Este orden se revisa cuando haya feedback del cliente o cambien las prioridades.
 Aparte de las preguntas de abajo —que son decisiones del cliente— hay deuda
 **técnica** conocida: nueve puntos levantados el 2026-09-07 —ocho auditando los
 seis `tasks.md` cerrados contra el código, y D-09 de una conversación del mismo
-día—, **de los que queda uno solo abierto**: las otras ocho se saldaron el
-2026-09-08, tres con `012` y cinco con `013`. Viven en
+día—, **y las nueve quedaron saldadas el 2026-09-08**: tres con `012`, cinco con
+`013`, y D-06 con una verificación manual en el navegador. Viven en
 [`docs/deuda-tecnica.md`](../../docs/deuda-tecnica.md), con archivo y línea, y
 repetidos en la sección "Deuda registrada" del `tasks.md` de cada feature.
 
-**No se saldan sin OK explícito del usuario.** La que queda es **D-06**, que es
-gate antes del primer usuario real: confirmar en el navegador los permisos de
-`/admin/*` con una cuenta de Google real. Todo lo automatizable de esa deuda ya
-está cubierto por tests; lo que falta no lo puede hacer una suite, porque las
-fixtures plantan la cookie de sesión en vez de pasar por OAuth.
+**El registro está en cero, y la regla sigue en pie para lo que venga: no se
+salda deuda sin OK explícito del usuario.** El archivo no se archiva — las
+entradas tachadas explican por qué el código es como es, que es información que
+el código no da por sí solo.
+
+**El único gate que queda antes del primer usuario real es `010`**, y no es
+deuda sino feature: sin notificaciones, a alguien le desplazan una reserva
+confirmada y se entera solo si mira el calendario.
 
 ---
 
