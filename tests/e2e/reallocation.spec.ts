@@ -153,14 +153,28 @@ test("a priority project displaces a common booking and the displaced PM sees it
   await expect(blockWithStatus(page, HIGH_PROJECT, "Pendiente")).toBeVisible(AFTER_WRITE);
 
   /**
-   * AC-2.2, y la parte que justifica este test: **el PM desplazado la ve sin
-   * tocar ningún filtro.** La URL va pelada a propósito. Hasta que exista `010`
-   * esta es la única forma que tiene de enterarse de que le sacaron una reserva
-   * que ya estaba confirmada.
+   * AC-2.2: **el PM desplazado la ve sin tocar ningún filtro.** La URL va pelada
+   * a propósito.
    */
   await authenticate(context, pmCommon);
   await page.goto(`/calendar?view=day&date=${DISPLACE_DAY}`);
   await expect(blockWithStatus(page, COMMON_PROJECT, "Desplazada")).toBeVisible(AFTER_WRITE);
+
+  /**
+   * T4.6 de `010`, y es el test que cierra el gate: **el PM desplazado se entera
+   * sin mirar el calendario.** Hasta que existió esta campana, la única forma de
+   * enterarse de que le sacaron una reserva confirmada era pasar por acá y
+   * notarlo — que es exactamente el problema que `010` vino a resolver.
+   */
+  const bell = page.getByRole("button", { name: /Notificaciones (d+ sin leer)/ });
+  await expect(bell).toBeVisible(AFTER_WRITE);
+  await bell.click();
+
+  // Y el aviso nombra al proyecto que se llevó la franja (AC-1.5): "te
+  // desplazaron" sin decir quién obliga a salir a averiguarlo.
+  const panel = page.getByRole("dialog").filter({ hasText: "Notificaciones" });
+  await expect(panel).toContainText("Te desplazaron una reserva");
+  await expect(panel).toContainText(HIGH_PROJECT);
 });
 
 // AC-1.2

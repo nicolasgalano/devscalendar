@@ -94,6 +94,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
 ---
 
+## Cerrado después, en otra feature
+
+- **AC-2.1 cumplida el 2026-09-08 por `010`.** Esta feature salió sin avisarle al PM desplazado: se enteraba mirando el calendario, donde `displaced` es visible por default. Ahora `reallocate_booking()` escribe dos notificaciones —al PM del proyecto desplazado y al desarrollador— nombrando al proyecto que se llevó la franja, y el E2E de desplazamiento lo verifica de punta a punta.
+
 ## Blocked / follow-ups
 
 - [ ] **F1** — **Notificar al PM desplazado y al dev (AC-2.1).** Es de `010`, y acá **pesa más que en `005`**: ahí el que esperaba era el dev, que entra a la app igual; acá a alguien le sacan una reserva ya confirmada sin pedirle permiso. Mitigación parcial hasta entonces: `displaced` es visible por default y el rastro queda en `audit_log`. **No simularlo con un toast.**

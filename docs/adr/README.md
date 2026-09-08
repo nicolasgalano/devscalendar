@@ -41,3 +41,4 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 | 0009 | La autorización por columna se resuelve con trigger, no con RLS                  | accepted                                               |
 | 0010 | Una escritura que cruza proyectos se resuelve con una función `security definer` | accepted                                               |
 | 0011 | Roles múltiples como array, y `active` adentro de la pregunta de pertenencia     | accepted                                               |
+| 0012 | Las notificaciones son un outbox escrito por trigger | accepted |

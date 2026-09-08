@@ -140,6 +140,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          booking_id: string | null;
+          created_at: string;
+          email_attempts: number;
+          email_error: string | null;
+          email_sent_at: string | null;
+          email_status: string;
+          id: string;
+          payload: Json;
+          read_at: string | null;
+          recipient_id: string;
+          type: string;
+        };
+        Insert: {
+          booking_id?: string | null;
+          created_at?: string;
+          email_attempts?: number;
+          email_error?: string | null;
+          email_sent_at?: string | null;
+          email_status?: string;
+          id?: string;
+          payload?: Json;
+          read_at?: string | null;
+          recipient_id: string;
+          type: string;
+        };
+        Update: {
+          booking_id?: string | null;
+          created_at?: string;
+          email_attempts?: number;
+          email_error?: string | null;
+          email_sent_at?: string | null;
+          email_status?: string;
+          id?: string;
+          payload?: Json;
+          read_at?: string | null;
+          recipient_id?: string;
+          type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_booking_id_fkey";
+            columns: ["booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profile_invites: {
         Row: {
           created_at: string;
@@ -277,6 +334,16 @@ export type Database = {
       has_role: {
         Args: { target: Database["public"]["Enums"]["user_role"] };
         Returns: boolean;
+      };
+      mark_notifications_read: { Args: { ids: string[] }; Returns: number };
+      notify_user: {
+        Args: {
+          notification_payload: Json;
+          notification_type: string;
+          target_booking: string;
+          target_recipient: string;
+        };
+        Returns: undefined;
       };
       reallocate_booking: {
         Args: {

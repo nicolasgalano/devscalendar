@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { requireBookingAccess } from "@/lib/api/require-booking-access";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
 import { REALLOCATION_ERRORS } from "@/lib/bookings/priority";
@@ -63,8 +64,7 @@ export async function POST(request: Request) {
     // El conflicto se relee para que el cliente pueda repintar el diálogo con lo
     // que hay **ahora**. Si volviera solo el mensaje, el PM apretaría el mismo
     // botón sobre los mismos datos viejos — la lección de `005` §5.
-    const conflict = async () =>
-      findConflictingBooking(supabase, { devId, startsAt, endsAt });
+    const conflict = async () => findConflictingBooking(supabase, { devId, startsAt, endsAt });
 
     // `reason` es lo que la UI mira, no el texto: T4.3 pide que el empate y la
     // prioridad insuficiente se lean distinto, y un mensaje reescrito no puede
@@ -116,6 +116,10 @@ export async function POST(request: Request) {
   }
 
   const result = data as unknown as ReallocationResult;
+
+  // Los avisos del desplazamiento ya los escribió `reallocate_booking()`; esto
+  // solo adelanta el envío y puede fallar sin consecuencias.
+  dispatchNotifications();
 
   return NextResponse.json(result, { status: 201 });
 }

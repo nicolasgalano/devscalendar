@@ -19,7 +19,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 007 | Google Calendar push integration                  | draft  | 005                | §8.1                |
 | 008 | Jira integration                                  | draft  | 004                | §8.2                |
 | 009 | Slack integration                                 | draft  | 004, 005           | §8.3                |
-| 010 | Notifications & audit log                         | draft  | 004, 005, 006      | §7, §12             |
+| 010 | Notifications & audit log                         | done   | 004, 005, 006, 012 | §7, §12             |
 | 011 | Planning view (grilla semanal de carga)           | draft  | 003, 004, 005, 006 | §4, §12             |
 | 012 | Roles múltiples y `active` con dientes            | done   | 001, 002           | §3, §12 (seguridad) |
 | 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
@@ -61,9 +61,12 @@ salda deuda sin OK explícito del usuario.** El archivo no se archiva — las
 entradas tachadas explican por qué el código es como es, que es información que
 el código no da por sí solo.
 
-**El único gate que queda antes del primer usuario real es `010`**, y no es
-deuda sino feature: sin notificaciones, a alguien le desplazan una reserva
-confirmada y se entera solo si mira el calendario.
+**Ese gate se cerró el 2026-09-08 con `010`.** El aviso ahora sale por bandeja
+in-app y por email, y el caso que lo justificaba —te desplazan una reserva
+confirmada— avisa al PM y al desarrollador nombrando al proyecto que se llevó la
+franja. **Queda una tarea que no es de código: configurar el proveedor de email
+(cuenta, dominio verificado y `RESEND_API_KEY` en Vercel).** Hasta que exista,
+los avisos se acumulan y la bandeja funciona igual.
 
 ---
 
@@ -114,6 +117,8 @@ es la única razón por la que esta tabla sigue existiendo.
 | ~~Q-8~~  | ~~¿La unidad de reserva es franja libre o bloques fijos de X horas?~~                                 | **Franja libre** (inicio–fin), como Google Calendar.                                                                                                                                                        | Solo el formulario, no el modelo: `bookings.starts_at` / `ends_at` sirven para las dos formas                                                                                                                                                                                                           |
 | ~~Q-Q1~~ | ~~¿Un usuario puede quedarse sin ningún rol desde la UI?~~                                            | **No: el schema exige al menos uno** (400). Quedarse sin roles se parece a dar de baja, y para eso está `active`, que deja el motivo. El conjunto vacío existe solo para quien todavía no fue dado de alta. | `userRolesSchema` en `src/lib/validation/users.ts`. Salió así en `012`                                                                                                                                                                                                                                  |
 | ~~Q-Q2~~ | ~~¿Un admin puede desactivarse a sí mismo o quitarse el rol admin?~~                                  | **Sí, sin protección especial.** Con más de un admin no es un problema, y con uno solo el arreglo es por base.                                                                                              | Un guard en `PATCH /api/users/[id]`, si el equipo lo pide. Salió así en `012`                                                                                                                                                                                                                           |
+| ~~Q-9~~  | ~~¿Notificaciones por in-app, Slack, email o todas?~~ | **In-app + email**, respondida el 2026-09-08. Slack sigue siendo de `009`. El default que se arrastraba —solo in-app— no resolvía el problema que motiva `010`: seguía habiendo que entrar para enterarse. | Sacar el email es borrar un canal; agregar Slack es `009` sobre esta misma infraestructura |
+| ~~Q-M~~  | ~~Retención del `audit_log`: ¿indefinida o con TTL?~~ | **Indefinida en el MVP**, con su default. Se evalúa archivar a los 12–24 meses cuando haya volumen. | Un job de retención y la decisión de qué se archiva |
 | ~~Q-N~~  | ~~¿Hay timeout para que el dev apruebe? Si no responde en X horas, ¿qué pasa?~~                       | **Sin timeout.** La reserva queda `pending` hasta que el dev responda.                                                                                                                                      | El recordatorio que la pregunta imaginaba es material de `010`; hoy no hay ningún job que mire la antigüedad de una `pending`. Era el `Q-F` de `005`                                                                                                                                                    |
 | ~~Q-O~~  | ~~Si la reserva prioritaria que desplazó a otra se cancela, ¿la desplazada se restaura?~~             | **No se restaura.** El PM anterior decide si reasigna.                                                                                                                                                      | `reallocate_booking()` no guarda de quién tomó la franja más allá del `audit_log`. Restaurar automáticamente exige saber si la franja sigue libre, que es una segunda realocación. Era el `Q-G` de `006`                                                                                                |
 | ~~Q-F~~  | ~~¿Cuál es la jornada laboral y qué días no se trabaja?~~                                             | **09:00–17:00; no se trabaja fines de semana ni feriados argentinos.** Respondida el 2026-08-05.                                                                                                            | `src/lib/calendar/workdays.ts` y `load.ts`                                                                                                                                                                                                                                                              |
@@ -132,8 +137,6 @@ esperando confirmación.
 
 | #        | Pregunta                                                                | Recomendación por defecto                                                                                                 | Feature                                                     |
 | :------- | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :---------------------------------------------------------- |
-| **Q-9**  | ¿Notificaciones por in-app, Slack, email o todas?                       | In-app siempre, Slack como plugin, email diferido a Fase 2 salvo pedido explícito.                                        | `010` — y `005/spec.md` la marca "**Bloquea:** feature 010" |
-| **Q-M**  | Retención del `audit_log`: ¿indefinida o con TTL?                       | Indefinida en MVP; evaluar archivado a los 12–24 meses.                                                                   | `010`                                                       |
 | **Q-4**  | ¿Jira y Slack son alternativos o ambos por proyecto?                    | Ambos, configurable por proyecto.                                                                                         | `008` y `009` — "**Bloquea:** modelo de config de proyecto" |
 | Q-3      | Google Calendar: ¿solo push o sync bidireccional?                       | Push en MVP, bidireccional en Fase 2. `007/spec.md` la da por confirmada, pero sin fecha ni quién la confirmó.            | `007`                                                       |
 | Q-H      | ¿El evento va al calendario primario del dev o a uno dedicado?          | Uno dedicado ("DevsCalendar bookings"), creado la primera vez que el dev linkea su cuenta.                                | `007`                                                       |

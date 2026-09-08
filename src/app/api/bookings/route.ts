@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { requireBookingAccess } from "@/lib/api/require-booking-access";
 import { isDeveloper } from "@/lib/auth/roles";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
@@ -33,10 +34,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!project?.active) {
-    return NextResponse.json(
-      { error: "Ese proyecto está desactivado" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Ese proyecto está desactivado" }, { status: 400 });
   }
 
   // Mismo criterio que `projects.pm_id` en 002: Postgres no puede exigir que la
@@ -131,6 +129,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // El aviso ya está escrito (trigger); esto solo adelanta el envío y puede
+  // fallar sin consecuencias — el cron levanta lo que quede pendiente.
+  dispatchNotifications();
 
   return NextResponse.json(data, { status: 201 });
 }

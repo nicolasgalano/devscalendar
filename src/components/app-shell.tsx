@@ -17,7 +17,9 @@ import {
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notification-bell";
 import { isAdmin, isDeveloper, type UserRole } from "@/lib/auth/roles";
+import type { NotificationRow } from "@/lib/notifications/events";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
@@ -130,6 +132,7 @@ export function AppShell({
   children,
   roles,
   userLabel,
+  notifications,
 }: {
   children: React.ReactNode;
   /** Pasa los roles enteros y no un `isAdmin`: con `005` ya son dos los que
@@ -137,6 +140,9 @@ export function AppShell({
    *  que un booleano por rol no solo se multiplica — se contradice. */
   roles: UserRole[];
   userLabel: string;
+  /** `010`: la campana vive en el shell porque un aviso puede llegar estés donde
+   *  estés. Las filas las resuelve el layout, que ya es server component. */
+  notifications: NotificationRow[];
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -292,6 +298,7 @@ export function AppShell({
           <span className="text-caption text-muted-foreground hidden truncate sm:block">
             {userLabel}
           </span>
+          <NotificationBell notifications={notifications} />
           <ThemeToggle />
           <form action="/auth/signout" method="post">
             <Button type="submit" variant="ghost" size="icon-sm" aria-label="Cerrar sesión">

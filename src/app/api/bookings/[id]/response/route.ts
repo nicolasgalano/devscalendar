@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { requireBookingResponder } from "@/lib/api/require-booking-responder";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
 import {
@@ -126,6 +127,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Cero filas sin error: el `.eq("updated_at", …)` no encontró nada, así que
   // alguien escribió la reserva en el medio.
   if (!data) return staleBookingResponse(supabase, id);
+
+  // El aviso ya está escrito (trigger / reallocate_booking); esto solo adelanta
+  // el envío y puede fallar sin consecuencias — el cron levanta lo pendiente.
+  dispatchNotifications();
 
   return NextResponse.json(data);
 }

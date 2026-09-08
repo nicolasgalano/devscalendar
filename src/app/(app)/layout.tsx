@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { hasAnyRole } from "@/lib/auth/roles";
+import { getMyNotifications } from "@/lib/notifications/query";
 import { getCurrentProfile, getCurrentUser } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/pending-access");
   }
 
+  const notifications = await getMyNotifications();
+
   return (
-    <AppShell roles={profile.roles} userLabel={profile.full_name ?? profile.email}>
+    <AppShell
+      roles={profile.roles}
+      userLabel={profile.full_name ?? profile.email}
+      notifications={notifications}
+    >
       {children}
     </AppShell>
   );

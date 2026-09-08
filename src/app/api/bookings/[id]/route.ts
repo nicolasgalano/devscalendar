@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { requireBookingAccess } from "@/lib/api/require-booking-access";
 import { isDeveloper } from "@/lib/auth/roles";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
@@ -67,6 +68,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // El aviso ya está escrito (trigger); esto solo adelanta el envío y puede
+    // fallar sin consecuencias — el cron levanta lo que quede pendiente.
+    dispatchNotifications();
+
     return NextResponse.json(data);
   }
 
@@ -179,6 +185,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // El aviso ya está escrito (trigger); esto solo adelanta el envío y puede
+  // fallar sin consecuencias — el cron levanta lo que quede pendiente.
+  dispatchNotifications();
 
   return NextResponse.json({ ...data, requiresReapproval: status !== snapshot.status });
 }
