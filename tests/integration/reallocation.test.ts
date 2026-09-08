@@ -320,10 +320,16 @@ describe("reallocate_booking", () => {
 
     // Y no quedó rastro en la auditoría: el trigger de 005 escribe adentro de la
     // misma transacción, así que si la fila sobrevivió es que no hubo rollback.
+    //
+    // **Acotado a las dos acciones de la realocación desde `010`.** Sembrar la
+    // reserva ahora deja su propia fila `create` (AC-5.1), escrita mucho antes
+    // de esta transacción y que no tiene por qué desaparecer con ella. Sin el
+    // filtro, este test acusaría de no hacer rollback a algo que sí lo hizo.
     const { data: trail } = await adminClient()
       .from("audit_log")
       .select("id")
-      .eq("entity_id", existing.id);
+      .eq("entity_id", existing.id)
+      .in("action", ["status_change", "reallocated"]);
     expect(trail ?? []).toHaveLength(0);
   });
 
@@ -350,10 +356,13 @@ describe("reallocate_booking", () => {
     expect(error).toBeNull();
     const result = data as unknown as { booking: { id: string } };
 
+    // Acotado a las dos acciones del desplazamiento: desde `010` sembrar la
+    // reserva también deja su fila `create`, que no es lo que este test mira.
     const { data: trail } = await adminClient()
       .from("audit_log")
       .select("action, actor_id, diff")
-      .eq("entity_id", existing.id);
+      .eq("entity_id", existing.id)
+      .in("action", ["status_change", "reallocated"]);
 
     // Dos filas por el mismo evento, a propósito (plan.md §3.4): una cuenta el
     // cambio de estado y la otra la decisión. Con una sola no se puede saber

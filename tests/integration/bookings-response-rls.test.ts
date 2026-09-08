@@ -332,11 +332,23 @@ describe("bookings developer response RLS", () => {
    * `security definer`. El rastro no se puede falsificar desde un cliente.
    */
   describe("audit_log on status change", () => {
+    /**
+     * **Acotado a `status_change` desde `010`.** Antes alcanzaba con filtrar por
+     * reserva, porque el cambio de estado era la única acción que se auditaba.
+     * Ahora también hay `create` y `update` —AC-5.1, que era justamente el
+     * agujero que `010` vino a tapar— así que un filtro por `entity_id` a secas
+     * trae de más y estos tests empezaron a fallar contando filas ajenas.
+     *
+     * Se corrige acotando, no relajando el conteo: lo que estos tests afirman es
+     * que hay **exactamente una** fila por cambio de estado, y eso sigue siendo
+     * cierto y sigue valiendo la pena afirmarlo.
+     */
     async function auditRowsFor(bookingId: string) {
       const { data } = await adminClient()
         .from("audit_log")
         .select("entity, entity_id, action, actor_id, diff")
-        .eq("entity_id", bookingId);
+        .eq("entity_id", bookingId)
+        .eq("action", "status_change");
       return data ?? [];
     }
 
