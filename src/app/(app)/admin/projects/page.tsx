@@ -18,7 +18,7 @@ export default async function AdminProjectsPage() {
     supabase
       .from("profiles")
       .select("id, full_name, email")
-      .eq("role", "pm")
+      .contains("roles", ["pm"])
       .eq("active", true)
       .order("full_name"),
   ]);

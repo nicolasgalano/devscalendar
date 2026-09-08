@@ -72,7 +72,7 @@ describe("deleting a user with soft references", () => {
     try {
       await adminClient()
         .from("profile_invites")
-        .insert({ email: invitedEmail, role: "developer", invited_by: admin.id });
+        .insert({ email: invitedEmail, roles: ["developer"], invited_by: admin.id });
 
       await deleteTestUser(admin.id);
 
@@ -95,11 +95,7 @@ describe("deleting a user with soft references", () => {
       password,
       "admin",
     );
-    const pm = await createUserWithRole(
-      testEmail(`life-owner-${randomUUID()}`),
-      password,
-      "pm",
-    );
+    const pm = await createUserWithRole(testEmail(`life-owner-${randomUUID()}`), password, "pm");
     const project = await createProjectRow({
       name: `Lifecycle project ${randomUUID()}`,
       clientId,
@@ -132,11 +128,7 @@ describe("deleting a user with soft references", () => {
   });
 
   it("refuses to delete a PM that still owns projects", async () => {
-    const pm = await createUserWithRole(
-      testEmail(`life-owner2-${randomUUID()}`),
-      password,
-      "pm",
-    );
+    const pm = await createUserWithRole(testEmail(`life-owner2-${randomUUID()}`), password, "pm");
     const project = await createProjectRow({
       name: `Owned project ${randomUUID()}`,
       clientId,

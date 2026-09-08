@@ -67,26 +67,26 @@ describe("canManageProject", () => {
   const project = { pmId: "pm-1" };
 
   it("lets an admin manage any project", () => {
-    expect(canManageProject({ id: "admin-1", role: "admin" }, project)).toBe(true);
+    expect(canManageProject({ id: "admin-1", roles: ["admin"] }, project)).toBe(true);
   });
 
   it("lets a PM manage only their own", () => {
-    expect(canManageProject({ id: "pm-1", role: "pm" }, project)).toBe(true);
-    expect(canManageProject({ id: "pm-2", role: "pm" }, project)).toBe(false);
+    expect(canManageProject({ id: "pm-1", roles: ["pm"] }, project)).toBe(true);
+    expect(canManageProject({ id: "pm-2", roles: ["pm"] }, project)).toBe(false);
   });
 
   it("keeps developers and role-less users out", () => {
-    expect(canManageProject({ id: "pm-1", role: "developer" }, project)).toBe(false);
-    expect(canManageProject({ id: "pm-1", role: null }, project)).toBe(false);
+    expect(canManageProject({ id: "pm-1", roles: ["developer"] }, project)).toBe(false);
+    expect(canManageProject({ id: "pm-1", roles: [] }, project)).toBe(false);
     expect(canManageProject(null, project)).toBe(false);
   });
 });
 
 describe("canCreateBookings", () => {
   it("is the admin and the PM, nobody else", () => {
-    expect(canCreateBookings({ id: "a", role: "admin" })).toBe(true);
-    expect(canCreateBookings({ id: "b", role: "pm" })).toBe(true);
-    expect(canCreateBookings({ id: "c", role: "developer" })).toBe(false);
+    expect(canCreateBookings({ id: "a", roles: ["admin"] })).toBe(true);
+    expect(canCreateBookings({ id: "b", roles: ["pm"] })).toBe(true);
+    expect(canCreateBookings({ id: "c", roles: ["developer"] })).toBe(false);
     expect(canCreateBookings(null)).toBe(false);
   });
 });

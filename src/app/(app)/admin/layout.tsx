@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { isAdmin } from "@/lib/auth/roles";
 import { getCurrentProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
 
-  if (profile?.role !== "admin") {
+  if (!profile?.active || !isAdmin(profile.roles)) {
     redirect("/");
   }
 

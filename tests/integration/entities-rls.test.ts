@@ -106,11 +106,7 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     const client = await signInClient(admin.email, password);
     const name = `admin-created-${randomUUID()}`;
 
-    const { data, error } = await client
-      .from("clients")
-      .insert({ name })
-      .select()
-      .single();
+    const { data, error } = await client.from("clients").insert({ name }).select().single();
 
     expect(error).toBeNull();
     expect(data?.name).toBe(name);
@@ -122,7 +118,7 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     const email = testEmail(`invited-${randomUUID()}`);
     const { error: seedError } = await adminClient()
       .from("profile_invites")
-      .insert({ email, role: "developer" });
+      .insert({ email, roles: ["developer"] });
     expect(seedError).toBeNull();
 
     const client = await signInClient(developer.email, password);
@@ -157,7 +153,7 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     const client = await signInClient(developer.email, password);
     const { data, error } = await client
       .from("profiles")
-      .update({ role: "developer", active: false })
+      .update({ roles: ["developer"], active: false })
       .eq("id", admin.id)
       .select();
 
@@ -166,10 +162,10 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
 
     const { data: fresh } = await adminClient()
       .from("profiles")
-      .select("role, active")
+      .select("roles, active")
       .eq("id", admin.id)
       .single();
-    expect(fresh?.role).toBe("admin");
+    expect(fresh?.roles).toEqual(["admin"]);
     expect(fresh?.active).toBe(true);
   });
 
@@ -179,7 +175,7 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     const client = await signInClient(developer.email, password);
     const { data, error } = await client
       .from("profiles")
-      .update({ role: "admin" })
+      .update({ roles: ["admin"] })
       .eq("id", developer.id)
       .select();
 
@@ -188,10 +184,10 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
 
     const { data: fresh } = await adminClient()
       .from("profiles")
-      .select("role")
+      .select("roles")
       .eq("id", developer.id)
       .single();
-    expect(fresh?.role).toBe("developer");
+    expect(fresh?.roles).toEqual(["developer"]);
   });
 
   // Control positivo: sin esto, los dos de arriba pasarían igual si `profiles`
@@ -201,15 +197,18 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     try {
       const { data, error } = await client
         .from("profiles")
-        .update({ role: "pm" })
+        .update({ roles: ["pm"] })
         .eq("id", developer.id)
-        .select("role");
+        .select("roles");
 
       expect(error).toBeNull();
-      expect(data).toEqual([{ role: "pm" }]);
+      expect(data).toEqual([{ roles: ["pm"] }]);
     } finally {
       // Los demás tests del archivo cuentan con que este usuario sea developer.
-      await adminClient().from("profiles").update({ role: "developer" }).eq("id", developer.id);
+      await adminClient()
+        .from("profiles")
+        .update({ roles: ["developer"] })
+        .eq("id", developer.id);
     }
   });
 

@@ -20,10 +20,10 @@ Es el core transaccional del sistema. Todo lo demás (aprobación, prioridad, in
 
 `003-calendar-ui` necesitaba renderizar reservas para poder cumplir sus propios acceptance criteria, así que la tabla nace ahí. El corte está documentado en `specs/features/003-calendar-ui/plan.md` §3.1:
 
-| Qué | Feature |
-| :---- | :---- |
-| Tabla `bookings`, RLS de **lectura**, índices de rango, seed | `003` (migration `00000000000004_bookings.sql`) |
-| Policies de escritura, `exclusion constraint` anti doble-booking, API de CRUD, máquina de estados | **`004` — esta feature** |
+| Qué                                                                                               | Feature                                         |
+| :------------------------------------------------------------------------------------------------ | :---------------------------------------------- |
+| Tabla `bookings`, RLS de **lectura**, índices de rango, seed                                      | `003` (migration `00000000000004_bookings.sql`) |
+| Policies de escritura, `exclusion constraint` anti doble-booking, API de CRUD, máquina de estados | **`004` — esta feature**                        |
 
 Consecuencias concretas para quien la implemente:
 

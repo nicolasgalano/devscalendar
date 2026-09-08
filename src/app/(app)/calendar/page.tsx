@@ -101,7 +101,7 @@ export default async function CalendarPage({
   // Ya resuelto y memorizado por el layout del route group: acá no cuesta otro
   // round trip al servidor de auth (ver `lib/supabase/session.ts`).
   const profile = await getCurrentProfile();
-  const viewer: BookingViewer | null = profile ? { id: profile.id, role: profile.role } : null;
+  const viewer: BookingViewer | null = profile ? { id: profile.id, roles: profile.roles } : null;
 
   const [content, facets, options] = await Promise.all([
     params.view === "day"

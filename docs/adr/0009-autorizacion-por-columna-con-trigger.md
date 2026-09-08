@@ -67,3 +67,23 @@ Una columna que agregue una feature futura **nace protegida**. Abrirla exige nom
 - **Una segunda policy más restrictiva.** No sirve: las policies del mismo comando se combinan con **OR**, así que una policy adicional solo puede **agregar** permisos, nunca acotar los de otra.
 - **Columnas generadas o una vista actualizable.** Habría que reconstruir el camino de escritura entero alrededor de una vista, y la RLS quedaría partida entre la tabla y la vista. Mucho más aparato para la misma garantía.
 - **Solo el guard de la API.** Es lo que hace la mayoría de las apps, y es exactamente lo que la RLS de este proyecto viene a no hacer: un `update` desde el cliente de Supabase —que la app usa en todos lados— se saltearía el handler por completo.
+
+---
+
+## Nota del 2026-09-08 — roles múltiples (ADR 0011)
+
+`012` convirtió `profiles.role` en un conjunto, así que conviene decir qué de
+este ADR cambió: **nada de la regla, algo de cómo se lee.**
+
+El guard de columnas **no se toca**. Compara `auth.uid()` contra `dev_id` sin
+mirar el rol, y esa era ya la decisión correcta por un motivo que ahora se ve
+mejor: aprobar es una cuestión de **identidad**, no de pertenencia a un rol. Que
+alguien tenga uno o cinco roles no cambia de quién es el tiempo comprometido.
+
+Lo que sí se lee distinto es la frase "el admin no queda exento, y es el único
+lugar de la app donde el rol admin no alcanza". Sigue siendo verdad, y ahora
+también su recíproca, que antes no se podía expresar: **un admin que además tiene
+el rol `developer` sí aprueba sus propias reservas**, porque el chequeo nunca
+preguntó por el rol. Con la columna singular ese caso no existía —había que
+elegir— y la excepción parecía ser sobre el rol admin cuando en realidad era
+sobre la identidad.

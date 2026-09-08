@@ -5,7 +5,7 @@ import type { Database } from "@/types/database";
 
 type Profile = Pick<
   Database["public"]["Tables"]["profiles"]["Row"],
-  "id" | "full_name" | "email" | "role" | "active"
+  "id" | "full_name" | "email" | "roles" | "active"
 >;
 
 /**
@@ -40,7 +40,7 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, active")
+    .select("id, full_name, email, roles, active")
     .eq("id", user.id)
     .maybeSingle();
 

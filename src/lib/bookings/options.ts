@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isAdmin } from "@/lib/auth/roles";
 import type { ProjectPriority } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
 
@@ -43,22 +44,24 @@ export async function getBookingFormOptions(
     .select("id, name, priority, client:clients!inner (name)")
     .eq("active", true);
 
-  if (viewer!.role === "pm") projectsQuery = projectsQuery.eq("pm_id", viewer!.id);
+  // El admin ve todos los proyectos activos; el PM, los suyos. Con roles
+  // múltiples el orden importa: quien es PM *y* admin ve todos, porque admin es
+  // superconjunto de pm para operar reservas (D-09).
+  if (!isAdmin(viewer!.roles)) projectsQuery = projectsQuery.eq("pm_id", viewer!.id);
 
   const [projects, devs] = await Promise.all([
     projectsQuery,
     supabase
       .from("profiles")
       .select("id, full_name, email")
-      .eq("role", "developer")
+      .contains("roles", ["developer"])
       .eq("active", true),
   ]);
 
   if (projects.error) throw projects.error;
   if (devs.error) throw devs.error;
 
-  const byName = (a: { name: string }, b: { name: string }) =>
-    a.name.localeCompare(b.name, "es");
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "es");
 
   return {
     projects: (projects.data ?? [])

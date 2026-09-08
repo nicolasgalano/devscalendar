@@ -256,7 +256,7 @@ describe("getBookingFormOptions", () => {
 
     const options = await getBookingFormOptions(mock.client, {
       id: "d1",
-      role: "developer",
+      roles: ["developer"],
     });
 
     expect(options).toEqual({ projects: [], devs: [] });
@@ -275,7 +275,7 @@ describe("getBookingFormOptions", () => {
   it("scopes a PM to their own active projects", async () => {
     const mock = createSupabaseMock({ projects, profiles: devs });
 
-    await getBookingFormOptions(mock.client, { id: "pm1", role: "pm" });
+    await getBookingFormOptions(mock.client, { id: "pm1", roles: ["pm"] });
 
     const { eq } = mock.lastQuery("projects").filters;
     expect(eq).toContainEqual(["pm_id", "pm1"]);
@@ -285,7 +285,7 @@ describe("getBookingFormOptions", () => {
   it("does not scope an admin by PM", async () => {
     const mock = createSupabaseMock({ projects, profiles: devs });
 
-    await getBookingFormOptions(mock.client, { id: "a1", role: "admin" });
+    await getBookingFormOptions(mock.client, { id: "a1", roles: ["admin"] });
 
     const { eq } = mock.lastQuery("projects").filters;
     expect(eq.map(([column]) => column)).not.toContain("pm_id");
@@ -295,17 +295,20 @@ describe("getBookingFormOptions", () => {
   it("offers only active developers", async () => {
     const mock = createSupabaseMock({ projects, profiles: devs });
 
-    await getBookingFormOptions(mock.client, { id: "a1", role: "admin" });
+    await getBookingFormOptions(mock.client, { id: "a1", roles: ["admin"] });
 
-    const { eq } = mock.lastQuery("profiles").filters;
-    expect(eq).toContainEqual(["role", "developer"]);
+    // `012`: el rol es un conjunto, así que se pregunta por pertenencia
+    // (`roles=cs.{developer}`) y no por igualdad. Que el filtro sea el correcto
+    // en el cable lo verifica el smoke test — acá solo se comprueba que se pida.
+    const { eq, contains } = mock.lastQuery("profiles").filters;
+    expect(contains).toContainEqual(["roles", ["developer"]]);
     expect(eq).toContainEqual(["active", true]);
   });
 
   it("maps and sorts both lists by name", async () => {
     const mock = createSupabaseMock({ projects, profiles: devs });
 
-    const options = await getBookingFormOptions(mock.client, { id: "a1", role: "admin" });
+    const options = await getBookingFormOptions(mock.client, { id: "a1", roles: ["admin"] });
 
     expect(options.projects).toEqual([
       { id: "p1", name: "Portal de reservas", clientName: "Nimbus", priority: "high" },
@@ -325,7 +328,7 @@ describe("getBookingFormOptions", () => {
     });
 
     await expect(
-      getBookingFormOptions(mock.client, { id: "a1", role: "admin" }),
+      getBookingFormOptions(mock.client, { id: "a1", roles: ["admin"] }),
     ).rejects.toMatchObject({ message: "boom" });
   });
 });

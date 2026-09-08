@@ -114,8 +114,8 @@ misma omisión que D-01 de `001`, en chico, y conviene saldarlas con ella.
 - [ ] **D-07** — **El `PATCH` no chequea el `active` del desarrollador.** El
       `POST` pide `role, active` y rechaza al desactivado con un 400
       (`src/app/api/bookings/route.ts:27,38-43`); el `PATCH` pide **solo `role`**
-      (`src/app/api/bookings/[id]/route.ts:100-104`). O sea: no se puede *crear*
-      una reserva para un dev desactivado, pero sí *mover* una existente encima
+      (`src/app/api/bookings/[id]/route.ts:100-104`). O sea: no se puede _crear_
+      una reserva para un dev desactivado, pero sí _mover_ una existente encima
       de él.
 - [ ] **D-08** — **Nada impide reservar sobre un proyecto desactivado.**
       `getBookingOptions()` filtra `.eq("active", true)`

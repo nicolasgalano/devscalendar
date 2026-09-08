@@ -28,6 +28,9 @@ export type RecordedQuery = {
   filters: {
     eq: [string, unknown][];
     in: [string, unknown][];
+    /** `012`: los roles son un array, y preguntarle a PostgREST por pertenencia
+     *  es `contains` (`roles=cs.{pm}`), no `eq`. */
+    contains: [string, unknown][];
     lt: [string, unknown][];
     gt: [string, unknown][];
     neq: [string, unknown][];
@@ -42,6 +45,7 @@ const CHAINABLE = [
   "delete",
   "eq",
   "neq",
+  "contains",
   "in",
   "lt",
   "lte",
@@ -102,7 +106,7 @@ export function createSupabaseMock(
         table,
         columns: "",
         ops: [],
-        filters: { eq: [], in: [], lt: [], gt: [], neq: [] },
+        filters: { eq: [], in: [], lt: [], gt: [], neq: [], contains: [] },
       };
       queries.push(record);
 

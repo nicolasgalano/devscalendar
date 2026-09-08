@@ -22,7 +22,7 @@ create policy "bookings: manager update"
 
 No es un bug hipotético: es el comportamiento por defecto si la feature se implementa de la forma que parece natural. Es el R-1 de la spec de `006`.
 
-Y no se arregla con una policy más ingeniosa. La regla que hace falta es *"podés escribir esta fila si estás creando otra de mayor prioridad que la pisa"*, y una policy solo ve la fila que se está tocando — no tiene forma de conocer la reserva nueva, que ni siquiera existe todavía. Es la misma clase de límite que ADR 0009 documentó para la autorización por columna: la RLS decide sobre filas, de a una.
+Y no se arregla con una policy más ingeniosa. La regla que hace falta es _"podés escribir esta fila si estás creando otra de mayor prioridad que la pisa"_, y una policy solo ve la fila que se está tocando — no tiene forma de conocer la reserva nueva, que ni siquiera existe todavía. Es la misma clase de límite que ADR 0009 documentó para la autorización por columna: la RLS decide sobre filas, de a una.
 
 ## Decisión
 
@@ -49,7 +49,7 @@ Y no se arregla con una policy más ingeniosa. La regla que hace falta es *"pod�
 - **La regla de prioridad queda en dos lugares**, igual que en ADR 0008 y 0009 y con la misma justificación: `canDisplace()` en TypeScript para que la UI decida qué ofrecer antes de escribir, y la función para que la garantía no dependa de que un cliente se acuerde. La de la base es la que manda.
 - **Una función definer es más fácil de romper que una policy.** Un `search_path` sin fijar o un chequeo movido de lugar cambia quién puede hacer qué, sin que nada lo señale. Por eso el `set search_path = public`, el orden de los chequeos escrito en el plan, y los tests de integración que **leen las filas de vuelta** en vez de mirar el código de error: un test que solo mire el error pasaría igual con la RLS filtrando en silencio, que es el modo de falla que este ADR existe para evitar.
 - **Los SQLSTATEs `DC0xx` son inventados.** PostgREST no sabe qué status HTTP darles y puede contestar 500; el handler traduce por `error.code`, del cuerpo JSON, nunca por el status con que llegó la respuesta. Es una convención propia y hay que sostenerla.
-- El bloqueo de concurrencia es **explícito y parcial**. Un `for update` sobre las reservas del dev en el rango serializa dos realocaciones simultáneas, pero no hay predicate lock sin `serializable`: una reserva aprobada *dentro* del rango después del lock no se ataja. La consecuencia está acotada —lo que se inserta es `pending`, así que no puede doble-bookear— y el exclusion constraint sigue siendo la garantía dura.
+- El bloqueo de concurrencia es **explícito y parcial**. Un `for update` sobre las reservas del dev en el rango serializa dos realocaciones simultáneas, pero no hay predicate lock sin `serializable`: una reserva aprobada _dentro_ del rango después del lock no se ataja. La consecuencia está acotada —lo que se inserta es `pending`, así que no puede doble-bookear— y el exclusion constraint sigue siendo la garantía dura.
 
 ## Alcance futuro
 
@@ -60,3 +60,28 @@ Este patrón lo hereda **`007`**, que tiene el mismo problema con otra cara: bor
 - **Ablandar la policy de `update`** para que un PM prioritario pueda tocar reservas de proyectos comunes. Deja el permiso abierto **siempre**, no solo durante un desplazamiento confirmado: cualquier PM de un proyecto prioritario podría reescribir reservas ajenas por cualquier camino, incluido el cliente de Supabase desde el navegador.
 - **`service_role` desde el route handler.** Más simple de escribir y peor en todo lo demás: apaga la RLS para el request entero, mueve la regla a un lugar que solo se cumple si se pasa por ese handler, y contradice `CLAUDE.md`.
 - **Dos requests separados** (desplazar, después crear). Sin atomicidad: si el segundo falla, queda una reserva desplazada y nada en su lugar, y el PM desplazado perdió la franja para nadie.
+
+---
+
+## Nota del 2026-09-08 — roles múltiples y `active` (ADR 0011)
+
+`012` reescribió `can_manage_booking()`, que es la puerta de `reallocate_booking()`,
+así que conviene decir qué cambió: **la regla no, sus dos preguntas sí.**
+
+- "¿Sos admin?" pasó de `current_user_role() = 'admin'` a `has_role('admin')`,
+  que es pertenencia y no igualdad. Alguien que es PM **y** admin sigue pudiendo
+  desplazar, cosa que antes dependía de cuál de los dos roles le hubieran
+  cargado.
+- La rama del PM ganó el `active` que no tenía. Ser el `pm_id` de un proyecto
+  dejó de alcanzar por sí solo: hay que seguir habilitado.
+
+`reallocate_booking()` cambió una línea —el chequeo del desarrollador pasó de
+`role = 'developer'` a `'developer' = any(roles)`—, y **los dos `active` que ya
+tenía se quedaron como estaban**. Vale la pena subrayarlo: esta función era el
+único camino del sistema que chequeaba `active` como correspondía, y fue la
+evidencia de que D-01 era un descuido y no una decisión. El camino más nuevo lo
+hacía bien; los viejos no.
+
+Lo que **no** cambió es lo central de este ADR: un `update` que la RLS filtra no
+falla, así que cualquier test de esto tiene que leer las filas de vuelta. Los
+tests de `012` lo hacen por la misma razón.

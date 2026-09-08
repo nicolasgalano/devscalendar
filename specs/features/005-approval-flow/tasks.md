@@ -69,7 +69,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
   - **Con su contraparte positiva**, que no es decorativa: sin ella, el test pasaría igual si el `.eq()` estuviera fallando siempre y nadie se enteraría de que la respuesta nunca entra.
 - [x] **T3.5** — Integración de auditoría: aprobar y rechazar escriben su fila en `audit_log` con `from`, `to` y el motivo.
   - Vive dentro de `bookings-response-rls.test.ts` y no en `audit-log.test.ts`: necesita exactamente las mismas fixtures (proyecto, dev asignado, reserva pendiente, sesión del dev) y duplicarlas era pagar un `beforeAll` entero por cuatro asserts. `audit-log.test.ts` sigue siendo el de `002`, sobre el trigger de prioridad.
-  - Cubre además **la cancelación del PM**, porque el trigger registra *todo* cambio de estado (`plan.md` §3.4) y no solo la respuesta del dev — y el caso negativo: tocar la nota no escribe nada.
+  - Cubre además **la cancelación del PM**, porque el trigger registra _todo_ cambio de estado (`plan.md` §3.4) y no solo la respuesta del dev — y el caso negativo: tocar la nota no escribe nada.
 - [x] **T3.6** — **Concurrencia (R-4):** dos aprobaciones en paralelo sobre franjas superpuestas del mismo dev; exactamente una persiste. _DoD: en paralelo, no en serie — en serie pasa hasta un check aplicativo._
   - Tres aprobaciones simultáneas con `Promise.all`, una sola sobrevive, y se verifica contra la base que quedó una sola aprobada — no que la API haya filtrado.
   - Es también la justificación del "sin chequeo previo" de T2.4: acá el árbitro tiene que ser el constraint.

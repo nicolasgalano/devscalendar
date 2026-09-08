@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/api/require-admin";
+import { isPm } from "@/lib/auth/roles";
 import { updateUserSchema } from "@/lib/validation/users";
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   const { supabase } = guard;
@@ -20,17 +18,19 @@ export async function PATCH(
     );
   }
 
-  const { role, active, primaryPmId } = parsed.data;
+  const { roles, active, primaryPmId } = parsed.data;
 
-  // AC-3.2 / R-3: primary_pm_id must reference a profile with role 'pm'.
+  // AC-3.2 / R-3: primary_pm_id must reference a profile that *has* the 'pm'
+  // role. Since 012 that is a membership question, not an equality: someone who
+  // is PM and admin is a perfectly good primary PM (D-09).
   if (primaryPmId) {
     const { data: pmProfile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("roles")
       .eq("id", primaryPmId)
       .single();
 
-    if (pmProfile?.role !== "pm") {
+    if (!isPm(pmProfile?.roles)) {
       return NextResponse.json(
         { error: "El PM primario debe ser un usuario con rol pm" },
         { status: 400 },
@@ -41,7 +41,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("profiles")
     .update({
-      ...(role !== undefined && { role }),
+      ...(roles !== undefined && { roles }),
       ...(active !== undefined && { active }),
       ...(primaryPmId !== undefined && { primary_pm_id: primaryPmId }),
     })

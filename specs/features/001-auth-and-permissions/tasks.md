@@ -54,7 +54,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 - [x] **T5.2** — Update `specs/features/README.md`: mark 001 as `in-progress`, then `done` when tests pass.
 - [~] **T5.3** — Confirm open questions with the client before feature closes:
   - [x] Q-5 (dev sees global calendar or only own) — **cerrada por `005` el 2026-08-31:** calendario global en modo lectura, y `/inbox` es una vista sobre eso. El filtro por `dev_id` vive en el query y no en una policy. Ver la tabla de `specs/features/README.md`.
-  - [ ] Q-6 (client role in Phase 1?) — sigue diferida a Fase 2; el enum es extensible. **Cuidado con la etiqueta:** el `Q-6` de `specs/features/README.md` es *otra* pregunta (si la realocación saltea la aprobación del dev), cerrada por `006`. Son dos preguntas distintas con el mismo nombre, y la de acá sigue abierta.
+  - [ ] Q-6 (client role in Phase 1?) — sigue diferida a Fase 2; el enum es extensible. **Cuidado con la etiqueta:** el `Q-6` de `specs/features/README.md` es _otra_ pregunta (si la realocación saltea la aprobación del dev), cerrada por `006`. Son dos preguntas distintas con el mismo nombre, y la de acá sigue abierta.
 
 ---
 
@@ -121,7 +121,7 @@ explícito del usuario** — ver `docs/deuda-tecnica.md`, que es el registro cen
     `getBookingOptions()` (`src/lib/bookings/options.ts:46`), que acota al PM a
     los suyos y al admin no lo acota. La única excepción es **aprobar**, que es
     de identidad y no de rol (ADR 0009).
-  - **Pero para *ser* el PM responsable, el admin está excluido.**
+  - **Pero para _ser_ el PM responsable, el admin está excluido.**
     `projects.pm_id` exige `role = 'pm'` exacto en tres lugares
     (`api/projects/route.ts:29`, `api/projects/[id]/route.ts:33`, y el
     desplegable de `admin/projects/page.tsx:21`), y `profiles.primary_pm_id`
@@ -149,7 +149,7 @@ explícito del usuario** — ver `docs/deuda-tecnica.md`, que es el registro cen
   - **La base.** `profiles.role` singular pasa a un conjunto — array de
     `user_role` o tabla `profile_roles`. Y sobre todo **`current_user_role()`
     (`00000000000000:47`), que es la puerta de casi todas las policies** y hoy
-    devuelve *un* rol: pasa a ser una pregunta de pertenencia
+    devuelve _un_ rol: pasa a ser una pregunta de pertenencia
     (`has_role('admin')`). Cambiarla altera de golpe el comportamiento de todo
     lo que la usa. `handle_new_user()` y `profile_invites` también asignan un
     rol único.

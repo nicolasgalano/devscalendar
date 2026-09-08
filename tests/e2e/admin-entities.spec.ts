@@ -5,6 +5,7 @@ import {
   authenticate,
   cleanupByName,
   createUser,
+  deactivateUser,
   deleteInvite,
   deleteUser,
   type TestUser,
@@ -151,6 +152,83 @@ test.describe("admin entity management", () => {
       await expect(page.getByRole("link", { name: "Clientes" })).toHaveCount(0);
     } finally {
       await deleteUser(developer.userId);
+    }
+  });
+
+  /**
+   * `012` / D-09 — el caso que antes no se podía ni escribir: una persona que es
+   * PM **y** admin. Con `profiles.role` singular había que elegir, y elegir
+   * `admin` significaba que ninguno de sus proyectos podía nombrarla
+   * responsable, porque `pm_id` exigía `role = 'pm'` exacto.
+   */
+  test("a pm+admin keeps the panel and can be named responsible for a project", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    const both = await createUser(["pm", "admin"]);
+    try {
+      await authenticate(context, both);
+
+      // Sigue entrando al panel: sumar `pm` no le sacó nada (AC-2.2).
+      await page.goto("/admin/projects");
+      await expect(page.getByRole("heading", { name: "Proyectos" })).toBeVisible();
+
+      // Y ahora aparece en el desplegable de PM responsable (AC-2.1).
+      await openDialog(page, "Crear proyecto");
+      const dialog = page.getByRole("dialog");
+      await dialog.getByText("Elegí un PM").click();
+      await expect(page.getByRole("option", { name: both.fullName })).toBeVisible();
+    } finally {
+      await deleteUser(both.userId);
+    }
+  });
+
+  /**
+   * AC-4.1 — la navegación es unión y no `else if`. Antes, quien fuera dev y
+   * admin perdía una de las dos secciones según el orden en que estaba escrito
+   * el ternario.
+   */
+  test("a developer+admin sees both the inbox and the admin section", async ({ page, context }) => {
+    await context.clearCookies();
+    const both = await createUser(["developer", "admin"]);
+    try {
+      await authenticate(context, both);
+      await page.goto("/calendar");
+
+      await expect(page.getByRole("link", { name: "Pendientes", exact: true })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Clientes" })).toBeVisible();
+    } finally {
+      await deleteUser(both.userId);
+    }
+  });
+
+  /**
+   * AC-3.1 / D-01 — desactivar a alguien le saca el acceso de verdad. Hasta
+   * `012`, un admin desactivado conservaba `/api/*` entero: el único chequeo de
+   * `active` vivía en un layout de UI, y las rutas de API no tienen layout.
+   */
+  test("a deactivated admin is bounced and refused by the API", async ({ page, context }) => {
+    await context.clearCookies();
+    const admin = await createUser("admin");
+    try {
+      await deactivateUser(admin.userId);
+      await authenticate(context, admin);
+
+      await page.goto("/admin/clients");
+      await expect(page).toHaveURL(/\/pending-access/);
+
+      const status = await page.evaluate(async () => {
+        const response = await fetch("/api/clients", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "no deberia crearse" }),
+        });
+        return response.status;
+      });
+      expect(status).toBe(403);
+    } finally {
+      await deleteUser(admin.userId);
     }
   });
 });

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { isDeveloper } from "@/lib/auth/roles";
 import { getCurrentProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +15,16 @@ export const dynamic = "force-dynamic";
  * vacía permanente en su navegación sería ruido. Si algún día un admin tiene
  * que responder por alguien, eso es delegación — está fuera del MVP a propósito
  * (`spec.md` §5).
+ *
+ * **Con roles múltiples (`012`) eso se lee mejor de lo que se leía:** el
+ * criterio nunca fue "no ser admin", era "ser desarrollador". Alguien con
+ * `admin` **y** `developer` sí ve su bandeja, porque tiene reservas propias que
+ * responder. Lo que no existe es la bandeja de un admin que no es dev.
  */
 export default async function InboxLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
 
-  if (profile?.role !== "developer") {
+  if (!profile?.active || !isDeveloper(profile.roles)) {
     redirect("/");
   }
 

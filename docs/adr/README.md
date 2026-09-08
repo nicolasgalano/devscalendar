@@ -28,15 +28,16 @@ Cada ADR es un archivo `NNNN-<slug>.md`. Se usa el formato corto:
 
 ## Índice
 
-| # | Título | Estado |
-| :---- | :---- | :---- |
-| 0001 | Tech stack: Next.js + Supabase + Vercel | accepted |
-| 0002 | Language conventions: español para docs, inglés para código | accepted |
-| 0003 | UI & tooling stack: pnpm + Tailwind + shadcn on demand + Vitest/Playwright | accepted (estilos y componentes reemplazados por 0006) |
-| 0004 | Invitación por email: el rol se pre-asigna y el trigger lo consume | accepted |
-| 0005 | `audit_log` mínimo en 002, extensible por 010 | accepted |
-| 0006 | Tailwind v4 (CSS-first), shadcn sobre Base UI, y DESIGN.md como autoridad | accepted |
-| 0007 | Calendario propio sobre CSS grid, en vez de una librería | accepted |
-| 0008 | El anti doble-booking vive en dos capas, no en una | accepted |
-| 0009 | La autorización por columna se resuelve con trigger, no con RLS | accepted |
-| 0010 | Una escritura que cruza proyectos se resuelve con una función `security definer` | accepted |
+| #    | Título                                                                           | Estado                                                 |
+| :--- | :------------------------------------------------------------------------------- | :----------------------------------------------------- |
+| 0001 | Tech stack: Next.js + Supabase + Vercel                                          | accepted                                               |
+| 0002 | Language conventions: español para docs, inglés para código                      | accepted                                               |
+| 0003 | UI & tooling stack: pnpm + Tailwind + shadcn on demand + Vitest/Playwright       | accepted (estilos y componentes reemplazados por 0006) |
+| 0004 | Invitación por email: el rol se pre-asigna y el trigger lo consume               | accepted                                               |
+| 0005 | `audit_log` mínimo en 002, extensible por 010                                    | accepted                                               |
+| 0006 | Tailwind v4 (CSS-first), shadcn sobre Base UI, y DESIGN.md como autoridad        | accepted                                               |
+| 0007 | Calendario propio sobre CSS grid, en vez de una librería                         | accepted                                               |
+| 0008 | El anti doble-booking vive en dos capas, no en una                               | accepted                                               |
+| 0009 | La autorización por columna se resuelve con trigger, no con RLS                  | accepted                                               |
+| 0010 | Una escritura que cruza proyectos se resuelve con una función `security definer` | accepted                                               |
+| 0011 | Roles múltiples como array, y `active` adentro de la pregunta de pertenencia     | accepted                                               |

@@ -25,18 +25,25 @@ function serviceClient() {
   });
 }
 
-/** Crea un usuario y le asigna el rol; no toca el navegador. */
-export async function createUser(role: Role): Promise<TestUser> {
+/**
+ * Crea un usuario y le asigna sus roles; no toca el navegador.
+ *
+ * Acepta uno o varios (`012`): las llamadas existentes pasan uno solo, y el
+ * caso que D-09 vino a habilitar —alguien con `pm` y `admin`— pasa los dos.
+ */
+export async function createUser(role: Role | Role[]): Promise<TestUser> {
   const admin = serviceClient();
+  const roles = Array.isArray(role) ? role : [role];
+  const label = roles.join("-");
   const id = randomUUID();
   // Identificador de corrida + uuid: lo primero identifica los registros como
   // datos de prueba, lo segundo evita que dos archivos que corren en paralelo
   // dentro de la misma corrida se pisen.
-  const email = testEmail(`e2e-${role}-${id}`);
+  const email = testEmail(`e2e-${label}-${id}`);
   const password = `E2e-password-${id}!`;
   // Único: los tests corren en paralelo y varios crean un PM a la vez, así que
   // un nombre compartido vuelve ambiguos los locators por texto.
-  const fullName = testName(`QA ${role} ${id.slice(0, 8)}`);
+  const fullName = testName(`QA ${label} ${id.slice(0, 8)}`);
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -47,7 +54,7 @@ export async function createUser(role: Role): Promise<TestUser> {
 
   const { error: roleError } = await admin
     .from("profiles")
-    .update({ role, full_name: fullName })
+    .update({ roles, full_name: fullName })
     .eq("id", data.user.id);
   if (roleError) throw roleError;
 
@@ -215,4 +222,16 @@ export async function deleteProjectFixture(ids: { clientId: string; projectId: s
   await admin.from("audit_log").delete().eq("entity_id", ids.projectId);
   await admin.from("projects").delete().eq("id", ids.projectId);
   await admin.from("clients").delete().eq("id", ids.clientId);
+}
+
+/**
+ * `012` / D-01: desactivar sin pasar por la UI, para probar que un usuario dado
+ * de baja pierde los permisos y no solo las pantallas.
+ */
+export async function deactivateUser(userId: string) {
+  const { error } = await serviceClient()
+    .from("profiles")
+    .update({ active: false })
+    .eq("id", userId);
+  if (error) throw error;
 }

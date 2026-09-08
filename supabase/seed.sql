@@ -13,7 +13,7 @@
 -- usable password, because the real login is Google OAuth. To give *your*
 -- Google account a role, use an invite:
 --
---   insert into public.profile_invites (email, role) values ('you@example.com', 'admin');
+--   insert into public.profile_invites (email, roles) values ('you@example.com', '{admin}');
 --
 -- ...and then log in. The trigger consumes the invite (see ADR 0004).
 
@@ -21,7 +21,7 @@
 -- 1. People (features 001 / 002)
 -- ─────────────────────────────────────────────────────────────
 -- The `on_auth_user_created` trigger creates the matching profiles row; the
--- role is assigned right after, since the trigger leaves it null.
+-- roles are assigned right after, since the trigger leaves the set empty.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -44,11 +44,11 @@ values
    now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Rodrigo Paz"}', now(), now())
 on conflict (id) do nothing;
 
-update public.profiles set role = 'pm'
+update public.profiles set roles = '{pm}'
 where id in ('00000000-0000-4000-8000-000000000011',
              '00000000-0000-4000-8000-000000000012');
 
-update public.profiles set role = 'developer'
+update public.profiles set roles = '{developer}'
 where id in ('00000000-0000-4000-8000-000000000021',
              '00000000-0000-4000-8000-000000000022',
              '00000000-0000-4000-8000-000000000023');
@@ -65,13 +65,13 @@ where id in ('00000000-0000-4000-8000-000000000021',
 -- trigger only fires on insert.
 --
 -- Change this email to yours when working on another machine.
-insert into public.profile_invites (email, role)
-values ('emiliano@wedoweb.co', 'admin')
+insert into public.profile_invites (email, roles)
+values ('emiliano@wedoweb.co', '{admin}')
 on conflict (email) do nothing;
 
 update public.profiles
-set role = 'admin'
-where email = 'emiliano@wedoweb.co' and role is null;
+set roles = '{admin}'
+where email = 'emiliano@wedoweb.co' and cardinality(roles) = 0;
 
 -- ─────────────────────────────────────────────────────────────
 -- 2. Clients and projects (feature 002-entities-admin)

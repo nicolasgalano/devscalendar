@@ -8,8 +8,7 @@ import { testEmail, testName } from "../run-id";
 // El guard vuelve a correr acá, no solo en `setup.ts`: es la única forma de que
 // un archivo que importe estos helpers desde otro proyecto de Vitest herede la
 // misma protección sin acordarse de nada.
-const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceRoleKey: SERVICE_ROLE_KEY } =
-  loadTestEnv();
+const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceRoleKey: SERVICE_ROLE_KEY } = loadTestEnv();
 
 export function adminClient(): SupabaseClient<Database> {
   return createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -57,19 +56,29 @@ export async function signInClient(
 type UserRole = Database["public"]["Enums"]["user_role"];
 
 /**
- * Creates an auth user and promotes their auto-provisioned profile to `role`.
- * The `handle_new_user` trigger creates the profile with a null role, so tests
- * that need a specific role have to set it through the service-role client.
+ * Creates an auth user and gives their auto-provisioned profile `roles`.
+ * The `handle_new_user` trigger creates the profile with an empty role set, so
+ * tests that need specific roles have to set them through the service-role
+ * client.
+ *
+ * Takes one role or several (feature 012): every existing call site passes one
+ * and reads the same, while the cases D-09 exists for — someone who is `pm` and
+ * `admin` — pass both. `active` defaults to true and is a parameter because
+ * D-01 made "deactivated" a state worth testing on its own.
  */
 export async function createUserWithRole(
   email: string,
   password: string,
-  role: UserRole,
+  roles: UserRole | UserRole[],
+  options: { active?: boolean } = {},
 ) {
   const user = await createTestUser(email, password);
   const { error } = await adminClient()
     .from("profiles")
-    .update({ role })
+    .update({
+      roles: Array.isArray(roles) ? roles : [roles],
+      ...(options.active !== undefined && { active: options.active }),
+    })
     .eq("id", user.id);
   if (error) throw error;
   return user;

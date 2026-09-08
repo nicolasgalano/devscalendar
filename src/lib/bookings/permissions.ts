@@ -1,11 +1,11 @@
+import { isAdmin, isPm, type UserRole } from "@/lib/auth/roles";
 import { canRespond } from "@/lib/bookings/transitions";
 import type { BookingStatus } from "@/lib/validation/calendar";
-import type { Database } from "@/types/database";
 
-export type UserRole = Database["public"]["Enums"]["user_role"];
+export type { UserRole };
 
 /** Who is looking at the calendar, as far as the write path cares. */
-export type BookingViewer = { id: string; role: UserRole | null };
+export type BookingViewer = { id: string; roles: UserRole[] };
 
 /**
  * Mirrors `can_manage_booking()` in the database (migration 6) and
@@ -20,13 +20,13 @@ export type BookingViewer = { id: string; role: UserRole | null };
  */
 export function canManageProject(viewer: BookingViewer | null, project: { pmId: string }): boolean {
   if (!viewer) return false;
-  if (viewer.role === "admin") return true;
-  return viewer.role === "pm" && project.pmId === viewer.id;
+  if (isAdmin(viewer.roles)) return true;
+  return isPm(viewer.roles) && project.pmId === viewer.id;
 }
 
 /** Whether the viewer can create bookings at all — drives the primary action. */
 export function canCreateBookings(viewer: BookingViewer | null): boolean {
-  return viewer?.role === "admin" || viewer?.role === "pm";
+  return isAdmin(viewer?.roles) || isPm(viewer?.roles);
 }
 
 /**

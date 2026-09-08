@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/api/require-admin";
+import { hasAnyRole } from "@/lib/auth/roles";
 import { createUserInviteSchema } from "@/lib/validation/users";
 
 export async function POST(request: Request) {
@@ -16,25 +17,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const { email, role } = parsed.data;
+  const { email, roles } = parsed.data;
 
   const { data: existingProfile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, roles")
     .eq("email", email)
     .maybeSingle();
 
-  // Already logged in at least once and already has a role: this is a
+  // Already logged in at least once and already provisioned: this is a
   // duplicate, not an invite — the admin should use PATCH /api/users/[id].
-  if (existingProfile?.role) {
+  if (hasAnyRole(existingProfile?.roles)) {
     return NextResponse.json({ error: "Ese usuario ya existe" }, { status: 409 });
   }
 
-  // Logged in before but still pending (role is null): assign the role now.
+  // Logged in before but still pending (empty role set): assign the roles now.
   if (existingProfile) {
     const { data, error } = await supabase
       .from("profiles")
-      .update({ role })
+      .update({ roles })
       .eq("id", existingProfile.id)
       .select()
       .single();
@@ -46,11 +47,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ type: "profile", ...data }, { status: 200 });
   }
 
-  // Never logged in: park the role in profile_invites, consumed by
+  // Never logged in: park the roles in profile_invites, consumed by
   // handle_new_user() on their first Google login (see spec.md R-1).
   const { data, error } = await supabase
     .from("profile_invites")
-    .upsert({ email, role, invited_by: userId })
+    .upsert({ email, roles, invited_by: userId })
     .select()
     .single();
 

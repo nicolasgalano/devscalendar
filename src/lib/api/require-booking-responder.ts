@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isDeveloper } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/session";
 import type { BookingStatus } from "@/lib/validation/calendar";
@@ -52,6 +53,20 @@ export async function requireBookingResponder(bookingId: string): Promise<Bookin
     return {
       ok: false,
       response: NextResponse.json({ error: "No autenticado" }, { status: 401 }),
+    };
+  }
+
+  // 012 / D-01: un desarrollador desactivado dejó de poder responder. La policy
+  // `bookings: developer responds` ahora exige `has_role('developer')`, que
+  // incluye `active`, así que sin esto el update se iría filtrado en silencio y
+  // el handler respondería como si hubiera funcionado.
+  if (!profile.active || !isDeveloper(profile.roles)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Solo un desarrollador activo puede responder una reserva" },
+        { status: 403 },
+      ),
     };
   }
 

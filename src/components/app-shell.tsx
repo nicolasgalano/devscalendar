@@ -17,7 +17,7 @@ import {
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import type { UserRole } from "@/lib/bookings/permissions";
+import { isAdmin, isDeveloper, type UserRole } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
@@ -128,26 +128,31 @@ function findActive(pathname: string, params: URLSearchParams, nav: NavGroup[]):
 
 export function AppShell({
   children,
-  role,
+  roles,
   userLabel,
 }: {
   children: React.ReactNode;
-  /** Pasa el rol entero y no un `isAdmin`: con `005` ya son dos los que abren
-   *  navegación propia, y un booleano por rol se multiplica con cada feature. */
-  role: UserRole;
+  /** Pasa los roles enteros y no un `isAdmin`: con `005` ya son dos los que
+   *  abren navegación propia, y desde `012` pueden ser **la misma persona**, así
+   *  que un booleano por rol no solo se multiplica — se contradice. */
+  roles: UserRole[];
   userLabel: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // Cada rol suma su propio destino sobre el calendario: el dev su bandeja, el
-  // admin el atajo a lo que está esperando respuesta.
-  const extras: NavItem[] =
-    role === "developer" ? [DEVELOPER_NAV_ITEM] : role === "admin" ? [TEAM_PENDING_ITEM] : [];
+  // admin el atajo a lo que está esperando respuesta. **Unión y no `else if`**
+  // (`012`, AC-4.1): quien es dev y admin a la vez tiene las dos cosas, y con
+  // el ternario de antes perdía una por el orden en que estaban escritas.
+  const extras: NavItem[] = [
+    ...(isDeveloper(roles) ? [DEVELOPER_NAV_ITEM] : []),
+    ...(isAdmin(roles) ? [TEAM_PENDING_ITEM] : []),
+  ];
 
   const nav: NavGroup[] = [
     { label: null, items: [...BASE_NAV[0]!.items, ...extras] },
-    ...(role === "admin" ? [ADMIN_NAV] : []),
+    ...(isAdmin(roles) ? [ADMIN_NAV] : []),
   ];
 
   const activeItem = findActive(pathname, searchParams, nav);

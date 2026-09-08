@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/api/require-admin";
+import { isPm } from "@/lib/auth/roles";
 import { createProjectSchema } from "@/lib/validation/projects";
 
 export async function POST(request: Request) {
@@ -22,11 +23,11 @@ export async function POST(request: Request) {
   // this across rows, so it's validated here in the application layer.
   const { data: pmProfile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("roles")
     .eq("id", pmId)
     .single();
 
-  if (pmProfile?.role !== "pm") {
+  if (!isPm(pmProfile?.roles)) {
     return NextResponse.json(
       { error: "El PM responsable debe ser un usuario con rol pm" },
       { status: 400 },

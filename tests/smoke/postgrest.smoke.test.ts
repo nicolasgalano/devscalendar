@@ -4,11 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { findConflictingBooking } from "@/lib/bookings/conflicts";
 import { getBookingFormOptions } from "@/lib/bookings/options";
-import {
-  countConsideredDevs,
-  getBookingsInRange,
-  getFilterFacets,
-} from "@/lib/calendar/query";
+import { countConsideredDevs, getBookingsInRange, getFilterFacets } from "@/lib/calendar/query";
 import { DEFAULT_STATUSES, type CalendarFilters } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
 
@@ -180,10 +176,49 @@ describe("contrato con PostgREST y GoTrue", () => {
 
   /** El embed `client:clients!inner (name)` del formulario de reservas. */
   it("trae las opciones del formulario con el nombre del cliente", async () => {
-    const options = await getBookingFormOptions(client, { id: pm.id, role: "pm" });
+    const options = await getBookingFormOptions(client, { id: pm.id, roles: ["pm"] });
     const found = options.projects.find((project) => project.id === projectA);
 
     expect(found!.clientName).toContain("Smoke cliente A");
     expect(options.devs.some((candidate) => candidate.id === dev.id)).toBe(true);
+  });
+
+  /**
+   * `012`: los cinco `.eq("role", …)` pasaron a `.contains("roles", [...])`, que
+   * viaja como `roles=cs.{developer}`. Un filtro mal escrito **typechequea
+   * igual** y devuelve la lista entera o vacía sin quejarse, así que esto solo
+   * lo puede confirmar PostgREST.
+   */
+  it("filtra por pertenencia en un array de enum, no por igualdad", async () => {
+    const devs = await client.from("profiles").select("id").contains("roles", ["developer"]);
+    expect(devs.error).toBeNull();
+    expect(devs.data!.some((row) => row.id === dev.id)).toBe(true);
+    expect(devs.data!.some((row) => row.id === pm.id)).toBe(false);
+
+    const pms = await client.from("profiles").select("id").contains("roles", ["pm"]);
+    expect(pms.error).toBeNull();
+    expect(pms.data!.some((row) => row.id === pm.id)).toBe(true);
+    expect(pms.data!.some((row) => row.id === dev.id)).toBe(false);
+  });
+
+  /**
+   * Y el caso que motiva D-09: `contains` es pertenencia, así que alguien con
+   * dos roles aparece en las dos listas. Con `eq` sobre una columna singular
+   * esto era imposible por construcción.
+   */
+  it("devuelve a alguien con dos roles en las dos listas", async () => {
+    const both = await createUserWithRole(testEmail(`smoke-both-${randomUUID()}`), password, [
+      "pm",
+      "developer",
+    ]);
+    try {
+      const asPm = await client.from("profiles").select("id").contains("roles", ["pm"]);
+      const asDev = await client.from("profiles").select("id").contains("roles", ["developer"]);
+
+      expect(asPm.data!.some((row) => row.id === both.id)).toBe(true);
+      expect(asDev.data!.some((row) => row.id === both.id)).toBe(true);
+    } finally {
+      await deleteTestUser(both.id);
+    }
   });
 });

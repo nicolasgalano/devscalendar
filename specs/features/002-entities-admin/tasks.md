@@ -103,15 +103,14 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
       (`src/components/ui/select.tsx:21-29`): renderiza el `value`, no el texto
       del item elegido. Seis lugares:
 
-  | Pantalla | Select | Qué muestra el trigger |
-  | :---- | :---- | :---- |
-  | `/admin/users` | PM primario (`users-table.tsx:308`) | `__none__`, o el uuid crudo del PM |
-  | `/admin/users` | Rol, al editar (`users-table.tsx:291`) | `developer` en vez de `Developer` |
-  | `/admin/users` | Rol, al invitar (`users-table.tsx:263`) | ídem |
-  | `/admin/projects` | Prioridad (`projects-table.tsx:395`) | `normal` / `high` en vez de `Común` / `Prioritario` |
-  | `/admin/projects` | Cliente (`projects-table.tsx:357`) | el placeholder hasta elegir; después, el uuid |
-  | `/admin/projects` | PM responsable (`projects-table.tsx:376`) | ídem |
-
+  | Pantalla          | Select                                    | Qué muestra el trigger                              |
+  | :---------------- | :---------------------------------------- | :-------------------------------------------------- |
+  | `/admin/users`    | PM primario (`users-table.tsx:308`)       | `__none__`, o el uuid crudo del PM                  |
+  | `/admin/users`    | Rol, al editar (`users-table.tsx:291`)    | `developer` en vez de `Developer`                   |
+  | `/admin/users`    | Rol, al invitar (`users-table.tsx:263`)   | ídem                                                |
+  | `/admin/projects` | Prioridad (`projects-table.tsx:395`)      | `normal` / `high` en vez de `Común` / `Prioritario` |
+  | `/admin/projects` | Cliente (`projects-table.tsx:357`)        | el placeholder hasta elegir; después, el uuid       |
+  | `/admin/projects` | PM responsable (`projects-table.tsx:376`) | ídem                                                |
   - El `__none__` que reportó el usuario es el más visible; el de prioridad es el
     más grave de los otros cinco, porque `DESIGN.md` §11 pide el vocabulario del
     PM y no el de la base — y las **opciones** del desplegable ya dicen `Común` /
@@ -121,6 +120,7 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
     hacen `booking-dialog.tsx:276,307` y `calendar-filters.tsx:194`.
     `ROLE_LABEL` y `pmLabel()` ya existen en `users-table.tsx:52,58` y hoy solo
     se usan para la tabla.
+
 - [ ] **D-05** — **`readJsonBody()` falta en los seis handlers de esta feature.**
       Era F5 de `004`; **le corresponde a `002`**, que es la dueña de las rutas.
       `CLAUDE.md` es explícito: el body se lee con `readJsonBody()` y nunca con

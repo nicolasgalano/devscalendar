@@ -32,31 +32,71 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ROLE_LABEL, ROLE_ORDER, formatRoles, sortRoles, type UserRole } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
-
-type UserRole = "admin" | "pm" | "developer";
 
 type Pm = { id: string; full_name: string | null; email: string };
 type Profile = {
   id: string;
   email: string;
   full_name: string | null;
-  role: UserRole | null;
+  roles: UserRole[];
   active: boolean;
   primary_pm_id: string | null;
 };
-type Invite = { email: string; role: UserRole; created_at: string };
+type Invite = { email: string; roles: UserRole[]; created_at: string };
 
 const NO_PRIMARY_PM = "__none__";
 
-const ROLE_LABEL: Record<UserRole, string> = {
-  admin: "Admin",
-  pm: "PM",
-  developer: "Developer",
-};
-
 function pmLabel(pm: Pm) {
   return pm.full_name ?? pm.email;
+}
+
+/**
+ * `012` / D-09: los roles son un conjunto, así que el control es una casilla por
+ * rol y no un desplegable.
+ *
+ * De paso se lleva puestos **dos de los seis casos de D-04**: el `<SelectValue>`
+ * sin hijos que imprimía `developer` en vez de `Developer` desaparece con el
+ * `Select`. Los otros cuatro —PM primario acá, y los tres de `projects-table`—
+ * siguen ahí y son deuda aparte.
+ *
+ * El mensaje de "al menos uno" se muestra en lugar de deshabilitar en silencio:
+ * un botón gris sin explicación es la forma más rápida de que alguien crea que
+ * la pantalla está rota. La regla la impone igual el schema con un 400 (AC-1.4).
+ */
+function RolesField({
+  value,
+  onChange,
+}: {
+  value: UserRole[];
+  onChange: (roles: UserRole[]) => void;
+}) {
+  function toggle(role: UserRole, checked: boolean) {
+    onChange(sortRoles(checked ? [...value, role] : value.filter((r) => r !== role)));
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>Roles</Label>
+      <div className="flex flex-col gap-2">
+        {ROLE_ORDER.map((role) => (
+          <Label key={role} className="flex items-center gap-2 font-normal">
+            <Checkbox
+              checked={value.includes(role)}
+              onCheckedChange={(checked) => toggle(role, checked === true)}
+            />
+            {ROLE_LABEL[role]}
+          </Label>
+        ))}
+      </div>
+      {value.length === 0 && (
+        <p className="text-muted-foreground text-xs">
+          Elegí al menos un rol. Para dar de baja a alguien, desmarcá «Activo».
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function UsersTable({
@@ -74,22 +114,22 @@ export function UsersTable({
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<UserRole>("developer");
+  const [inviteRoles, setInviteRoles] = useState<UserRole[]>(["developer"]);
 
   const [editing, setEditing] = useState<Profile | null>(null);
-  const [editRole, setEditRole] = useState<UserRole>("developer");
+  const [editRoles, setEditRoles] = useState<UserRole[]>(["developer"]);
   const [editActive, setEditActive] = useState(true);
   const [editPrimaryPmId, setEditPrimaryPmId] = useState<string>(NO_PRIMARY_PM);
 
   function openInvite() {
     setInviteEmail("");
-    setInviteRole("developer");
+    setInviteRoles(["developer"]);
     setInviteOpen(true);
   }
 
   function openEdit(profile: Profile) {
     setEditing(profile);
-    setEditRole(profile.role ?? "developer");
+    setEditRoles(profile.roles);
     setEditActive(profile.active);
     setEditPrimaryPmId(profile.primary_pm_id ?? NO_PRIMARY_PM);
   }
@@ -101,7 +141,7 @@ export function UsersTable({
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({ email: inviteEmail, roles: inviteRoles }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -110,7 +150,7 @@ export function UsersTable({
       }
       setInviteOpen(false);
       setInviteEmail("");
-      setInviteRole("developer");
+      setInviteRoles(["developer"]);
       router.refresh();
     } catch {
       setError("No se pudo conectar con el servidor. Probá de nuevo.");
@@ -128,7 +168,7 @@ export function UsersTable({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: editRole,
+          roles: editRoles,
           active: editActive,
           primaryPmId: editPrimaryPmId === NO_PRIMARY_PM ? null : editPrimaryPmId,
         }),
@@ -158,7 +198,7 @@ export function UsersTable({
       />
 
       {error && (
-        <p role="alert" className="mb-3 text-ui text-destructive">
+        <p role="alert" className="text-ui text-destructive mb-3">
           {error}
         </p>
       )}
@@ -190,11 +230,14 @@ export function UsersTable({
                     {profile.email}
                   </TableCell>
                   <TableCell>{profile.full_name ?? "—"}</TableCell>
-                  {/* §3.2: el rol no es urgencia — se comunica con texto, no con color. */}
+                  {/* §3.2: el rol no es urgencia — se comunica con texto, no con color.
+                      Desde `012` son varios, y van separados por `·` en vez de en
+                      badges: tres badges por fila compiten con el estado, que sí
+                      es la señal que se busca al escanear la tabla. */}
                   <TableCell
-                    className={cn(!profile.role && "text-muted-foreground italic")}
+                    className={cn(profile.roles.length === 0 && "text-muted-foreground italic")}
                   >
-                    {profile.role ? ROLE_LABEL[profile.role] : "Sin rol"}
+                    {formatRoles(profile.roles) ?? "Sin rol"}
                   </TableCell>
                   <TableCell>{primaryPm ? pmLabel(primaryPm) : "—"}</TableCell>
                   <TableCell>
@@ -214,8 +257,8 @@ export function UsersTable({
 
       {invites.length > 0 && (
         <section className="mt-8">
-          <h2 className="pb-2 text-section font-medium">Invitaciones pendientes</h2>
-          <p className="pb-2 text-ui text-muted-foreground">
+          <h2 className="text-section pb-2 font-medium">Invitaciones pendientes</h2>
+          <p className="text-ui text-muted-foreground pb-2">
             Reciben el rol asignado en su primer ingreso con Google.
           </p>
           <Table>
@@ -229,7 +272,7 @@ export function UsersTable({
               {invites.map((invite) => (
                 <TableRow key={invite.email}>
                   <TableCell>{invite.email}</TableCell>
-                  <TableCell>{ROLE_LABEL[invite.role]}</TableCell>
+                  <TableCell>{formatRoles(invite.roles)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -253,25 +296,13 @@ export function UsersTable({
                 onChange={(e) => setInviteEmail(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Rol</Label>
-              <Select
-                value={inviteRole}
-                onValueChange={(value) => setInviteRole(value as UserRole)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="pm">PM</SelectItem>
-                  <SelectItem value="developer">Developer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <RolesField value={inviteRoles} onChange={setInviteRoles} />
           </div>
           <DialogFooter>
-            <Button onClick={handleInvite} disabled={!inviteEmail.trim() || submitting}>
+            <Button
+              onClick={handleInvite}
+              disabled={!inviteEmail.trim() || inviteRoles.length === 0 || submitting}
+            >
               Invitar usuario
             </Button>
           </DialogFooter>
@@ -284,19 +315,7 @@ export function UsersTable({
             <DialogTitle>Editar usuario</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label>Rol</Label>
-              <Select value={editRole} onValueChange={(value) => setEditRole(value as UserRole)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="pm">PM</SelectItem>
-                  <SelectItem value="developer">Developer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <RolesField value={editRoles} onChange={setEditRoles} />
 
             <div className="flex flex-col gap-1.5">
               <Label>PM primario</Label>
@@ -327,7 +346,7 @@ export function UsersTable({
             </Label>
           </div>
           <DialogFooter>
-            <Button onClick={handleEdit} disabled={submitting}>
+            <Button onClick={handleEdit} disabled={editRoles.length === 0 || submitting}>
               Guardar cambios
             </Button>
           </DialogFooter>

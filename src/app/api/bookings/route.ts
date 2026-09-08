@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
 import { requireBookingAccess } from "@/lib/api/require-booking-access";
+import { isDeveloper } from "@/lib/auth/roles";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
 import { createBookingSchema } from "@/lib/validation/bookings";
 
@@ -24,11 +25,11 @@ export async function POST(request: Request) {
   // FK apunte a un profile con cierto rol, así que se valida acá.
   const { data: dev } = await supabase
     .from("profiles")
-    .select("role, active")
+    .select("roles, active")
     .eq("id", devId)
     .maybeSingle();
 
-  if (dev?.role !== "developer") {
+  if (!dev || !isDeveloper(dev.roles)) {
     return NextResponse.json(
       { error: "La reserva tiene que asignarse a un usuario con rol desarrollador" },
       { status: 400 },
@@ -36,10 +37,7 @@ export async function POST(request: Request) {
   }
 
   if (!dev.active) {
-    return NextResponse.json(
-      { error: "Ese desarrollador está desactivado" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Ese desarrollador está desactivado" }, { status: 400 });
   }
 
   /**

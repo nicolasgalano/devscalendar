@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { hasAnyRole } from "@/lib/auth/roles";
 import { getCurrentProfile, getCurrentUser } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +24,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const profile = await getCurrentProfile();
-  if (!profile || !profile.active || !profile.role) {
+  if (!profile || !profile.active || !hasAnyRole(profile.roles)) {
     redirect("/pending-access");
   }
 
   return (
-    <AppShell role={profile.role} userLabel={profile.full_name ?? profile.email}>
+    <AppShell roles={profile.roles} userLabel={profile.full_name ?? profile.email}>
       {children}
     </AppShell>
   );

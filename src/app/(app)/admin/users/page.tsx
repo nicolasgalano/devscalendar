@@ -10,13 +10,13 @@ export default async function AdminUsersPage() {
   const [profilesResult, invitesResult, pmsResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, email, full_name, role, active, primary_pm_id")
+      .select("id, email, full_name, roles, active, primary_pm_id")
       .order("email"),
-    supabase.from("profile_invites").select("email, role, created_at").order("created_at"),
+    supabase.from("profile_invites").select("email, roles, created_at").order("created_at"),
     supabase
       .from("profiles")
       .select("id, full_name, email")
-      .eq("role", "pm")
+      .contains("roles", ["pm"])
       .eq("active", true)
       .order("full_name"),
   ]);

@@ -30,7 +30,7 @@ describe("handle_new_user with profile_invites", () => {
 
     const { error: inviteError } = await adminClient()
       .from("profile_invites")
-      .insert({ email, role: "pm" });
+      .insert({ email, roles: ["pm"] });
     expect(inviteError).toBeNull();
 
     const user = await createTestUser(email, "Test-password-123!");
@@ -43,14 +43,16 @@ describe("handle_new_user with profile_invites", () => {
       .single();
 
     expect(error).toBeNull();
-    expect(data).toMatchObject({ id: user.id, email, role: "pm", active: true });
+    expect(data).toMatchObject({ id: user.id, email, roles: ["pm"], active: true });
   });
 
   it("consumes the invitation so it cannot be reused", async () => {
     const email = testEmail(`invite-once-${randomUUID()}`);
     invitedEmail = email;
 
-    await adminClient().from("profile_invites").insert({ email, role: "admin" });
+    await adminClient()
+      .from("profile_invites")
+      .insert({ email, roles: ["admin"] });
 
     const user = await createTestUser(email, "Test-password-123!");
     userId = user.id;
@@ -72,18 +74,20 @@ describe("handle_new_user with profile_invites", () => {
 
     const { data, error } = await adminClient()
       .from("profiles")
-      .select("role")
+      .select("roles")
       .eq("id", user.id)
       .single();
 
     expect(error).toBeNull();
-    expect(data?.role).toBeNull();
+    expect(data?.roles).toEqual([]);
   });
 
   it("does not apply an invitation addressed to a different email", async () => {
     const invited = testEmail(`invite-other-${randomUUID()}`);
     invitedEmail = invited;
-    await adminClient().from("profile_invites").insert({ email: invited, role: "admin" });
+    await adminClient()
+      .from("profile_invites")
+      .insert({ email: invited, roles: ["admin"] });
 
     const user = await createTestUser(
       testEmail(`invite-unrelated-${randomUUID()}`),
@@ -93,11 +97,11 @@ describe("handle_new_user with profile_invites", () => {
 
     const { data } = await adminClient()
       .from("profiles")
-      .select("role")
+      .select("roles")
       .eq("id", user.id)
       .single();
 
-    expect(data?.role).toBeNull();
+    expect(data?.roles).toEqual([]);
 
     // La invitación ajena sigue intacta.
     const { data: stillThere } = await adminClient()

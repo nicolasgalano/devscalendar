@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/api/require-admin";
+import { isPm } from "@/lib/auth/roles";
 import { updateProjectSchema } from "@/lib/validation/projects";
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   const { supabase } = guard;
@@ -26,11 +24,11 @@ export async function PATCH(
   if (pmId !== undefined) {
     const { data: pmProfile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("roles")
       .eq("id", pmId)
       .single();
 
-    if (pmProfile?.role !== "pm") {
+    if (!isPm(pmProfile?.roles)) {
       return NextResponse.json(
         { error: "El PM responsable debe ser un usuario con rol pm" },
         { status: 400 },

@@ -337,7 +337,7 @@ export async function countConsideredDevs(
   const { count, error } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .eq("role", "developer")
+    .contains("roles", ["developer"])
     .eq("active", true);
 
   if (error) throw error;

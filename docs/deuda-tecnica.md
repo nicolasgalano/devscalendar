@@ -27,17 +27,17 @@ primera persona real**, y están marcadas así.
 
 ## Índice
 
-| # | Deuda | Feature | Gate |
-| :---- | :---- | :---- | :---- |
-| D-01 | `active = false` solo se aplica en la UI, no en la API ni en la RLS | 001 | **antes de usuarios reales** |
-| D-02 | AC-1.3 salió reinterpretada y nunca se registró el desvío | 001 | no bloquea |
-| D-03 | `profiles.primary_pm_id` quedó a medio implementar | 002 | no bloquea |
-| D-04 | `SelectValue` sin hijos imprime el valor crudo en `/admin/*` | 002 | no bloquea, pero se ve |
-| D-05 | `readJsonBody()` falta en los seis handlers de `002` | 002 | no bloquea |
-| D-06 | Verificar en el navegador los permisos de `/admin/*` — E2E y RLS ya verificados el 2026-09-07; **queda solo el navegador** | 002 | **antes de usuarios reales** |
-| D-07 | El `PATCH` de reservas no chequea el `active` del desarrollador | 004 | no bloquea |
-| D-08 | Nada impide reservar sobre un proyecto desactivado | 004 | no bloquea |
-| D-09 | Un rol por persona; nadie puede ser PM y admin a la vez → **roles múltiples** | 001 | **antes de `010`** |
+| #        | Deuda                                                                                                                      | Feature | Gate                                    |
+| :------- | :------------------------------------------------------------------------------------------------------------------------- | :------ | :-------------------------------------- |
+| ~~D-01~~ | ~~`active = false` solo se aplica en la UI, no en la API ni en la RLS~~                                                    | 001     | **saldada 2026-09-08** (`012`)          |
+| D-02     | AC-1.3 salió reinterpretada y nunca se registró el desvío                                                                  | 001     | no bloquea                              |
+| D-03     | `profiles.primary_pm_id` quedó a medio implementar                                                                         | 002     | no bloquea                              |
+| D-04     | `SelectValue` sin hijos imprime el valor crudo en `/admin/*`                                                               | 002     | no bloquea, pero se ve                  |
+| D-05     | `readJsonBody()` falta en los seis handlers de `002`                                                                       | 002     | no bloquea                              |
+| D-06     | Verificar en el navegador los permisos de `/admin/*` — E2E y RLS ya verificados el 2026-09-07; **queda solo el navegador** | 002     | **antes de usuarios reales**            |
+| ~~D-07~~ | ~~El `PATCH` de reservas no chequea el `active` del desarrollador~~                                                        | 004     | **saldada 2026-09-08 con D-01** (`012`) |
+| D-08     | Nada impide reservar sobre un proyecto desactivado                                                                         | 004     | no bloquea                              |
+| ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
 
 ---
 
@@ -154,14 +154,14 @@ nunca volvió sobre las pantallas de `002`, que son donde el bug nació.
 `SelectValue` es `Select.Value` de Base UI sin hijos (`src/components/ui/select.tsx:21-29`):
 renderiza el `value`, no el texto del item elegido. Dónde se ve:
 
-| Pantalla | Select | Qué muestra el trigger |
-| :---- | :---- | :---- |
-| `/admin/users` | PM primario (`users-table.tsx:308`) | `__none__`, o el uuid crudo del PM |
-| `/admin/users` | Rol, en editar (`users-table.tsx:291`) | `developer` en vez de `Developer` |
-| `/admin/users` | Rol, en invitar (`users-table.tsx:263`) | ídem |
-| `/admin/projects` | Prioridad (`projects-table.tsx:395`) | `normal` / `high` en vez de `Común` / `Prioritario` |
-| `/admin/projects` | Cliente (`projects-table.tsx:357`) | el placeholder hasta elegir; después, el uuid |
-| `/admin/projects` | PM responsable (`projects-table.tsx:376`) | ídem |
+| Pantalla          | Select                                    | Qué muestra el trigger                              |
+| :---------------- | :---------------------------------------- | :-------------------------------------------------- |
+| `/admin/users`    | PM primario (`users-table.tsx:308`)       | `__none__`, o el uuid crudo del PM                  |
+| `/admin/users`    | Rol, en editar (`users-table.tsx:291`)    | `developer` en vez de `Developer`                   |
+| `/admin/users`    | Rol, en invitar (`users-table.tsx:263`)   | ídem                                                |
+| `/admin/projects` | Prioridad (`projects-table.tsx:395`)      | `normal` / `high` en vez de `Común` / `Prioritario` |
+| `/admin/projects` | Cliente (`projects-table.tsx:357`)        | el placeholder hasta elegir; después, el uuid       |
+| `/admin/projects` | PM responsable (`projects-table.tsx:376`) | ídem                                                |
 
 El de prioridad es el peor de los seis después del `__none__`: `DESIGN.md` §11
 pide el vocabulario del PM y no el de la base, y el desplegable **ya** dice
@@ -263,14 +263,21 @@ Con **cada uno de los dos roles**, logueado de verdad por Google:
    la que ningún test visita con un no-admin.**
 3. **La API tampoco.** Desde la consola del navegador, ya logueado:
    ```js
-   await fetch("/api/users", { method: "POST", headers: { "content-type": "application/json" },
-     body: JSON.stringify({ email: "test-<runId>-probe@example.com", role: "admin" }) }).then(r => r.status)
+   await fetch("/api/users", {
+     method: "POST",
+     headers: { "content-type": "application/json" },
+     body: JSON.stringify({ email: "test-<runId>-probe@example.com", role: "admin" }),
+   }).then((r) => r.status);
    ```
    Esperado **403** por `requireAdmin()`. Repetir contra `/api/clients` y
    `/api/projects`. Un `201` acá es un bug de `002` con toda la prioridad.
 4. **La base, que es la garantía de verdad.** Con la sesión del developer:
    ```js
-   const { data, error } = await window.__sb.from("profiles").update({ role: "admin" }).eq("id", "<su propio uuid>").select()
+   const { data, error } = await window.__sb
+     .from("profiles")
+     .update({ role: "admin" })
+     .eq("id", "<su propio uuid>")
+     .select();
    ```
    Esperado: `error === null` y `data.length === 0` — la RLS **filtra en
    silencio**, no falla. Después confirmar desde el dashboard de Supabase que el
@@ -295,8 +302,8 @@ riesgo en `/admin/*` es **D-01**, no esto.
 400 (`src/app/api/bookings/route.ts:27,38-43`). El `PATCH` pide **solo `role`**
 (`src/app/api/bookings/[id]/route.ts:100-104`).
 
-O sea: no se puede *crear* una reserva para un desarrollador desactivado, pero sí
-*mover* una existente encima de él. La asimetría no está anotada en ningún lado.
+O sea: no se puede _crear_ una reserva para un desarrollador desactivado, pero sí
+_mover_ una existente encima de él. La asimetría no está anotada en ningún lado.
 Se salda junto con D-01, que es la misma omisión en grande.
 
 ---
@@ -344,7 +351,7 @@ proyectos y no solo los propios. La regla aparece cuatro veces, siempre igual:
 
 La única excepción es **aprobar**, que es de identidad y no de rol (ADR 0009).
 
-**Pero para *ser* el PM responsable, el admin está excluido.** `projects.pm_id`
+**Pero para _ser_ el PM responsable, el admin está excluido.** `projects.pm_id`
 exige `role = 'pm'` exacto en tres lugares —`api/projects/route.ts:29`,
 `api/projects/[id]/route.ts:33` y el desplegable de
 `admin/projects/page.tsx:21`— y `profiles.primary_pm_id` hace lo mismo
@@ -376,7 +383,7 @@ Lo que toca, para dimensionarlo antes de empezar:
 - **La base.** `profiles.role` singular pasa a un conjunto — array de `user_role`
   o tabla `profile_roles`. Y sobre todo **`current_user_role()`
   (`00000000000000:47`), que es la puerta de casi todas las policies** y hoy
-  devuelve *un* rol: pasa a ser una pregunta de pertenencia (`has_role('admin')`).
+  devuelve _un_ rol: pasa a ser una pregunta de pertenencia (`has_role('admin')`).
   Cambiarla altera de golpe el comportamiento de todo lo que la usa.
   `handle_new_user()` y `profile_invites` también asignan un rol único.
 - **Los guards y las funciones puras.** `requireAdmin()`, `requireBookingAccess()`,
@@ -411,3 +418,47 @@ por segunda vez. **La respuesta fue que no accede:** el enum se queda en `admin`
 **O sea que lo único que falta para empezar es el OK explícito.** No hay ninguna
 pregunta de producto pendiente detrás de esta deuda. Sigue valiendo la regla de
 arriba: no se toca sin ese OK.
+
+---
+
+## Saldadas — 2026-09-08
+
+**D-01, D-07 y D-09 se saldaron juntas** con la feature
+`012-multiple-roles-and-active-enforcement`, con OK explícito del usuario. Las
+tres entradas de arriba quedan como estaban a propósito: describen el problema
+que había, y quien llegue a este archivo buscando por qué el código es como es
+tiene que poder leerlo. Lo que sigue es qué cambió.
+
+**D-09 — roles múltiples.** `profiles.role` pasó a `profiles.roles`
+(`user_role[]`), `current_user_role()` se borró, y en su lugar quedaron
+`has_role(user_role)` y `has_any_role()`. Las nueve policies que preguntaban por
+el rol se recrearon. Alguien puede tener `pm` y `admin` a la vez, y **ser el
+`pm_id` de un proyecto**, que era la mitad que faltaba: `010` ya puede notificar
+a quien realmente lleva el proyecto. Ver ADR 0011.
+
+**D-01 — `active` con dientes.** El chequeo entró **adentro** de `has_role()`, no
+al lado: una policy tiene un solo tiro, y una condición separada se olvida sola
+—que es exactamente cómo nació esta deuda—. Con eso, las siete policies que
+preguntan por un rol heredan el chequeo, y también lo hereda lo que se escriba
+después. Los tres guards de `src/lib/api/` lo miran para devolver un 403 legible
+en vez de un resultado vacío.
+
+Dos excepciones deliberadas, cada una con su test: **`profiles: self read`** no
+pasa por las funciones nuevas —sin poder leerse a sí mismo, un desactivado no
+puede ni ver el cartel de `/pending-access`— y **`profiles: team directory read`**
+no suma `active`, porque filtra la fila que se lee y no a quien lee: si
+desactivar a alguien lo sacara del directorio, sus reservas viejas perderían el
+nombre en el calendario.
+
+**D-07 — el `PATCH` de reservas.** Entró en el mismo cambio, como decía su propia
+entrada. El `select` del handler pedía solo el rol; ahora pide `roles, active` y
+rechaza al desactivado, igual que el `POST`.
+
+**Lo que sigue abierto y es de la misma familia: D-08.** Nada impide reservar
+sobre un proyecto desactivado. No se tocó porque nunca estuvo anotada como parte
+de D-01 y no se saldan deudas de paso. Con `can_manage_booking()` ya reescrita,
+es un chequeo más adentro de esa función.
+
+**Y lo que esto le deja a D-06:** la verificación manual en el navegador sigue
+pendiente, y ahora tiene un caso más que valía la pena probar de todos modos —un
+usuario desactivado— que el E2E nuevo ya cubre automáticamente.

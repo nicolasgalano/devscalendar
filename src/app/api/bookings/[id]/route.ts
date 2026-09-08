@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readJsonBody } from "@/lib/api/read-json";
 import { requireBookingAccess } from "@/lib/api/require-booking-access";
+import { isDeveloper } from "@/lib/auth/roles";
 import { EXCLUSION_VIOLATION, findConflictingBooking } from "@/lib/bookings/conflicts";
 import {
   canCancel,
@@ -13,10 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updateBookingSchema } from "@/lib/validation/bookings";
 import type { BookingStatus } from "@/lib/validation/calendar";
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const parsed = updateBookingSchema.safeParse(await readJsonBody(request));
@@ -97,17 +95,25 @@ export async function PATCH(
   }
 
   if (devId) {
+    // D-07, saldada con D-01 en `012`: este `select` pedía **solo** el rol, así
+    // que no se podía *crear* una reserva para un desarrollador desactivado
+    // pero sí *mover* una existente encima de él. La asimetría con el POST no
+    // era una decisión: era la misma omisión de D-01, en chico.
     const { data: dev } = await supabase
       .from("profiles")
-      .select("role")
+      .select("roles, active")
       .eq("id", devId)
       .maybeSingle();
 
-    if (dev?.role !== "developer") {
+    if (!dev || !isDeveloper(dev.roles)) {
       return NextResponse.json(
         { error: "La reserva tiene que asignarse a un usuario con rol desarrollador" },
         { status: 400 },
       );
+    }
+
+    if (!dev.active) {
+      return NextResponse.json({ error: "Ese desarrollador está desactivado" }, { status: 400 });
     }
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isAdmin } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/session";
 
@@ -28,9 +29,20 @@ export async function requireBookingAccess(projectId: string): Promise<BookingGu
     };
   }
 
+  // 012 / D-01: `getCurrentProfile()` siempre trajo `active` y este guard nunca
+  // lo miraba. La RLS ahora sí, así que sin este chequeo un PM desactivado
+  // recibiría un 404 —la policy le filtra el proyecto— en vez de un 403, y se
+  // iría a buscar un problema de datos que es de permisos.
+  if (!profile.active) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "La cuenta está desactivada" }, { status: 403 }),
+    };
+  }
+
   const supabase = await createClient();
 
-  if (profile.role === "admin") {
+  if (isAdmin(profile.roles)) {
     return { ok: true, supabase, userId: profile.id };
   }
 
