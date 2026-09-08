@@ -1,226 +1,139 @@
--- Seed data for a development database.
--- Run with: `pnpm db:seed` (pushes migrations and then this file to the linked
--- project). Every statement is idempotent — `on conflict` throughout — so it is
--- safe to re-run against a database that already has data.
+-- Seed data — Purga de la ficción original + alta de las 3 personas del
+-- equipo WeDo Web que faltaban (Cris, Matías, Bruno).
 --
--- Everything here uses fixed UUIDs so every seed run lands on the same data and
--- you can hardcode ids while debugging:
+-- Historia: hasta el 2026-09-06 esto era una seed de ficción (Paula/Diego,
+-- Acme/Nimbus, 15 reservas). El 2026-09-07 pasa a ser una **corrida final
+-- one-shot**: purga las entidades de demo por id (UUIDs `…0011`–`…005e`),
+-- crea a las tres personas faltantes con UUIDs fijos, y **no toca ni
+-- clientes ni proyectos** — para cuando corrió esta seed, los clientes y
+-- proyectos reales ya estaban cargados a mano por /admin con nombres que
+-- diverjen del doc de referencia (por ejemplo, "CFAM" en vez de "Colegio
+-- Franco", "Kimjera" que no está en el doc, etc.). Un insert por nombre
+-- fallaba por unique constraint, y meter los ids fijos crearía duplicados.
 --
---   …0011/0012 PMs · …0021–0023 developers · …0031/0032 clients
---   …0041/0042 projects · …0051–005e bookings
+-- **Última vez que este archivo carga datos "de arranque".** De ahora en
+-- más todo alta pasa por /admin. La corrida siguiente de db:seed es
+-- idempotente (no-op) por diseño.
 --
--- The auth users below exist only to satisfy the profiles FK: they have no
--- usable password, because the real login is Google OAuth. To give *your*
--- Google account a role, use an invite:
+-- UUIDs estables introducidos:
+--   0x0104–0x0106  Cris, Matías, Bruno (los que faltaban en el equipo)
 --
---   insert into public.profile_invites (email, roles) values ('you@example.com', '{admin}');
+-- Personas del equipo que ya existen en la base con UUIDs random (OAuth):
+-- Brenda, Lucía, Emi, Nico. Brenda se pasa a `roles = {pm}` porque el
+-- usuario la eligió PM interina de los proyectos (2026-09-07); los demás
+-- no se tocan.
 --
--- ...and then log in. The trigger consumes the invite (see ADR 0004).
+-- Ejecución: `pnpm db:seed` sobre el proyecto enlazado.
 
 -- ─────────────────────────────────────────────────────────────
--- 1. People (features 001 / 002)
+-- 0. Limpieza de la ficción de demo
 -- ─────────────────────────────────────────────────────────────
--- The `on_auth_user_created` trigger creates the matching profiles row; the
--- roles are assigned right after, since the trigger leaves the set empty.
+-- Orden por los `on delete restrict`: bookings → projects → clients →
+-- auth.users (cascadea a profiles). Todo por id, nunca por nombre, para no
+-- llevarse por delante datos reales.
+
+delete from public.bookings where id in (
+  '00000000-0000-4000-8000-000000000051',
+  '00000000-0000-4000-8000-000000000052',
+  '00000000-0000-4000-8000-000000000053',
+  '00000000-0000-4000-8000-000000000054',
+  '00000000-0000-4000-8000-000000000055',
+  '00000000-0000-4000-8000-000000000056',
+  '00000000-0000-4000-8000-000000000057',
+  '00000000-0000-4000-8000-000000000058',
+  '00000000-0000-4000-8000-000000000059',
+  '00000000-0000-4000-8000-00000000005a',
+  '00000000-0000-4000-8000-00000000005b',
+  '00000000-0000-4000-8000-00000000005c',
+  '00000000-0000-4000-8000-00000000005d',
+  '00000000-0000-4000-8000-00000000005e'
+);
+
+delete from public.projects where id in (
+  '00000000-0000-4000-8000-000000000041',
+  '00000000-0000-4000-8000-000000000042'
+);
+
+delete from public.clients where id in (
+  '00000000-0000-4000-8000-000000000031',
+  '00000000-0000-4000-8000-000000000032'
+);
+
+delete from auth.users where id in (
+  '00000000-0000-4000-8000-000000000011',
+  '00000000-0000-4000-8000-000000000012',
+  '00000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000022',
+  '00000000-0000-4000-8000-000000000023'
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 1. Personas que faltan — Cris, Matías, Bruno
+-- ─────────────────────────────────────────────────────────────
+-- El trigger `on_auth_user_created` crea la fila en profiles con roles
+-- vacío; el update de abajo la fija a developer.
+--
+-- Matías y Bruno viajan con emails placeholder `@wedoweb.co` — no son fijos
+-- del equipo y el doc no tiene su casilla real (PENDIENTE #2, #3, #5).
+
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 )
 values
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000011',
-   'authenticated', 'authenticated', 'paula.mendez@seed.local', '!seed-no-login!',
-   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Paula Méndez"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000012',
-   'authenticated', 'authenticated', 'diego.arce@seed.local', '!seed-no-login!',
-   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Diego Arce"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000021',
-   'authenticated', 'authenticated', 'cristian.soto@seed.local', '!seed-no-login!',
-   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Cristian Soto"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000022',
-   'authenticated', 'authenticated', 'malena.rojas@seed.local', '!seed-no-login!',
-   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Malena Rojas"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000023',
-   'authenticated', 'authenticated', 'rodrigo.paz@seed.local', '!seed-no-login!',
-   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Rodrigo Paz"}', now(), now())
-on conflict (id) do nothing;
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000104',
+   'authenticated', 'authenticated', 'cris@wedoweb.co', '!seed-no-login!',
+   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Cris"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000105',
+   'authenticated', 'authenticated', 'matias@wedoweb.co', '!seed-no-login!',
+   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Matías"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000106',
+   'authenticated', 'authenticated', 'bruno@wedoweb.co', '!seed-no-login!',
+   now(), '{"provider":"seed","providers":["seed"]}', '{"full_name":"Bruno"}', now(), now())
+-- Sin target: cubre choques por id **y** por email. Si algún día alguien
+-- creó `cris@wedoweb.co` por otro camino, esta línea no la re-inserta.
+on conflict do nothing;
 
-update public.profiles set roles = '{pm}'
-where id in ('00000000-0000-4000-8000-000000000011',
-             '00000000-0000-4000-8000-000000000012');
+-- Migración 9 reemplazó `profiles.role` por `profiles.roles` (array). El
+-- trigger `profiles_normalise_roles` ordena y deduplica en cada write.
+update public.profiles set roles = array['developer']::public.user_role[]
+where id in ('00000000-0000-4000-8000-000000000104',
+             '00000000-0000-4000-8000-000000000105',
+             '00000000-0000-4000-8000-000000000106')
+  and not ('developer' = any(roles));
 
-update public.profiles set roles = '{developer}'
-where id in ('00000000-0000-4000-8000-000000000021',
-             '00000000-0000-4000-8000-000000000022',
-             '00000000-0000-4000-8000-000000000023');
+-- ─────────────────────────────────────────────────────────────
+-- 2. Brenda pasa a pm
+-- ─────────────────────────────────────────────────────────────
+-- Estaba admin en la base; el usuario la eligió PM (2026-09-07). Se
+-- reemplaza `{admin}` (o `{admin,pm}` si esta seed corrió parcial) por
+-- `{pm}`. Con el modelo multi-rol podría ser `{pm, admin}`, pero el doc la
+-- lista solo como PM. Si necesita admin de nuevo, se agrega vía /admin/users.
+update public.profiles set roles = array['pm']::public.user_role[]
+where email = 'brenda@wedoweb.co' and roles is distinct from array['pm']::public.user_role[];
 
--- Admin access for the local developer.
---
--- On a database seeded from scratch, auth.users is empty, so a real Google
--- login lands on /pending-access with no role. Seeding the invite means the
--- next login self-heals: the `handle_new_user` trigger consumes it and the
--- profile is born as admin (ADR 0004).
---
--- The second statement covers the case where the profile already exists (you
--- logged in before the seed ran), which the invite alone cannot fix because the
--- trigger only fires on insert.
---
--- Change this email to yours when working on another machine.
+-- ─────────────────────────────────────────────────────────────
+-- 3. Invitaciones de admin — Emi y Nico
+-- ─────────────────────────────────────────────────────────────
+-- Emi y Nico ya son admin en la base (login OAuth). Las invitaciones
+-- quedan como fallback si algún día se recrea el profile o cambian de
+-- cuenta.
 insert into public.profile_invites (email, roles)
-values ('emiliano@wedoweb.co', '{admin}')
+values
+  ('emiliano@wedoweb.co', array['admin']::public.user_role[]),
+  ('nico@wedoweb.co', array['admin']::public.user_role[])
 on conflict (email) do nothing;
 
-update public.profiles
-set roles = '{admin}'
-where email = 'emiliano@wedoweb.co' and cardinality(roles) = 0;
+-- ─────────────────────────────────────────────────────────────
+-- 4. Clientes y proyectos — no se cargan desde acá
+-- ─────────────────────────────────────────────────────────────
+-- Los clientes y proyectos reales se administran desde /admin. El intento
+-- inicial de sembrarlos por seed (2026-09-07) chocó con nombres únicos ya
+-- cargados a mano — el equipo estaba usando el ABM antes de esta seed.
+-- Cargar por UI evita ese doble camino y deja la seed más chica.
 
 -- ─────────────────────────────────────────────────────────────
--- 2. Clients and projects (feature 002-entities-admin)
+-- 5. Bookings
 -- ─────────────────────────────────────────────────────────────
--- Two clients and two projects with different priorities, so every calendar
--- filter (client, project, PM, priority) has something to filter.
-insert into public.clients (id, name)
-values
-  ('00000000-0000-4000-8000-000000000031', 'Acme Corp'),
-  ('00000000-0000-4000-8000-000000000032', 'Nimbus SRL')
-on conflict (id) do nothing;
-
-insert into public.projects (id, client_id, name, pm_id, priority, jira_enabled, slack_enabled)
-values
-  ('00000000-0000-4000-8000-000000000041', '00000000-0000-4000-8000-000000000031',
-   'Website Revamp', '00000000-0000-4000-8000-000000000011', 'normal', true, false),
-  ('00000000-0000-4000-8000-000000000042', '00000000-0000-4000-8000-000000000032',
-   'Portal de reservas', '00000000-0000-4000-8000-000000000012', 'high', false, true)
-on conflict (id) do nothing;
-
--- ─────────────────────────────────────────────────────────────
--- 3. Bookings (features 003-calendar-ui / 005-approval-flow)
--- ─────────────────────────────────────────────────────────────
--- Anchored to the Monday of the current week, so every seed run lands on a
--- populated day view without editing dates by hand. Wall-clock times are built
--- in the client's timezone, which is the one the calendar renders in (Q-10).
---
--- The fixtures cover, on purpose:
---   · two developers overlapping at the same hour  → parallel lanes (AC-2.2)
---   · a booking on a high-priority project         → priority marker (AC-2.3)
---   · one booking in each of the 5 states          → functional spec §5.2
---   · one outside 09:00–17:00 and one on a Saturday → Q-F / Q-G
---   · four pendings of the same developer on four different days → the inbox of
---     005, which is a list ordered by date and needs more than one date to
---     prove that it orders anything
--- Most of this is rare in production, which is exactly why it belongs in the
--- seed: nobody remembers to test by hand what almost never happens.
-do $$
-declare
-  tz constant text := 'America/Argentina/Buenos_Aires';
-  monday constant date := date_trunc('week', current_date)::date;
-  tuesday constant date := (date_trunc('week', current_date)::date) + 1;
-  wednesday constant date := (date_trunc('week', current_date)::date) + 2;
-  thursday constant date := (date_trunc('week', current_date)::date) + 3;
-  friday constant date := (date_trunc('week', current_date)::date) + 4;
-  saturday constant date := (date_trunc('week', current_date)::date) + 5;
-
-  pm_paula constant uuid := '00000000-0000-4000-8000-000000000011';
-  pm_diego constant uuid := '00000000-0000-4000-8000-000000000012';
-  dev_cristian constant uuid := '00000000-0000-4000-8000-000000000021';
-  dev_malena constant uuid := '00000000-0000-4000-8000-000000000022';
-  dev_rodrigo constant uuid := '00000000-0000-4000-8000-000000000023';
-  proj_website constant uuid := '00000000-0000-4000-8000-000000000041';
-  proj_portal constant uuid := '00000000-0000-4000-8000-000000000042';
-begin
-  insert into public.bookings
-    (id, project_id, dev_id, created_by, starts_at, ends_at, status, note, ticket_ref,
-     response_note, responded_at)
-  values
-    -- Monday, normal working hours.
-    ('00000000-0000-4000-8000-000000000051', proj_website, dev_cristian, pm_paula,
-     (monday + time '09:00') at time zone tz, (monday + time '13:00') at time zone tz,
-     'approved', 'Migración del checkout', 'WEB-142',
-     null, now()),
-    -- Overlaps the one above in time, different developer → parallel lanes.
-    ('00000000-0000-4000-8000-000000000052', proj_website, dev_malena, pm_paula,
-     (monday + time '09:00') at time zone tz, (monday + time '12:00') at time zone tz,
-     'pending', 'Revisión de diseño responsive', 'WEB-155',
-     null, null),
-    -- High-priority project, spans most of the day. Approved *with* a remark:
-    -- the note is optional when approving, and only mandatory on a rejection.
-    ('00000000-0000-4000-8000-000000000053', proj_portal, dev_rodrigo, pm_diego,
-     (monday + time '10:00') at time zone tz, (monday + time '17:00') at time zone tz,
-     'approved', 'Integración de pagos', 'POR-7',
-     'Arranco después del daily', now()),
-    ('00000000-0000-4000-8000-000000000054', proj_portal, dev_cristian, pm_diego,
-     (monday + time '14:00') at time zone tz, (monday + time '17:00') at time zone tz,
-     'pending', null, 'POR-11',
-     null, null),
-    -- Rejected with a reason. The reason lives in `response_note`, which is the
-    -- developer's field; `note` stays the PM's ask, so both the calendar and the
-    -- inbox can show what was asked *and* why it did not happen (005 §3.1).
-    ('00000000-0000-4000-8000-000000000055', proj_website, dev_malena, pm_paula,
-     (monday + time '13:00') at time zone tz, (monday + time '15:00') at time zone tz,
-     'rejected', 'Ajustes de accesibilidad del carrito', null,
-     'No llega, ya está con otro cliente', now()),
-    ('00000000-0000-4000-8000-000000000056', proj_website, dev_rodrigo, pm_paula,
-     (monday + time '09:00') at time zone tz, (monday + time '10:00') at time zone tz,
-     'cancelled', null, null,
-     null, null),
-    ('00000000-0000-4000-8000-000000000057', proj_website, dev_cristian, pm_paula,
-     (monday + time '15:00') at time zone tz, (monday + time '16:00') at time zone tz,
-     'displaced', 'Desplazada por Portal de reservas', null,
-     null, null),
-    -- Outside the 09:00–17:00 workday: exceptional, allowed, never hidden (Q-G).
-    ('00000000-0000-4000-8000-000000000058', proj_portal, dev_malena, pm_diego,
-     (monday + time '18:00') at time zone tz, (monday + time '20:00') at time zone tz,
-     'approved', 'Ventana de deploy', 'POR-19',
-     null, now()),
-    -- Saturday: non-working day, so the month view flags it as over capacity.
-    ('00000000-0000-4000-8000-000000000059', proj_website, dev_rodrigo, pm_paula,
-     (saturday + time '10:00') at time zone tz, (saturday + time '14:00') at time zone tz,
-     'approved', 'Migración de base, ventana de fin de semana', 'WEB-160',
-     null, now()),
-    -- Two back-to-back approved bookings for the same developer. This is the
-    -- edge of the anti double-booking constraint (004): tstzrange defaults to
-    -- [), so 13:00 closes the first and opens the second without colliding.
-    -- Seeded on Tuesday, away from Monday's fixtures, so every seed run
-    -- exercises that boundary — if the range type were ever changed to [],
-    -- the seed itself would fail.
-    ('00000000-0000-4000-8000-00000000005a', proj_website, dev_malena, pm_paula,
-     (tuesday + time '09:00') at time zone tz, (tuesday + time '13:00') at time zone tz,
-     'approved', 'Refactor del carrito', 'WEB-171',
-     null, now()),
-    ('00000000-0000-4000-8000-00000000005b', proj_website, dev_malena, pm_paula,
-     (tuesday + time '13:00') at time zone tz, (tuesday + time '17:00') at time zone tz,
-     'approved', 'Continuación, mismo día', 'WEB-171',
-     null, now()),
-    -- Cristian's inbox (005, AC-1.1). With …0054 on Monday these make four
-    -- pendings on four different days, one per shape the list has to render:
-    -- with a note and a ticket, with neither, and one outside the workday so the
-    -- warning of 004 also shows up here. None of them overlaps another of his,
-    -- so each one can be approved by hand without running into the constraint.
-    ('00000000-0000-4000-8000-00000000005c', proj_website, dev_cristian, pm_paula,
-     (wednesday + time '09:00') at time zone tz, (wednesday + time '13:00') at time zone tz,
-     'pending', 'Accesibilidad del checkout: foco y lectores de pantalla', 'WEB-180',
-     null, null),
-    ('00000000-0000-4000-8000-00000000005d', proj_portal, dev_cristian, pm_diego,
-     (thursday + time '10:00') at time zone tz, (thursday + time '12:00') at time zone tz,
-     'pending', null, null,
-     null, null),
-    ('00000000-0000-4000-8000-00000000005e', proj_portal, dev_cristian, pm_diego,
-     (friday + time '18:00') at time zone tz, (friday + time '21:00') at time zone tz,
-     'pending', 'Ventana de migración, fuera de horario', 'POR-31',
-     null, null)
-  -- Idempotent on purpose: re-running the seed refreshes the
-  -- dates to the current week instead of failing on the primary key.
-  on conflict (id) do update set
-    project_id = excluded.project_id,
-    dev_id = excluded.dev_id,
-    created_by = excluded.created_by,
-    starts_at = excluded.starts_at,
-    ends_at = excluded.ends_at,
-    status = excluded.status,
-    note = excluded.note,
-    ticket_ref = excluded.ticket_ref,
-    -- Listed like the rest: without these two, re-seeding a database where
-    -- somebody answered a booking by hand would keep the answer next to a state
-    -- the seed has just overwritten.
-    response_note = excluded.response_note,
-    responded_at = excluded.responded_at;
-end $$;
+-- Ninguna. Se cargan desde /calendar. La empty state que dejó 011 muestra
+-- la grilla vacía en vez del cartel de "sin reservas".
