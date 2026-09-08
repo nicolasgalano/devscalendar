@@ -20,7 +20,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 008 | Jira integration                                  | draft  | 004                | §8.2                |
 | 009 | Slack integration                                 | draft  | 004, 005           | §8.3                |
 | 010 | Notifications & audit log                         | done   | 004, 005, 006, 012 | §7, §12             |
-| 011 | Planning view (grilla semanal de carga)           | draft  | 003, 004, 005, 006 | §4, §12             |
+| 011 | Planning view (grilla semanal de carga)           | done   | 003, 004, 005, 006 | §4, §12             |
 | 012 | Roles múltiples y `active` con dientes            | done   | 001, 002           | §3, §12 (seguridad) |
 | 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
 
