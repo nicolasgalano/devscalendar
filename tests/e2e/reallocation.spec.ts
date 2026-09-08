@@ -166,15 +166,23 @@ test("a priority project displaces a common booking and the displaced PM sees it
    * enterarse de que le sacaron una reserva confirmada era pasar por acá y
    * notarlo — que es exactamente el problema que `010` vino a resolver.
    */
-  const bell = page.getByRole("button", { name: /Notificaciones (d+ sin leer)/ });
+  const bell = page.getByRole("button", { name: /Notificaciones \(\d+ sin leer\)/ });
   await expect(bell).toBeVisible(AFTER_WRITE);
   await bell.click();
 
-  // Y el aviso nombra al proyecto que se llevó la franja (AC-1.5): "te
-  // desplazaron" sin decir quién obliga a salir a averiguarlo.
-  const panel = page.getByRole("dialog").filter({ hasText: "Notificaciones" });
-  await expect(panel).toContainText("Te desplazaron una reserva");
-  await expect(panel).toContainText(HIGH_PROJECT);
+  /**
+   * Se busca el aviso por su propio nombre accesible en vez de por el contenedor
+   * del popover: qué rol expone Base UI para ese contenedor es un detalle de la
+   * librería, y un test que dependa de eso se rompe en el próximo upgrade sin
+   * que haya cambiado nada de lo que el PM ve.
+   *
+   * Y **el aviso nombra al proyecto que se llevó la franja** (AC-1.5): "te
+   * desplazaron" sin decir quién obliga a salir a averiguarlo, que es medio
+   * aviso.
+   */
+  const notice = page.getByRole("button", { name: /Te desplazaron una reserva/ });
+  await expect(notice).toBeVisible(AFTER_WRITE);
+  await expect(notice).toContainText(HIGH_PROJECT);
 });
 
 // AC-1.2
