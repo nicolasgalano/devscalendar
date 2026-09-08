@@ -38,7 +38,7 @@ describe("handle_new_user with profile_invites", () => {
 
     const { data, error } = await adminClient()
       .from("profiles")
-      .select("id, email, role, active")
+      .select("id, email, roles, active")
       .eq("id", user.id)
       .single();
 

@@ -21,11 +21,11 @@ describe("handle_new_user trigger", () => {
 
     const { data, error } = await adminClient()
       .from("profiles")
-      .select("id, email, role, active")
+      .select("id, email, roles, active")
       .eq("id", user.id)
       .single();
 
     expect(error).toBeNull();
-    expect(data).toMatchObject({ id: user.id, email, role: null, active: true });
+    expect(data).toMatchObject({ id: user.id, email, roles: [], active: true });
   });
 });
