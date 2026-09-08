@@ -2,7 +2,7 @@
 
 - **ID:** 011-planning-view
 - **Plan reference:** `./plan.md`
-- **Status:** in progress.
+- **Status:** done el 2026-09-08. Todas las tasks cerradas — implementación, docs y revisión visual del usuario incluidas.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 
@@ -68,7 +68,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 - [x] **T5.1** — `CLAUDE.md`: sumado `011` al listado de estado, línea encabezado actualizada, "Próxima" apunta a las tres integraciones.
 - [x] **T5.2** — `DESIGN.md` §14: entrada de 011 con los cuatro estados visuales de la celda, la sobrecarga con `--danger` + tooltip, el tratamiento de días no laborables reutilizado, y **la ruptura deliberada de la regla del "botón con verbo en el vacío"** (§9): las cuatro vistas ahora renderizan la grilla vacía sin cartel y `Crear reserva` vive en el encabezado; el cartel se conserva solo para el caso filtrado.
 - [x] **T5.3** — `specs/features/README.md`: `011` a `done`.
-- [ ] **T5.4** — Revisión visual en ambos temas, a 1280 / 1440 / <1024px. Necesita ojos humanos.
+- [x] **T5.4** — Revisión visual en ambos temas, a 1280 / 1440 / <1024px. Hecha por el usuario el 2026-09-08.
 
 ---
 
