@@ -1,6 +1,6 @@
 import type { CalendarView } from "@/lib/validation/calendar";
 
-import { zonedToInstant } from "./range";
+import { addDays, mondayOf, zonedToInstant } from "./range";
 
 const LOCALE = "es-AR";
 
@@ -60,7 +60,19 @@ export function formatRangeLabel(view: CalendarView, isoDate: string, tz: string
       return capitalize(formatMonthYear(isoDate, tz));
     case "year":
       return isoDate.slice(0, 4);
+    case "planning": {
+      // La ventana anclada al lunes que arma `viewBounds("planning", ...)`.
+      // Se recomputa acá y no se recibe por parámetro para que el toolbar no
+      // tenga que conocer la lógica de anclaje.
+      const start = mondayOf(isoDate);
+      const end = addDays(start, 27); // inclusivo, para el rango legible
+      return `${shortDate(start)} – ${shortDate(end)}`;
+    }
   }
+}
+
+function shortDate(isoDate: string): string {
+  return `${Number(isoDate.slice(8, 10))}/${Number(isoDate.slice(5, 7))}`;
 }
 
 /** `L M M J V S D`, starting on Monday. */

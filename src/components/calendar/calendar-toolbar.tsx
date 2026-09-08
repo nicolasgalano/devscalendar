@@ -12,6 +12,7 @@ const VIEWS: { value: CalendarView; label: string }[] = [
   { value: "year", label: "Año" },
   { value: "month", label: "Mes" },
   { value: "day", label: "Día" },
+  { value: "planning", label: "Planificación" },
 ];
 
 const GROUPS = [

@@ -8,6 +8,7 @@ import { CalendarPendingProvider, CalendarResults } from "@/components/calendar/
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { DayView } from "@/components/calendar/day-view";
 import { MonthView } from "@/components/calendar/month-view";
+import { PlanningView } from "@/components/calendar/planning-view";
 import { YearView } from "@/components/calendar/year-view";
 import { EmptyState, NoResultsState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -16,9 +17,11 @@ import { getBookingFormOptions } from "@/lib/bookings/options";
 import type { BookingViewer } from "@/lib/bookings/permissions";
 import { deriveFacets } from "@/lib/calendar/facets";
 import { aggregateDayLoad } from "@/lib/calendar/load";
+import { buildPlanningMatrix, computeDevDayLoad } from "@/lib/calendar/planning";
 import {
   getBookingsInRange,
   getDayLoad,
+  getDevDayLoad,
   getFilterFacets,
   getSelectedFilterNames,
   type SelectedFilterNames,
@@ -104,9 +107,7 @@ export default async function CalendarPage({
   const viewer: BookingViewer | null = profile ? { id: profile.id, roles: profile.roles } : null;
 
   const [content, facets, options] = await Promise.all([
-    params.view === "day"
-      ? renderDay()
-      : renderAggregated(params.view === "month" ? "month" : "year"),
+    renderView(),
     getFacets(),
     getBookingFormOptions(supabase, viewer),
   ]);
@@ -149,9 +150,27 @@ export default async function CalendarPage({
     return deriveFacets(rows, params.filters);
   }
 
+  async function renderView(): Promise<ViewContent> {
+    switch (params.view) {
+      case "day":
+        return renderDay();
+      case "planning":
+        return renderPlanning();
+      case "month":
+        return renderAggregated("month");
+      case "year":
+        return renderAggregated("year");
+    }
+  }
+
   async function renderDay(): Promise<ViewContent> {
     const bookings = await getBookingsInRange(supabase, { range, filters: params.filters });
-    if (bookings.length === 0) return emptyOrNoResults();
+    // Con filtros aplicados el "sin resultados" sigue nombrando el filtro:
+    // una jornada vacía y muda no aclara si el filtro está escondiendo la
+    // agenda o si el día es genuinamente libre.
+    if (bookings.length === 0 && hasActiveFilters(params.filters)) {
+      return emptyOrNoResults();
+    }
 
     return {
       state: "data",
@@ -167,6 +186,52 @@ export default async function CalendarPage({
     };
   }
 
+  async function renderPlanning(): Promise<ViewContent> {
+    // Dos queries en paralelo: la principal está filtrada por el usuario y
+    // arma la matriz; la de sobrecarga es sin filtros de entidad (plan §5).
+    // Mezclar las dos en una sola query obligaría a duplicar filas y a mentir
+    // sobre la sobrecarga cuando hay un filtro activo — que es exactamente
+    // R-1.
+    const [bookings, devDayLoad] = await Promise.all([
+      getBookingsInRange(supabase, { range, filters: params.filters }),
+      getDevDayLoad(supabase, range),
+    ]);
+
+    // Cuando hay filtros aplicados que no matchean se sigue mostrando el
+    // "sin resultados" que nombra el filtro: un grid vacío ahí sería
+    // engañoso — no aclara si el filtro está escondiendo cosas o si
+    // realmente no hay reservas. El vacío estructural es honesto solo
+    // cuando no hay filtro que culpar.
+    if (bookings.length === 0 && hasActiveFilters(params.filters)) {
+      return emptyOrNoResults();
+    }
+
+    const [from, to] = viewBounds("planning", params.date);
+    const days = eachDay(from, to);
+    const rows = buildPlanningMatrix(bookings, days, TIMEZONE);
+    const overload = computeDevDayLoad(devDayLoad, days, TIMEZONE);
+    const bookingsById = new Map(bookings.map((booking) => [booking.id, booking]));
+
+    // Sin filtros y sin filas se renderiza la grilla igual, con la cabecera
+    // de las 4 semanas y sin filas de datos: el PM ve la estructura y el
+    // rango en el que está parado. Es lo que Google Calendar hace con un
+    // mes sin eventos, y es más útil que un cartel.
+    return {
+      state: "data",
+      node: (
+        <PlanningView
+          rows={rows}
+          days={days}
+          devDayLoad={devDayLoad}
+          bookings={bookingsById}
+          overload={overload}
+          params={params}
+          tz={TIMEZONE}
+        />
+      ),
+    };
+  }
+
   async function renderAggregated(view: "month" | "year"): Promise<ViewContent> {
     const { spans, devCount } = await getDayLoad(supabase, { range, filters: params.filters });
     const [from, to] = viewBounds(view, params.date);
@@ -177,7 +242,13 @@ export default async function CalendarPage({
       devCount,
     });
 
-    if (spans.length === 0) return emptyOrNoResults();
+    // Sin filtros, un mes o año sin reservas se muestra igual: la grilla ya
+    // sabe dibujar días vacíos y así el PM ve la estructura y puede navegar.
+    // El cartel se reserva para cuando el filtro esconde algo — es la única
+    // información que un vacío estructural no puede transmitir.
+    if (spans.length === 0 && hasActiveFilters(params.filters)) {
+      return emptyOrNoResults();
+    }
 
     return {
       state: "data",

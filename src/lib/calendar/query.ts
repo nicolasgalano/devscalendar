@@ -52,6 +52,22 @@ export type DayLoadData = {
   devCount: number;
 };
 
+/**
+ * One booking span keyed by dev, for the planning-view overload computation.
+ *
+ * `projectId` / `projectName` travel here because the tooltip on an overloaded
+ * cell has to name the projects that contribute to it — including projects the
+ * current filter hides. Without the name the outline becomes an unexplained
+ * mark and the whole `plan.md` R-1 mitigation collapses.
+ */
+export type DevDayLoadRow = {
+  devId: string;
+  projectId: string;
+  projectName: string;
+  startsAt: string;
+  endsAt: string;
+};
+
 // `dev:profiles!bookings_dev_id_fkey` — bookings points at profiles twice
 // (dev_id and created_by), so PostgREST needs the constraint name to know which
 // relationship to follow.
@@ -325,6 +341,40 @@ export async function getSelectedFilterNames(
     dev: personName(filters.devId),
     pm: personName(filters.pmId),
   };
+}
+
+/**
+ * Every dev-day booking span in the range, ignoring **all** user filters.
+ *
+ * The planning view needs this to compute overload correctly: if a PM filtered
+ * by their own client, an overload check that only looked at the filtered
+ * bookings would report every dev under 8h — because the other clients' work
+ * lives outside the array. That is the exact bug the view exists to prevent
+ * (`plan.md` §5, R-1). Anything status-terminal (`rejected`, `cancelled`,
+ * `displaced`) is excluded because no commitment remains.
+ *
+ * Reads through RLS on `bookings` (Q-5: every role can select), which is what
+ * makes the unfiltered read safe.
+ */
+export async function getDevDayLoad(
+  supabase: Client,
+  { from, to }: CalendarRange,
+): Promise<DevDayLoadRow[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("dev_id, starts_at, ends_at, project:projects!inner (id, name)")
+    .lt("starts_at", to)
+    .gt("ends_at", from)
+    .in("status", ["approved", "pending"]);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    devId: row.dev_id,
+    projectId: row.project.id,
+    projectName: row.project.name,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+  }));
 }
 
 /** Capacity denominator for the occupancy ramp — see `DayLoadData.devCount`. */

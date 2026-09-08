@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { projectPrioritySchema } from "./projects";
 
-export const calendarViewSchema = z.enum(["year", "month", "day"]);
+export const calendarViewSchema = z.enum(["year", "month", "day", "planning"]);
 export const calendarGroupSchema = z.enum(["dev", "project"]);
 
 /** The five states of the functional spec §5.2. */

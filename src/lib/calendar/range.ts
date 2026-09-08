@@ -132,6 +132,19 @@ export function startOfYear(isoDate: string): string {
   return `${isoDate.slice(0, 4)}-01-01`;
 }
 
+/**
+ * Monday of the ISO week that contains `isoDate`.
+ *
+ * Parsed as UTC on purpose: the input is already a wall-clock calendar date, so
+ * shifting it by the runtime's local offset would move the week by a day in
+ * negative-offset zones — the same trap `isWeekend` documents in `workdays.ts`.
+ */
+export function mondayOf(isoDate: string): string {
+  const day = new Date(`${isoDate}T00:00:00Z`).getUTCDay(); // 0=dom, 1=lun, ...
+  const offset = day === 0 ? -6 : 1 - day;
+  return addDays(isoDate, offset);
+}
+
 /** Every calendar date in `[from, to)`, as `YYYY-MM-DD`. */
 export function eachDay(fromIsoDate: string, toIsoDateExclusive: string): string[] {
   const days: string[] = [];
@@ -167,6 +180,13 @@ export function viewBounds(view: CalendarView, isoDate: string): [string, string
       const start = startOfYear(isoDate);
       return [start, addYears(start, 1)];
     }
+    case "planning": {
+      // 4 semanas ancladas al lunes de la semana de `isoDate`. La URL guarda la
+      // fecha sin normalizar (`plan.md` §8.2), así que la normalización pasa
+      // acá y en ningún otro lado.
+      const start = mondayOf(isoDate);
+      return [start, addDays(start, 28)];
+    }
   }
 }
 
@@ -196,6 +216,8 @@ export function shiftDate(view: CalendarView, isoDate: string, steps: number): s
       return addMonths(startOfMonth(isoDate), steps);
     case "year":
       return addYears(startOfYear(isoDate), steps);
+    case "planning":
+      return addDays(mondayOf(isoDate), steps * 28);
   }
 }
 

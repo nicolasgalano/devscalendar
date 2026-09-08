@@ -6,9 +6,11 @@ import {
   DEFAULT_DAY_WINDOW,
   daysInMonth,
   instantToIsoDate,
+  mondayOf,
   monthsInYear,
   resolveRange,
   shiftDate,
+  viewBounds,
   visibleDayWindow,
   zonedToInstant,
 } from "@/lib/calendar/range";
@@ -90,6 +92,49 @@ describe("shiftDate", () => {
     // Desde el 31, avanzar y retroceder tiene que volver al mismo mes.
     expect(shiftDate("month", "2026-01-31", 1)).toBe("2026-02-01");
     expect(shiftDate("month", shiftDate("month", "2026-01-31", 1), -1)).toBe("2026-01-01");
+  });
+
+  it("moves the planning window by 4 weeks anchored to the Monday", () => {
+    // Miércoles 2026-05-13 → lunes 2026-05-11 → 4 semanas después = 2026-06-08.
+    expect(shiftDate("planning", "2026-05-13", 1)).toBe("2026-06-08");
+    expect(shiftDate("planning", "2026-05-13", -1)).toBe("2026-04-13");
+  });
+});
+
+describe("mondayOf", () => {
+  it("returns the same date when it is already a Monday", () => {
+    // 2026-08-03 es lunes.
+    expect(mondayOf("2026-08-03")).toBe("2026-08-03");
+  });
+
+  it("moves back to the previous Monday from mid-week", () => {
+    // 2026-08-05 es miércoles.
+    expect(mondayOf("2026-08-05")).toBe("2026-08-03");
+  });
+
+  it("moves back 6 days from a Sunday, not forward 1", () => {
+    // Sin el caso especial, `getUTCDay === 0` derivaría en `offset = 1` y
+    // avanzaría a la próxima semana. La ISO week arranca en lunes.
+    expect(mondayOf("2026-08-09")).toBe("2026-08-03");
+  });
+
+  it("crosses month boundaries", () => {
+    // 2026-05-01 es viernes → lunes 2026-04-27.
+    expect(mondayOf("2026-05-01")).toBe("2026-04-27");
+  });
+
+  it("crosses year boundaries", () => {
+    // 2027-01-01 es viernes → lunes 2026-12-28.
+    expect(mondayOf("2027-01-01")).toBe("2026-12-28");
+  });
+});
+
+describe("viewBounds(planning)", () => {
+  it("spans exactly 28 days from the Monday of the anchor week", () => {
+    // Miércoles 2026-05-13 → lunes 2026-05-11 → 4 semanas.
+    const [from, to] = viewBounds("planning", "2026-05-13");
+    expect(from).toBe("2026-05-11");
+    expect(to).toBe("2026-06-08");
   });
 });
 
