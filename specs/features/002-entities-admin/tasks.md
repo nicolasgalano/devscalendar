@@ -79,7 +79,7 @@ Levantada auditando los AC de esta feature contra el código, más lo que report
 el usuario ese día sobre `/admin/users`. **Nada de esto se salda sin OK
 explícito** — el registro central es `docs/deuda-tecnica.md`.
 
-- [ ] **D-03** — **`profiles.primary_pm_id` quedó a medio implementar.** AC-3.2
+- [x] **D-03** — **`profiles.primary_pm_id` quedó a medio implementar.** AC-3.2
       (`spec.md:44`) pide dos cosas y solo se hizo una: la columna existe, se
       edita y se valida (`00000000000002_profile_invites_and_primary_pm.sql:14`,
       `src/app/api/users/[id]/route.ts:26-46`), pero **ningún otro código la
@@ -96,7 +96,7 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
     calendario, más invasivo y a contramano de que hoy se muestre al equipo
     entero a propósito; (3) **sacarlo entero**, si el equipo no lo usa: es una
     FK, una validación y un campo de formulario que mantener a cambio de nada.
-- [ ] **D-04** — **`SelectValue` sin hijos imprime el valor crudo.** Es **el mismo
+- [x] **D-04** — **`SelectValue` sin hijos imprime el valor crudo.** Es **el mismo
       bug que `004` T3.1 ya encontró y arregló** en `BookingDialog`; el arreglo
       nunca volvió sobre las pantallas de `002`, que son donde nació.
       `SelectValue` es `Select.Value` de Base UI sin hijos
@@ -121,7 +121,7 @@ explícito** — el registro central es `docs/deuda-tecnica.md`.
     `ROLE_LABEL` y `pmLabel()` ya existen en `users-table.tsx:52,58` y hoy solo
     se usan para la tabla.
 
-- [ ] **D-05** — **`readJsonBody()` falta en los seis handlers de esta feature.**
+- [x] **D-05** — **`readJsonBody()` falta en los seis handlers de esta feature.**
       Era F5 de `004`; **le corresponde a `002`**, que es la dueña de las rutas.
       `CLAUDE.md` es explícito: el body se lee con `readJsonBody()` y nunca con
       `request.json()` directo, porque este tira ante un body vacío o mal formado

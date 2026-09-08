@@ -117,7 +117,7 @@ misma omisión que D-01 de `001`, en chico, y conviene saldarlas con ella.
       (`src/app/api/bookings/[id]/route.ts:100-104`). O sea: no se puede _crear_
       una reserva para un dev desactivado, pero sí _mover_ una existente encima
       de él.
-- [ ] **D-08** — **Nada impide reservar sobre un proyecto desactivado.**
+- [x] **D-08** — **Nada impide reservar sobre un proyecto desactivado.**
       `getBookingOptions()` filtra `.eq("active", true)`
       (`src/lib/bookings/options.ts:44`), así que el desplegable no los ofrece —
       pero ni la API ni `can_manage_booking()` (`00000000000006:44`) verifican

@@ -22,6 +22,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 010 | Notifications & audit log                         | draft  | 004, 005, 006      | §7, §12             |
 | 011 | Planning view (grilla semanal de carga)           | draft  | 003, 004, 005, 006 | §4, §12             |
 | 012 | Roles múltiples y `active` con dientes            | done   | 001, 002           | §3, §12 (seguridad) |
+| 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
 
 ## Orden sugerido de implementación
 
@@ -39,7 +40,7 @@ Basado en dependencias y valor incremental:
 10. **009-slack-integration** — última porque combina lo de notifications con la asociación de canales.
 11. **011-planning-view** — vista de planificación semanal (grilla cliente > proyecto > dev × días). **Paralelizable con las integraciones** porque solo lee bookings y no depende de `010`. Va después de `006` porque consume el estado `displaced` en el popover, pero no lo bloquea.
 
-**Fuera de esta lista, porque no salió de la spec funcional sino del registro de deuda:** `012-multiple-roles-and-active-enforcement`, hecha el 2026-09-08 para saldar D-09 y D-01. Es prerequisito de `010` — sin ella las notificaciones salen hacia un `pm_id` que puede no ser quien lleva el proyecto.
+**Fuera de esta lista, porque no salieron de la spec funcional sino del registro de deuda:** `012-multiple-roles-and-active-enforcement` y `013-registered-debt-cleanup`, las dos del 2026-09-08. `012` es prerequisito de `010` —sin ella las notificaciones salen hacia un `pm_id` que puede no ser quien lleva el proyecto— y `013` cerró todo lo demás salvo D-06.
 
 Este orden se revisa cuando haya feedback del cliente o cambien las prioridades.
 
@@ -50,15 +51,16 @@ Este orden se revisa cuando haya feedback del cliente o cambien las prioridades.
 Aparte de las preguntas de abajo —que son decisiones del cliente— hay deuda
 **técnica** conocida: nueve puntos levantados el 2026-09-07 —ocho auditando los
 seis `tasks.md` cerrados contra el código, y D-09 de una conversación del mismo
-día—, **de los que quedan seis abiertos**: D-01, D-07 y D-09 se saldaron el
-2026-09-08 con `012`. Viven en
+día—, **de los que queda uno solo abierto**: las otras ocho se saldaron el
+2026-09-08, tres con `012` y cinco con `013`. Viven en
 [`docs/deuda-tecnica.md`](../../docs/deuda-tecnica.md), con archivo y línea, y
 repetidos en la sección "Deuda registrada" del `tasks.md` de cada feature.
 
-**No se saldan sin OK explícito del usuario.** De las seis que quedan, la única
-que es gate antes del primer usuario real es **D-06**: verificar en el navegador
-los permisos de `/admin/*`, que es la parte de esa deuda que ningún test
-reemplaza. Las otras cinco no bloquean nada.
+**No se saldan sin OK explícito del usuario.** La que queda es **D-06**, que es
+gate antes del primer usuario real: confirmar en el navegador los permisos de
+`/admin/*` con una cuenta de Google real. Todo lo automatizable de esa deuda ya
+está cubierto por tests; lo que falta no lo puede hacer una suite, porque las
+fixtures plantan la cookie de sesión en vez de pasar por OAuth.
 
 ---
 

@@ -204,6 +204,58 @@ test.describe("admin entity management", () => {
   });
 
   /**
+   * D-06 — feature 013. Achica lo que quedaba de esa deuda: hasta acá el único
+   * no-admin probado era un developer sobre `/admin/clients`, y la denuncia
+   * original del usuario era sobre `/admin/users`. Ahora se prueban las tres
+   * pantallas con un PM, que es el rol con más permisos de los que no son
+   * admin, y además los tres handlers.
+   *
+   * Lo que **no** puede cubrir ningún test de acá: las fixtures plantan la
+   * cookie de sesión (`session.ts`) en vez de pasar por Google, así que "una
+   * persona real entra y ve lo que corresponde" sigue necesitando ojos.
+   */
+  test("keeps a PM out of every admin screen and every admin handler", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    const projectManager = await createUser("pm");
+    try {
+      await authenticate(context, projectManager);
+
+      for (const path of ["/admin/users", "/admin/projects", "/admin/clients"]) {
+        await page.goto(path);
+        await expect(page).toHaveURL(/\/calendar/);
+      }
+
+      await expect(page.getByRole("link", { name: "Usuarios" })).toHaveCount(0);
+
+      const statuses = await page.evaluate(async () => {
+        const post = (url: string, body: unknown) =>
+          fetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }).then((response) => response.status);
+
+        return Promise.all([
+          post("/api/clients", { name: "no deberia crearse" }),
+          post("/api/projects", {
+            name: "no deberia crearse",
+            clientId: crypto.randomUUID(),
+            pmId: crypto.randomUUID(),
+          }),
+          post("/api/users", { email: "no@example.com", roles: ["developer"] }),
+        ]);
+      });
+
+      expect(statuses).toEqual([403, 403, 403]);
+    } finally {
+      await deleteUser(projectManager.userId);
+    }
+  });
+
+  /**
    * AC-3.1 / D-01 — desactivar a alguien le saca el acceso de verdad. Hasta
    * `012`, un admin desactivado conservaba `/api/*` entero: el único chequeo de
    * `active` vivía en un layout de UI, y las rutas de API no tienen layout.

@@ -56,10 +56,9 @@ function pmLabel(pm: Pm) {
  * `012` / D-09: los roles son un conjunto, así que el control es una casilla por
  * rol y no un desplegable.
  *
- * De paso se lleva puestos **dos de los seis casos de D-04**: el `<SelectValue>`
- * sin hijos que imprimía `developer` en vez de `Developer` desaparece con el
- * `Select`. Los otros cuatro —PM primario acá, y los tres de `projects-table`—
- * siguen ahí y son deuda aparte.
+ * De paso se llevó puestos **dos de los seis casos de D-04**: el `<SelectValue>`
+ * sin hijos que imprimía `developer` en vez de `Developer` desapareció con el
+ * `Select`. Los otros cuatro se arreglaron en `013`.
  *
  * El mensaje de "al menos uno" se muestra en lugar de deshabilitar en silencio:
  * un botón gris sin explicación es la forma más rápida de que alguien crea que
@@ -216,15 +215,12 @@ export function UsersTable({
               <TableHead>Email</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Rol</TableHead>
-              <TableHead>PM primario</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {profiles.map((profile) => {
-              const primaryPm = pms.find((pm) => pm.id === profile.primary_pm_id);
-              return (
+            {profiles.map((profile) => (
                 <TableRow key={profile.id}>
                   <TableCell className={cn(!profile.active && "text-muted-foreground")}>
                     {profile.email}
@@ -239,7 +235,6 @@ export function UsersTable({
                   >
                     {formatRoles(profile.roles) ?? "Sin rol"}
                   </TableCell>
-                  <TableCell>{primaryPm ? pmLabel(primaryPm) : "—"}</TableCell>
                   <TableCell>
                     <RecordStatus active={profile.active} />
                   </TableCell>
@@ -249,8 +244,7 @@ export function UsersTable({
                     </Button>
                   </TableCell>
                 </TableRow>
-              );
-            })}
+            ))}
           </TableBody>
         </Table>
       )}
@@ -324,7 +318,15 @@ export function UsersTable({
                 onValueChange={(value) => setEditPrimaryPmId(value as string)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  {/* D-04: `SelectValue` sin hijos imprime el **valor** —acá un
+                      uuid, o el literal `__none__`—, no el texto del item. */}
+                  <SelectValue>
+                    {editPrimaryPmId === NO_PRIMARY_PM
+                      ? "Ninguno"
+                      : (pms.find((pm) => pm.id === editPrimaryPmId)?.full_name ??
+                        pms.find((pm) => pm.id === editPrimaryPmId)?.email ??
+                        "Ninguno")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_PRIMARY_PM}>Ninguno</SelectItem>

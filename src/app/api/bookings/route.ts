@@ -21,6 +21,24 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const { supabase, userId } = guard;
 
+  // D-08, saldada en `013`: el desplegable ya filtraba los proyectos
+  // desactivados, pero con el id a mano se reservaba igual. La garantía dura es
+  // el `with check` de `bookings: manager insert`; esto está para que el motivo
+  // se lea, porque la policy filtra sin explicar cuál de las dos condiciones
+  // falló.
+  const { data: project } = await supabase
+    .from("projects")
+    .select("active")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (!project?.active) {
+    return NextResponse.json(
+      { error: "Ese proyecto está desactivado" },
+      { status: 400 },
+    );
+  }
+
   // Mismo criterio que `projects.pm_id` en 002: Postgres no puede exigir que la
   // FK apunte a un profile con cierto rol, así que se valida acá.
   const { data: dev } = await supabase

@@ -10,6 +10,7 @@ import {
   isPm,
   sortRoles,
 } from "@/lib/auth/roles";
+import { sortDevsByPrimaryPm } from "@/lib/bookings/options";
 import { canCreateBookings, canManageProject } from "@/lib/bookings/permissions";
 
 /**
@@ -86,5 +87,47 @@ describe("permissions with more than one role", () => {
     expect(canCreateBookings({ id: "yo", roles: [] })).toBe(false);
     expect(canManageProject({ id: "yo", roles: [] }, ownProject)).toBe(false);
     expect(canManageProject(null, ownProject)).toBe(false);
+  });
+});
+
+/**
+ * T4.1 — feature 013 / D-03. AC-3.2 de `002` pedía dos cosas y solo se había
+ * hecho una: la columna existía y se editaba, pero ningún código la leía.
+ */
+describe("sortDevsByPrimaryPm", () => {
+  const devs = [
+    { id: "ana", primaryPmId: "otro-pm" },
+    { id: "beto", primaryPmId: "pm-1" },
+    { id: "caro", primaryPmId: null },
+    { id: "dani", primaryPmId: "pm-1" },
+  ];
+
+  it("puts the viewer's own developers first, keeping the incoming order", () => {
+    const sorted = sortDevsByPrimaryPm(devs, { id: "pm-1", isAdmin: false });
+
+    expect(sorted.map((dev) => dev.id)).toEqual(["beto", "dani", "ana", "caro"]);
+  });
+
+  it("hides nobody — it is an order, not a filter", () => {
+    // AC-2.3, y es la mitad que importa: el AC original dice "candidato
+    // natural", no "único candidato", y Q-B ya dijo que el dev es transversal.
+    const sorted = sortDevsByPrimaryPm(devs, { id: "pm-1", isAdmin: false });
+
+    expect(sorted).toHaveLength(devs.length);
+    expect(new Set(sorted.map((dev) => dev.id))).toEqual(new Set(devs.map((dev) => dev.id)));
+  });
+
+  it("leaves the list alone for a PM who has no developers of their own", () => {
+    const sorted = sortDevsByPrimaryPm(devs, { id: "pm-sin-devs", isAdmin: false });
+
+    expect(sorted.map((dev) => dev.id)).toEqual(devs.map((dev) => dev.id));
+  });
+
+  it("does not reorder for an admin", () => {
+    // AC-2.2: no tiene devs propios, y un orden que cambia según quién mira sin
+    // que nada lo anuncie es peor que el alfabético.
+    const sorted = sortDevsByPrimaryPm(devs, { id: "pm-1", isAdmin: true });
+
+    expect(sorted.map((dev) => dev.id)).toEqual(devs.map((dev) => dev.id));
   });
 });

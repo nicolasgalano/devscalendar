@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api/read-json";
 import { requireAdmin } from "@/lib/api/require-admin";
 import { updateClientSchema } from "@/lib/validation/clients";
 
@@ -12,7 +13,7 @@ export async function PATCH(
   const { supabase } = guard;
   const { id } = await params;
 
-  const parsed = updateClientSchema.safeParse(await request.json());
+  const parsed = updateClientSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Datos inválidos", issues: parsed.error.flatten() },

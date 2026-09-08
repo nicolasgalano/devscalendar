@@ -33,6 +33,8 @@ Es la feature 0 del MVP: sin identidad no hay reservas, ni filtros, ni auditorí
 - **AC-1.1** — Given un usuario no autenticado, when accede a cualquier ruta protegida, then es redirigido al login.
 - **AC-1.2** — Given un usuario que hace login con Google exitosamente, when el email corresponde a un usuario dado de alta en el sistema, then queda logueado y ve la home según su rol.
 - **AC-1.3** — Given un login exitoso con un email que **no** está dado de alta, then se muestra un mensaje claro ("tu cuenta no está autorizada, contactá a un admin") y no queda sesión iniciada.
+  - **Desvío, registrado el 2026-09-08 (D-02).** Lo implementado **deja la sesión abierta** y manda a `/pending-access` (`src/app/pending-access/page.tsx`). Es la decisión correcta y no un descuido: sin sesión no se sabe a quién mostrarle el cartel ni qué email nombrar, y cerrarla obligaría a un segundo login apenas un admin lo diera de alta. La mitad del AC que sí se cumple es la que importa —no se accede a nada— y desde `013` eso incluye **no poder leer los maestros**: las policies de `select` de `clients` y `projects` pasaron de `using (true)` a exigir rol.
+  - Este desvío es el que volvía alcanzable a **F7 de `003`**, y por eso las dos se saldaron juntas. Antes de `013`, cualquiera que completara el OAuth leía por API la lista de clientes y proyectos de la empresa.
 
 ### US-2
 

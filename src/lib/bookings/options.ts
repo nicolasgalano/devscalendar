@@ -53,7 +53,7 @@ export async function getBookingFormOptions(
     projectsQuery,
     supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, primary_pm_id")
       .contains("roles", ["developer"])
       .eq("active", true),
   ]);
@@ -74,8 +74,42 @@ export async function getBookingFormOptions(
       .sort(byName),
     // Same fallback as the calendar: a teammate who signed in with Google and
     // has no display name yet is still bookable, by email.
-    devs: (devs.data ?? [])
-      .map((dev) => ({ id: dev.id, name: dev.full_name ?? dev.email }))
-      .sort(byName),
+    //
+    // Alfabético primero y recién después el reagrupado por PM primario: el
+    // orden dentro de cada grupo tiene que seguir siendo el de siempre.
+    devs: sortDevsByPrimaryPm(
+      (devs.data ?? [])
+        .map((dev) => ({
+          id: dev.id,
+          name: dev.full_name ?? dev.email,
+          primaryPmId: dev.primary_pm_id,
+        }))
+        .sort(byName),
+      { id: viewer!.id, isAdmin: isAdmin(viewer!.roles) },
+    ).map(({ id, name }) => ({ id, name })),
   };
+}
+
+/**
+ * D-03 / AC-3.2 de `002`: el desarrollador que tiene a este PM como PM primario
+ * es su **candidato natural**, así que va primero.
+ *
+ * **Es un orden y no un filtro**, y esa es la mitad que importa: el AC dice
+ * "candidato natural", no "único candidato". Q-B ya está respondida —el dev es
+ * transversal— así que esconder a los demás sería contradecirla. Cada grupo
+ * conserva el orden alfabético con el que llega.
+ *
+ * **Al admin no se le reordena** (AC-2.2): no tiene devs propios, y una lista
+ * cuyo orden cambia según quién mira, sin que nada lo anuncie, es peor que la
+ * alfabética de siempre.
+ */
+export function sortDevsByPrimaryPm<T extends { primaryPmId: string | null }>(
+  devs: T[],
+  viewer: { id: string; isAdmin: boolean },
+): T[] {
+  if (viewer.isAdmin) return devs;
+  return [
+    ...devs.filter((dev) => dev.primaryPmId === viewer.id),
+    ...devs.filter((dev) => dev.primaryPmId !== viewer.id),
+  ];
 }

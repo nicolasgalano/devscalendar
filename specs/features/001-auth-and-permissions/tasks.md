@@ -98,7 +98,7 @@ explícito del usuario** — ver `docs/deuda-tecnica.md`, que es el registro cen
     cambia de golpe el comportamiento de **todas** las policies que lo usan.
     Necesita tests de integración que **lean la fila de vuelta**, no que miren el
     código de error (la lección de `004` T4.2).
-- [ ] **D-02** — **AC-1.3 salió reinterpretada y el desvío nunca se registró.** El
+- [x] **D-02** — **AC-1.3 salió reinterpretada y el desvío nunca se registró.** El
       AC (`spec.md:35`) pide que un email no dado de alta **no deje sesión
       iniciada**; lo implementado deja la sesión abierta y muestra
       `/pending-access`. Es la decisión correcta —sin sesión no se sabe a quién

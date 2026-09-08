@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api/read-json";
 import { requireAdmin } from "@/lib/api/require-admin";
 import { isPm } from "@/lib/auth/roles";
 import { createProjectSchema } from "@/lib/validation/projects";
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const { supabase } = guard;
 
-  const parsed = createProjectSchema.safeParse(await request.json());
+  const parsed = createProjectSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Datos inválidos", issues: parsed.error.flatten() },

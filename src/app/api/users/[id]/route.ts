@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api/read-json";
 import { requireAdmin } from "@/lib/api/require-admin";
 import { isPm } from "@/lib/auth/roles";
 import { updateUserSchema } from "@/lib/validation/users";
@@ -10,7 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { supabase } = guard;
   const { id } = await params;
 
-  const parsed = updateUserSchema.safeParse(await request.json());
+  const parsed = updateUserSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Datos inválidos", issues: parsed.error.flatten() },

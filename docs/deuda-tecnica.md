@@ -30,13 +30,13 @@ primera persona real**, y están marcadas así.
 | #        | Deuda                                                                                                                      | Feature | Gate                                    |
 | :------- | :------------------------------------------------------------------------------------------------------------------------- | :------ | :-------------------------------------- |
 | ~~D-01~~ | ~~`active = false` solo se aplica en la UI, no en la API ni en la RLS~~                                                    | 001     | **saldada 2026-09-08** (`012`)          |
-| D-02     | AC-1.3 salió reinterpretada y nunca se registró el desvío                                                                  | 001     | no bloquea                              |
-| D-03     | `profiles.primary_pm_id` quedó a medio implementar                                                                         | 002     | no bloquea                              |
-| D-04     | `SelectValue` sin hijos imprime el valor crudo en `/admin/*`                                                               | 002     | no bloquea, pero se ve                  |
-| D-05     | `readJsonBody()` falta en los seis handlers de `002`                                                                       | 002     | no bloquea                              |
-| D-06     | Verificar en el navegador los permisos de `/admin/*` — E2E y RLS ya verificados el 2026-09-07; **queda solo el navegador** | 002     | **antes de usuarios reales**            |
+| ~~D-02~~ | ~~AC-1.3 salió reinterpretada y nunca se registró el desvío~~ (con F7 de `003`)                                                                  | 001     | **saldada 2026-09-08** (`013`)  |
+| ~~D-03~~ | ~~`profiles.primary_pm_id` quedó a medio implementar~~ → salida (1): orden, no filtro                                                                         | 002     | **saldada 2026-09-08** (`013`)  |
+| ~~D-04~~ | ~~`SelectValue` sin hijos imprime el valor crudo en `/admin/*`~~                                                               | 002     | **saldada 2026-09-08** (`013`)  |
+| ~~D-05~~ | ~~`readJsonBody()` falta en los seis handlers de `002`~~                                                                       | 002     | **saldada 2026-09-08** (`013`)  |
+| D-06     | Verificar en el navegador los permisos de `/admin/*` — **lo único que queda abierto**; los tests ya cubren todo lo automatizable | 002     | **antes de usuarios reales**            |
 | ~~D-07~~ | ~~El `PATCH` de reservas no chequea el `active` del desarrollador~~                                                        | 004     | **saldada 2026-09-08 con D-01** (`012`) |
-| D-08     | Nada impide reservar sobre un proyecto desactivado                                                                         | 004     | no bloquea                              |
+| ~~D-08~~ | ~~Nada impide reservar sobre un proyecto desactivado~~                                                                         | 004     | **saldada 2026-09-08** (`013`)  |
 | ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
 
 ---
@@ -462,3 +462,59 @@ es un chequeo más adentro de esa función.
 **Y lo que esto le deja a D-06:** la verificación manual en el navegador sigue
 pendiente, y ahora tiene un caso más que valía la pena probar de todos modos —un
 usuario desactivado— que el E2E nuevo ya cubre automáticamente.
+
+---
+
+## Saldadas — 2026-09-08, segunda tanda
+
+**D-02, D-03, D-04, D-05 y D-08** se saldaron con
+`013-registered-debt-cleanup`, con OK explícito. **Queda D-06 y nada más**, y de
+D-06 queda solo lo que ninguna suite puede hacer.
+
+**D-02 y F7 de `003`, que eran la misma cosa.** El desvío de AC-1.3 quedó
+registrado en `001/spec.md`: la sesión sobrevive al login sin alta **a
+propósito**, porque sin sesión no se sabe a quién mostrarle el cartel de
+`/pending-access` ni qué email nombrar. Y su consecuencia se cerró: las policies
+de `select` de `clients` y `projects` pasaron de `using (true)` a
+`has_any_role()`, así que completar el OAuth de Google dejó de ser, por sí solo,
+acceso a la lista de clientes y proyectos de la empresa. Las cuatro tablas
+—`bookings`, `profiles`, `clients`, `projects`— quedaron detrás del mismo
+criterio.
+
+**D-03 — se eligió la salida (1) de las tres que la entrada dejaba escritas:
+orden, no filtro.** `getBookingOptions()` pone primero a los devs que tienen al
+PM que abre el diálogo como PM primario. **Nadie desaparece de la lista**, que es
+la mitad que importa: el AC dice "candidato natural", no "único candidato", y
+Q-B ya había respondido que el dev es transversal. Al admin no se le reordena: no
+tiene devs propios. Y la columna "PM primario" salió de la tabla de
+`/admin/users`, como el usuario había pedido; el campo sigue en el diálogo.
+
+**D-04 — los cuatro que quedaban.** `012` se había llevado dos al matar el
+`Select` de rol. Los otros cuatro —PM primario, cliente, PM responsable y
+prioridad— ahora resuelven el texto adentro de `<SelectValue>`. El de prioridad
+era el peor: sus opciones ya decían `Común` y `Prioritario`, y solo el trigger
+volvía al vocabulario de la base.
+
+**D-05 — `readJsonBody()` en los seis handlers.** Un body vacío o mal formado
+responde 400 y deja de registrarse como una falla del servidor.
+
+**D-08 — un proyecto desactivado no acepta reservas nuevas.** El chequeo vive en
+el `with check` de `bookings: manager insert`, **no** en `can_manage_booking()`,
+y esa es la decisión de diseño que importa: esa función la comparten la policy de
+insert, la de update y `reallocate_booking()`, así que ponerlo ahí habría
+congelado también las reservas existentes del proyecto dado de baja — justo lo
+que su PM necesita poder cancelar. Desactivar bloquea historia nueva; no congela
+la vieja. Hay un test para cada mitad.
+
+### Lo que queda de D-06
+
+Solo la pasada manual con una cuenta de Google real. Lo demás está cubierto:
+
+- El E2E de un developer contra `/admin/clients` (verde desde el 2026-09-07).
+- Tres casos de RLS sobre `profiles` (2026-09-07).
+- Un admin **desactivado** que rebota y recibe 403 (`012`).
+- Un **PM** contra las tres pantallas de `/admin/*` y los tres handlers (`013`).
+
+Lo que no se puede automatizar es el login: las fixtures plantan la cookie de
+sesión (`tests/e2e/session.ts`) en vez de pasar por el OAuth de Google. El guion
+paso a paso sigue en la sección de D-06.

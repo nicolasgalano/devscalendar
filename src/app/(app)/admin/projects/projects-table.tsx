@@ -57,6 +57,13 @@ type ProjectFormState = {
   slackEnabled: boolean;
 };
 
+// §11: el vocabulario del PM, en un solo lugar. Las opciones del desplegable y
+// su trigger tienen que decir lo mismo — que no lo dijeran era D-04.
+const PRIORITY_LABEL: Record<"normal" | "high", string> = {
+  normal: "Común",
+  high: "Prioritario",
+};
+
 const EMPTY_FORM: ProjectFormState = {
   name: "",
   clientId: "",
@@ -354,7 +361,10 @@ function ProjectForm({
           disabled={lockClient}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Elegí un cliente" />
+            {/* D-04: sin hijos, el trigger imprime el uuid del cliente. */}
+            <SelectValue placeholder="Elegí un cliente">
+              {clients.find((client) => client.id === form.clientId)?.name}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {clients.map((client) => (
@@ -373,7 +383,12 @@ function ProjectForm({
           onValueChange={(value) => onChange({ ...form, pmId: value as string })}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Elegí un PM" />
+            <SelectValue placeholder="Elegí un PM">
+              {(() => {
+                const pm = pms.find((candidate) => candidate.id === form.pmId);
+                return pm ? pmLabel(pm) : undefined;
+              })()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {pms.map((pm) => (
@@ -392,7 +407,10 @@ function ProjectForm({
           onValueChange={(value) => onChange({ ...form, priority: value as "normal" | "high" })}
         >
           <SelectTrigger className="w-full">
-            <SelectValue />
+            {/* §11 otra vez, y era el peor de los seis: las opciones ya decían
+                `Común` y `Prioritario`, y solo el trigger volvía al vocabulario
+                de la base. */}
+            <SelectValue>{PRIORITY_LABEL[form.priority]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {/* §11: el vocabulario es el del PM, no el de la base de datos. */}

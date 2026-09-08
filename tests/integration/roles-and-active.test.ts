@@ -294,3 +294,150 @@ describe("multiple roles and active enforcement", () => {
     }
   });
 });
+
+/**
+ * T4.2 / T4.3 — feature 013. Las dos deudas que se saldaron en policies.
+ *
+ * Se leen las filas de vuelta por el mismo motivo de siempre: la RLS filtra en
+ * silencio, y en el caso de `select` el silencio es todavía más engañoso —una
+ * lista vacía se parece mucho a "no hay datos"—.
+ */
+describe("registered debt cleanup", () => {
+  const password = "Test-password-123!";
+
+  let provisioned: { id: string; email: string };
+  let roleless: { id: string; email: string };
+  let deactivated: { id: string; email: string };
+  let clientId: string;
+  let projectId: string;
+  let inactiveProjectId: string;
+
+  beforeAll(async () => {
+    const pm = await createUserWithRole(testEmail(`f7-pm-${randomUUID()}`), password, "pm");
+    const nobody = await createTestUser(testEmail(`f7-norole-${randomUUID()}`), password);
+    const off = await createUserWithRole(testEmail(`f7-off-${randomUUID()}`), password, "pm", {
+      active: false,
+    });
+
+    provisioned = { id: pm.id, email: pm.email! };
+    roleless = { id: nobody.id, email: nobody.email! };
+    deactivated = { id: off.id, email: off.email! };
+
+    clientId = (await createClientRow(`013 cliente ${randomUUID()}`)).id;
+    projectId = (
+      await createProjectRow({
+        name: `013 proyecto ${randomUUID()}`,
+        clientId,
+        pmId: provisioned.id,
+      })
+    ).id;
+    inactiveProjectId = (
+      await createProjectRow({
+        name: `013 proyecto inactivo ${randomUUID()}`,
+        clientId,
+        pmId: provisioned.id,
+      })
+    ).id;
+    await adminClient().from("projects").update({ active: false }).eq("id", inactiveProjectId);
+  });
+
+  afterAll(async () => {
+    await cleanupBookings([projectId, inactiveProjectId]);
+    await cleanupProject(projectId);
+    await cleanupProject(inactiveProjectId);
+    await cleanupClient(clientId);
+    await deleteTestUser(provisioned.id);
+    await deleteTestUser(roleless.id);
+    await deleteTestUser(deactivated.id);
+  });
+
+  // ── F7 / D-02 ─────────────────────────────────────────────────────────────
+
+  it("lets a provisioned user read the masters", async () => {
+    // Control positivo primero: sin esto, los dos negativos pasarían igual si la
+    // policy hubiera quedado cerrada para todo el mundo, y el calendario estaría
+    // roto sin que ningún test lo dijera.
+    const client = await signInClient(provisioned.email, password);
+
+    const clients = await client.from("clients").select("id").eq("id", clientId);
+    const projects = await client.from("projects").select("id").eq("id", projectId);
+
+    expect(clients.data).toHaveLength(1);
+    expect(projects.data).toHaveLength(1);
+  });
+
+  it("hides the masters from a user with no role", async () => {
+    // Es lo que F7 vino a cerrar: completar el OAuth de Google no puede ser, por
+    // sí solo, acceso a la lista de clientes y proyectos de la empresa.
+    const client = await signInClient(roleless.email, password);
+
+    const clients = await client.from("clients").select("id");
+    const projects = await client.from("projects").select("id");
+
+    expect(clients.error).toBeNull();
+    expect(projects.error).toBeNull();
+    expect(clients.data).toEqual([]);
+    expect(projects.data).toEqual([]);
+  });
+
+  it("hides the masters from a deactivated user", async () => {
+    const client = await signInClient(deactivated.email, password);
+
+    const clients = await client.from("clients").select("id");
+    const projects = await client.from("projects").select("id");
+
+    expect(clients.data).toEqual([]);
+    expect(projects.data).toEqual([]);
+  });
+
+  // ── D-08 ──────────────────────────────────────────────────────────────────
+
+  it("refuses a booking on a deactivated project", async () => {
+    const client = await signInClient(provisioned.email, password);
+
+    const { error } = await client.from("bookings").insert({
+      project_id: inactiveProjectId,
+      dev_id: provisioned.id,
+      starts_at: "2026-11-02T12:00:00Z",
+      ends_at: "2026-11-02T14:00:00Z",
+    });
+
+    expect(error).not.toBeNull();
+
+    const { data: rows } = await adminClient()
+      .from("bookings")
+      .select("id")
+      .eq("project_id", inactiveProjectId);
+    expect(rows).toEqual([]);
+  });
+
+  it("still lets the PM cancel a booking of a deactivated project", async () => {
+    // AC-4.2, y es la razón por la que el chequeo vive en la policy de insert y
+    // no en `can_manage_booking()`: desactivar un proyecto bloquea historia
+    // nueva, no congela la vieja. Un PM tiene que poder limpiar lo que quedó.
+    const [booking] = await createBookingRows([
+      {
+        projectId: inactiveProjectId,
+        devId: provisioned.id,
+        startsAt: "2026-11-03T12:00:00Z",
+        endsAt: "2026-11-03T14:00:00Z",
+        status: "pending",
+      },
+    ]);
+
+    const client = await signInClient(provisioned.email, password);
+    const { error } = await client
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("id", booking!.id);
+
+    expect(error).toBeNull();
+
+    const { data: fresh } = await adminClient()
+      .from("bookings")
+      .select("status")
+      .eq("id", booking!.id)
+      .single();
+    expect(fresh?.status).toBe("cancelled");
+  });
+});

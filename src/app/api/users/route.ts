@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api/read-json";
 import { requireAdmin } from "@/lib/api/require-admin";
 import { hasAnyRole } from "@/lib/auth/roles";
 import { createUserInviteSchema } from "@/lib/validation/users";
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const { supabase, userId } = guard;
 
-  const parsed = createUserInviteSchema.safeParse(await request.json());
+  const parsed = createUserInviteSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Datos inválidos", issues: parsed.error.flatten() },
