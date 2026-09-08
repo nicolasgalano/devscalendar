@@ -120,8 +120,11 @@ function primaryCreate(page: Page) {
 test("a PM creates, edits and cancels a booking", async ({ page }) => {
   await page.goto(`/calendar?view=day&date=${CREATE_DAY}`);
 
-  // El empty state ya tiene su verbo: es la deuda F2 de 003.
-  await expect(page.getByText("Sin reservas en este período")).toBeVisible();
+  // La deuda F2 de 003 ya se cerró: sin reservas y sin filtros, el calendario
+  // se renderiza vacío en vez del cartel — y la acción primaria vive en el
+  // encabezado (011). Se confirma que no hay bloques todavía y que el botón
+  // está listo para arrancar el flow.
+  await expect(page.getByRole("button", { name: /Pendiente|Aprobada/ })).toHaveCount(0);
   await primaryCreate(page).click();
 
   const dialog = page.getByRole("dialog", { name: "Nueva reserva" });
@@ -162,8 +165,9 @@ test("a PM creates, edits and cancels a booking", async ({ page }) => {
   await confirm.getByRole("button", { name: "Cancelar reserva" }).click();
 
   // Cancelada sale de la vista por defecto, pero sigue existiendo: vuelve con
-  // el filtro de estado.
-  await expect(page.getByText("Sin reservas en este período")).toBeVisible(AFTER_WRITE);
+  // el filtro de estado. La ausencia del bloque se verifica en su rol, no por
+  // el cartel — la vista sin filtros ahora renderiza vacía (011).
+  await expect(edited).not.toBeVisible(AFTER_WRITE);
   await page.goto(`/calendar?view=day&date=${CREATE_DAY}&status=cancelled`);
   await expect(page.getByRole("button", { name: /Cancelada/ })).toBeVisible();
 });

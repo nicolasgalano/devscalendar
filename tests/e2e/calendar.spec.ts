@@ -296,9 +296,14 @@ test("hidden states come back through the status filter", async ({ page }) => {
 test("tells apart an empty range from a filtered-out one", async ({ page }) => {
   const monday = mondayOfThisWeek();
 
-  // Nothing at all in the range.
+  // Nothing at all in the range: without filters the view renders the empty
+  // structure and no card gets in the way. The "Crear reserva" primary is
+  // there in the header, ready for the PM to book into the void.
   await page.goto("/calendar?view=day&date=2027-03-10");
-  await expect(page.getByText("Sin reservas en este período")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Calendario" })).toBeVisible();
+  await expect(page.getByText("Sin reservas en este período")).not.toBeVisible();
+  await expect(page.getByText(/Ninguna reserva coincide/)).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Crear reserva", exact: true })).toBeVisible();
 
   // Data exists, the filters hide it — and the message names the filter.
   await page.goto(`/calendar?view=day&date=${monday}&client=${NIMBUS}&priority=normal`);
