@@ -45,3 +45,7 @@ supabase/.temp/
 /playwright-report
 /playwright/.cache
 /test-results
+
+# timesheet imports (contienen datos internos: nombres, tickets, tarifas)
+docs/Timesheet*.csv
+docs/timesheet-import-report.md
