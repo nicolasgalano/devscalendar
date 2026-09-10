@@ -251,15 +251,9 @@ describe("contrato con PostgREST y GoTrue", () => {
       pmAsDevBookingId = rows[0]!.id;
     });
 
-    afterAll(async () => {
-      await cleanupBookings([projectA]);
-      // Re-crear los dos originales, así los tests que corran después nos
-      // vean con el mismo setup del beforeAll de arriba.
-      await createBookingRows([
-        { projectId: projectA, devId: dev.id, startsAt: at(9), endsAt: at(13) },
-        { projectId: projectB, devId: dev.id, startsAt: at(14), endsAt: at(17) },
-      ]);
-    });
+    // Sin `afterAll`: el `afterAll` del describe padre ya limpia bookings de
+    // projectA y projectB antes de borrar los proyectos, así que este booking
+    // extra viaja con ellos.
 
     it("getPmOnlyDevIds lista al PM puro y no al developer", async () => {
       const ids = await getPmOnlyDevIds(client);
