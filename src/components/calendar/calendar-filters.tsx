@@ -6,6 +6,7 @@ import { ListFilterIcon, Loader2Icon, XIcon } from "lucide-react";
 
 import { bookingStatusLabel } from "@/components/calendar/booking-status";
 import { useCalendarPending } from "@/components/calendar/calendar-pending";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -55,9 +56,17 @@ const STATUSES: BookingStatus[] = [
 export function CalendarFilters({
   params,
   facets,
+  pmOnlyIds,
 }: {
   params: CalendarParams;
   facets: Facets;
+  /**
+   * IDs de profiles con `roles = {pm}` puros — se muestran o esconden con el
+   * toggle "Incluir PMs" (feature 014). El componente lo usa para marcar con
+   * un badge al PM cuando aparece en el select de desarrollador porque la
+   * URL lo trae explícito (AC-3.2).
+   */
+  pmOnlyIds: readonly string[];
 }) {
   const router = useRouter();
   const { pending, navigate } = useCalendarPending();
@@ -100,6 +109,14 @@ export function CalendarFilters({
           value={filters.devId}
           options={facets.devs}
           onSelect={(value) => apply({ devId: value })}
+          // Cuando el dev seleccionado es PM puro y el toggle está off, la URL
+          // "manda" (AC-3.1) pero la persona no aparece en el resto de la
+          // vista: el badge deja claro por qué solo se ven sus reservas.
+          badgeForId={
+            filters.includePms
+              ? undefined
+              : (id) => (pmOnlyIds.includes(id) ? "PM" : null)
+          }
         />
         <FilterSelect
           label="PM"
@@ -143,6 +160,22 @@ export function CalendarFilters({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Feature 014: los PMs puros se esconden por default; este toggle los
+            trae de vuelta a la vista y al desplegable de "Desarrollador". */}
+        <Button
+          variant="outline"
+          size="sm"
+          aria-pressed={filters.includePms}
+          onClick={() => apply({ includePms: !filters.includePms })}
+        >
+          <Checkbox
+            checked={filters.includePms}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+          Incluir PMs
+        </Button>
+
         {pending && (
           <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
             <Loader2Icon aria-hidden="true" className="size-3.5 animate-spin" />
@@ -170,16 +203,20 @@ function FilterSelect({
   value,
   options,
   onSelect,
+  badgeForId,
 }: {
   label: string;
   value: string | null;
   options: { id: string; name: string }[];
   onSelect: (value: string | null) => void;
+  /** Un texto corto para acompañar al nombre seleccionado, o `null` si no. */
+  badgeForId?: (id: string) => string | null;
 }) {
   const selected = options.find((option) => option.id === value);
   // Nothing to choose from: the range has no bookings to narrow. Saying so is
   // better than an empty dropdown that reads as broken.
   const empty = options.length === 0;
+  const selectedBadge = selected && badgeForId ? badgeForId(selected.id) : null;
 
   return (
     <Select
@@ -193,9 +230,16 @@ function FilterSelect({
             `__all__`. */}
         <SelectValue>
           {selected ? (
-            <span>
-              <span className="text-muted-foreground">{label}: </span>
-              {selected.name}
+            <span className="inline-flex items-center gap-1.5">
+              <span>
+                <span className="text-muted-foreground">{label}: </span>
+                {selected.name}
+              </span>
+              {selectedBadge && (
+                <Badge variant="secondary" className="font-caption">
+                  {selectedBadge}
+                </Badge>
+              )}
             </span>
           ) : (
             <span className="text-muted-foreground">

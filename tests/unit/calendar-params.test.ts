@@ -21,6 +21,7 @@ describe("parseCalendarParams", () => {
         pmId: null,
         statuses: [...DEFAULT_STATUSES],
         priority: null,
+        includePms: false,
       },
     });
   });
@@ -65,6 +66,7 @@ describe("parseCalendarParams", () => {
         pmId: null,
         statuses: [...DEFAULT_STATUSES],
         priority: null,
+        includePms: false,
       },
     });
   });
@@ -88,6 +90,17 @@ describe("parseCalendarParams", () => {
   it("takes the first value when a param is repeated", () => {
     expect(parse({ view: ["day", "year"] }).view).toBe("day");
   });
+
+  // Feature 014: `includePms=1` es el único valor que activa el toggle. El
+  // default (`false`) tampoco se escribe en la URL, así que `parseCalendarParams`
+  // tiene que rechazar cualquier cosa que no sea el `1` estricto.
+  it("only reads includePms=1 as true", () => {
+    expect(parse({ includePms: "1" }).filters.includePms).toBe(true);
+    expect(parse({ includePms: "0" }).filters.includePms).toBe(false);
+    expect(parse({ includePms: "true" }).filters.includePms).toBe(false);
+    expect(parse({ includePms: "asdf" }).filters.includePms).toBe(false);
+    expect(parse({}).filters.includePms).toBe(false);
+  });
 });
 
 describe("hasActiveFilters", () => {
@@ -99,6 +112,9 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(parse({ client: CLIENT }).filters)).toBe(true);
     expect(hasActiveFilters(parse({ priority: "high" }).filters)).toBe(true);
     expect(hasActiveFilters(parse({ status: "cancelled" }).filters)).toBe(true);
+    // Feature 014: activar "Incluir PMs" también cuenta — es una desviación
+    // explícita del default.
+    expect(hasActiveFilters(parse({ includePms: "1" }).filters)).toBe(true);
   });
 
   // La lista se arma desde `DEFAULT_STATUSES` y se desordena, en vez de

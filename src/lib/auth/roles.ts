@@ -45,6 +45,15 @@ export function isDeveloper(roles: UserRole[] | null | undefined): boolean {
   return hasRole(roles, "developer");
 }
 
+/**
+ * `pm` sí, `developer` no. La respuesta a "¿quién esconde el calendario por
+ * default?" (feature 014). Un `{pm, developer}` es dev y no cuenta como PM
+ * puro — sigue apareciendo en la vista aunque el toggle esté off.
+ */
+export function isPmOnly(roles: UserRole[] | null | undefined): boolean {
+  return hasRole(roles, "pm") && !hasRole(roles, "developer");
+}
+
 /** Whether the account is provisioned at all — the old `role !== null`. */
 export function hasAnyRole(roles: UserRole[] | null | undefined): boolean {
   return (roles?.length ?? 0) > 0;

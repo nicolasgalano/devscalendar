@@ -45,6 +45,7 @@ describe("calendar query performance", () => {
     pmId: null,
     statuses: [...DEFAULT_STATUSES],
     priority: null,
+    includePms: false,
   };
 
   let pm: { id: string; email: string };

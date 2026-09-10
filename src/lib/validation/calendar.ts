@@ -70,6 +70,12 @@ export type CalendarFilters = {
   pmId: string | null;
   statuses: BookingStatus[];
   priority: ProjectPriority | null;
+  /**
+   * Feature 014: PMs puros (roles={pm} sin developer) se esconden por default.
+   * `true` los trae de vuelta a la vista y al dropdown de "dev". El único
+   * booleano en los filtros — su default (`false`) no viaja en la URL.
+   */
+  includePms: boolean;
 };
 
 export type CalendarParams = {
@@ -131,6 +137,9 @@ export function parseCalendarParams(
         .nullable()
         .catch(null)
         .parse(first(raw.priority) ?? null),
+      // `1` es explícito. Cualquier otra cosa —ausente, `0`, `true`, basura—
+      // cae al default `false`.
+      includePms: first(raw.includePms) === "1",
     },
   };
 }
@@ -147,6 +156,7 @@ export function hasActiveFilters(filters: CalendarFilters): boolean {
     filters.devId !== null ||
     filters.pmId !== null ||
     filters.priority !== null ||
+    filters.includePms ||
     !sameStatuses(filters.statuses, DEFAULT_STATUSES)
   );
 }

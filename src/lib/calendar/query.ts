@@ -1,5 +1,8 @@
+import { cache } from "react";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isPmOnly } from "@/lib/auth/roles";
 import { comparePendingBookings } from "@/lib/bookings/priority";
 import type { BookingStatus, CalendarFilters, ProjectPriority } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
@@ -98,6 +101,28 @@ const SPAN_COLUMNS = `
 ` as const;
 
 /**
+ * IDs of profiles con `roles = {pm}` puros (sin `developer`) y `active = true`.
+ * Es la lista que se excluye del calendario por default (feature 014).
+ *
+ * `.contains("roles", ["pm"])` filtra en la base — barato y trae también a los
+ * `{pm, developer}`. `isPmOnly()` en JS descarta a los híbridos, porque
+ * PostgREST no tiene "contiene X y no contiene Y" en un solo filtro.
+ *
+ * `cache()` deduplica dentro del request (mismo patrón que
+ * `getCurrentUser()` en `@/lib/supabase/session`). Entre requests se
+ * refresca — un cambio de roles se ve en la próxima navegación.
+ */
+export const getPmOnlyDevIds = cache(async (supabase: Client): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, roles")
+    .contains("roles", ["pm"])
+    .eq("active", true);
+  if (error) throw error;
+  return (data ?? []).filter((row) => isPmOnly(row.roles)).map((row) => row.id);
+});
+
+/**
  * Range overlap plus every active filter, for any column selection.
  *
  * The overlap is `starts_at < to and ends_at > from`, not a `between`: a
@@ -107,8 +132,13 @@ const SPAN_COLUMNS = `
  *
  * Client, PM and priority live on `projects`, so they are filtered through the
  * inner embed — RLS on projects and clients still applies underneath.
+ *
+ * **Feature 014 — exclusión de PMs puros:** cuando `includePms=false` y
+ * `devId` no está seleccionado, se agregan los PM puros al `.not("dev_id",
+ * "in", …)`. Si `devId` está seleccionado, la equality de arriba ya alcanza
+ * (si es un PM, se ve — selección explícita gana, AC-3.1).
  */
-function bookingsQuery<Columns extends string>(
+async function bookingsQuery<Columns extends string>(
   supabase: Client,
   columns: Columns,
   { from, to }: CalendarRange,
@@ -126,6 +156,13 @@ function bookingsQuery<Columns extends string>(
   if (filters.clientId) query = query.eq("project.client_id", filters.clientId);
   if (filters.pmId) query = query.eq("project.pm_id", filters.pmId);
   if (filters.priority) query = query.eq("project.priority", filters.priority);
+
+  if (!filters.includePms && !filters.devId) {
+    const pmOnlyIds = await getPmOnlyDevIds(supabase);
+    if (pmOnlyIds.length > 0) {
+      query = query.not("dev_id", "in", `(${pmOnlyIds.join(",")})`);
+    }
+  }
 
   return query.order("starts_at");
 }
@@ -355,18 +392,31 @@ export async function getSelectedFilterNames(
  *
  * Reads through RLS on `bookings` (Q-5: every role can select), which is what
  * makes the unfiltered read safe.
+ *
+ * **Feature 014:** cuando `includePms=false`, las horas de PM puros no cuentan
+ * como carga del equipo — un PM haciendo 8 h de reuniones no genera
+ * sobrecarga en una fila que ni siquiera aparece en la matriz.
  */
 export async function getDevDayLoad(
   supabase: Client,
   { from, to }: CalendarRange,
+  { includePms }: { includePms: boolean },
 ): Promise<DevDayLoadRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("bookings")
     .select("dev_id, starts_at, ends_at, project:projects!inner (id, name)")
     .lt("starts_at", to)
     .gt("ends_at", from)
     .in("status", ["approved", "pending"]);
 
+  if (!includePms) {
+    const pmOnlyIds = await getPmOnlyDevIds(supabase);
+    if (pmOnlyIds.length > 0) {
+      query = query.not("dev_id", "in", `(${pmOnlyIds.join(",")})`);
+    }
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((row) => ({
     devId: row.dev_id,

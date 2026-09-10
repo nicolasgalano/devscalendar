@@ -39,6 +39,7 @@ export function calendarHref(current: CalendarParams, patch: CalendarParamsPatch
   if (next.filters.devId) params.set("dev", next.filters.devId);
   if (next.filters.pmId) params.set("pm", next.filters.pmId);
   if (next.filters.priority) params.set("priority", next.filters.priority);
+  if (next.filters.includePms) params.set("includePms", "1");
 
   const statuses = [...next.filters.statuses].sort();
   const defaults = [...DEFAULT_STATUSES].sort();
@@ -60,6 +61,7 @@ export function clearFiltersHref(current: CalendarParams): string {
       pmId: null,
       priority: null,
       statuses: [...DEFAULT_STATUSES],
+      includePms: false,
     },
   });
 }

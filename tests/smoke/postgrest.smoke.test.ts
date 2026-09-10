@@ -4,7 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { findConflictingBooking } from "@/lib/bookings/conflicts";
 import { getBookingFormOptions } from "@/lib/bookings/options";
-import { countConsideredDevs, getBookingsInRange, getFilterFacets } from "@/lib/calendar/query";
+import {
+  countConsideredDevs,
+  getBookingsInRange,
+  getDevDayLoad,
+  getFilterFacets,
+  getPmOnlyDevIds,
+} from "@/lib/calendar/query";
 import { DEFAULT_STATUSES, type CalendarFilters } from "@/lib/validation/calendar";
 import type { Database } from "@/types/database";
 
@@ -44,6 +50,7 @@ const noFilters: CalendarFilters = {
   pmId: null,
   statuses: [...DEFAULT_STATUSES],
   priority: null,
+  includePms: false,
 };
 
 /** 2026-09-08, hora de Buenos Aires (UTC-3), como instante UTC. */
@@ -220,5 +227,80 @@ describe("contrato con PostgREST y GoTrue", () => {
     } finally {
       await deleteTestUser(both.id);
     }
+  });
+
+  /**
+   * Feature 014 — la exclusión de PM puros se hace con
+   * `.not("dev_id", "in", "(uuid,uuid)")`, y esa sintaxis solo la valida
+   * PostgREST. Un typo tipo `neq.in` o paréntesis mal balanceados no rompen
+   * ningún typecheck: pasan y filtran mal.
+   */
+  describe("feature 014 · exclusión de PM puros", () => {
+    /**
+     * Un booking cuyo `dev_id` es el PM del setup principal. El PM es puro
+     * (roles=['pm']) y tiene una reserva — no un caso realista para producción
+     * pero sí para el histórico importado de agosto 2026, que trae horas de
+     * PMs (Brenda, Lucía, Pedro).
+     */
+    let pmAsDevBookingId: string;
+
+    beforeAll(async () => {
+      const rows = await createBookingRows([
+        { projectId: projectA, devId: pm.id, startsAt: at(18), endsAt: at(19) },
+      ]);
+      pmAsDevBookingId = rows[0]!.id;
+    });
+
+    afterAll(async () => {
+      await cleanupBookings([projectA]);
+      // Re-crear los dos originales, así los tests que corran después nos
+      // vean con el mismo setup del beforeAll de arriba.
+      await createBookingRows([
+        { projectId: projectA, devId: dev.id, startsAt: at(9), endsAt: at(13) },
+        { projectId: projectB, devId: dev.id, startsAt: at(14), endsAt: at(17) },
+      ]);
+    });
+
+    it("getPmOnlyDevIds lista al PM puro y no al developer", async () => {
+      const ids = await getPmOnlyDevIds(client);
+      expect(ids).toContain(pm.id);
+      expect(ids).not.toContain(dev.id);
+    });
+
+    // AC-1.1: el default esconde a los PM puros.
+    it("con includePms=false el booking del PM no aparece", async () => {
+      const rows = await getBookingsInRange(client, { range: DAY, filters: noFilters });
+      expect(rows.some((row) => row.id === pmAsDevBookingId)).toBe(false);
+    });
+
+    // AC-2.2: con el toggle activado, sí.
+    it("con includePms=true el booking del PM aparece", async () => {
+      const rows = await getBookingsInRange(client, {
+        range: DAY,
+        filters: { ...noFilters, includePms: true },
+      });
+      expect(rows.some((row) => row.id === pmAsDevBookingId)).toBe(true);
+    });
+
+    // AC-3.1: selección explícita gana. Este es el test que evita "seleccioné a
+    // Brenda y no veo nada" — si el filtro `.not("dev_id", "in", …)` corriera
+    // cuando devId está set, la respuesta vendría vacía.
+    it("con devId=<PM> el booking aparece aunque includePms sea false", async () => {
+      const rows = await getBookingsInRange(client, {
+        range: DAY,
+        filters: { ...noFilters, devId: pm.id },
+      });
+      expect(rows.some((row) => row.id === pmAsDevBookingId)).toBe(true);
+    });
+
+    // AC-1.3: la sobrecarga del planning tampoco cuenta a los PMs cuando el
+    // toggle está off.
+    it("getDevDayLoad respeta includePms", async () => {
+      const withoutPms = await getDevDayLoad(client, DAY, { includePms: false });
+      expect(withoutPms.some((row) => row.devId === pm.id)).toBe(false);
+
+      const withPms = await getDevDayLoad(client, DAY, { includePms: true });
+      expect(withPms.some((row) => row.devId === pm.id)).toBe(true);
+    });
   });
 });

@@ -34,6 +34,7 @@ const noFilters: CalendarFilters = {
   pmId: null,
   statuses: [...DEFAULT_STATUSES],
   priority: null,
+  includePms: false,
 };
 
 /** 2026-08-05, local Buenos Aires time (UTC-3), as a UTC instant. */

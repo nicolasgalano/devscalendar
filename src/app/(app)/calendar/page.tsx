@@ -22,6 +22,7 @@ import {
   getBookingsInRange,
   getDayLoad,
   getDevDayLoad,
+  getPmOnlyDevIds,
   getFilterFacets,
   getSelectedFilterNames,
   type SelectedFilterNames,
@@ -106,10 +107,11 @@ export default async function CalendarPage({
   const profile = await getCurrentProfile();
   const viewer: BookingViewer | null = profile ? { id: profile.id, roles: profile.roles } : null;
 
-  const [content, facets, options] = await Promise.all([
+  const [content, facets, options, pmOnlyIds] = await Promise.all([
     renderView(),
     getFacets(),
     getBookingFormOptions(supabase, viewer),
+    getPmOnlyDevIds(supabase),
   ]);
 
   return (
@@ -133,7 +135,7 @@ export default async function CalendarPage({
         {/* Filtros y resultados comparten una sola transición, para que al
           filtrar la pantalla dé señal en vez de quedarse quieta. */}
         <CalendarPendingProvider>
-          <CalendarFilters params={params} facets={facets} />
+          <CalendarFilters params={params} facets={facets} pmOnlyIds={pmOnlyIds} />
           <CalendarResults>{content.node}</CalendarResults>
         </CalendarPendingProvider>
       </BookingResponseProvider>
@@ -194,7 +196,7 @@ export default async function CalendarPage({
     // R-1.
     const [bookings, devDayLoad] = await Promise.all([
       getBookingsInRange(supabase, { range, filters: params.filters }),
-      getDevDayLoad(supabase, range),
+      getDevDayLoad(supabase, range, { includePms: params.filters.includePms }),
     ]);
 
     // Cuando hay filtros aplicados que no matchean se sigue mostrando el

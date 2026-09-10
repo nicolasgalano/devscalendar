@@ -25,6 +25,7 @@ const noFilters: CalendarFilters = {
   pmId: null,
   statuses: [...DEFAULT_STATUSES],
   priority: null,
+  includePms: false,
 };
 
 function bookingRow(overrides: Record<string, unknown> = {}) {
@@ -47,9 +48,14 @@ function bookingRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Feature 014: cuando `!includePms && !devId`, `bookingsQuery` consulta
+// `profiles` para excluir a los PM puros. Un stub vacío alcanza — la lista
+// vacía saltea el `.not("dev_id", "in", …)` y el resto del test corre igual.
+const NO_PM_ONLY = { profiles: { data: [] } };
+
 describe("getBookingsInRange", () => {
   it("maps the row into the calendar shape", async () => {
-    const mock = createSupabaseMock({ bookings: { data: [bookingRow()] } });
+    const mock = createSupabaseMock({ bookings: { data: [bookingRow()] }, ...NO_PM_ONLY });
 
     const [booking] = await getBookingsInRange(mock.client, {
       range: RANGE,
@@ -88,6 +94,7 @@ describe("getBookingsInRange", () => {
           }),
         ],
       },
+      ...NO_PM_ONLY,
     });
 
     const [booking] = await getBookingsInRange(mock.client, {
@@ -105,7 +112,7 @@ describe("getBookingsInRange", () => {
    * es la clase de bug que nadie reporta porque el bloque simplemente no está.
    */
   it("filters by overlap, not by containment", async () => {
-    const mock = createSupabaseMock({ bookings: { data: [] } });
+    const mock = createSupabaseMock({ bookings: { data: [] }, ...NO_PM_ONLY });
 
     await getBookingsInRange(mock.client, { range: RANGE, filters: noFilters });
 
@@ -136,6 +143,7 @@ describe("getBookingsInRange", () => {
   it("throws when Supabase returns an error", async () => {
     const mock = createSupabaseMock({
       bookings: { error: { message: "permission denied for table bookings" } },
+      ...NO_PM_ONLY,
     });
 
     await expect(

@@ -23,6 +23,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 011 | Planning view (grilla semanal de carga)           | done   | 003, 004, 005, 006 | §4, §12             |
 | 012 | Roles múltiples y `active` con dientes            | done   | 001, 002           | §3, §12 (seguridad) |
 | 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
+| 014 | PMs fuera del calendario por default              | done   | 003, 011, 012      | §4                  |
 
 ## Orden sugerido de implementación
 

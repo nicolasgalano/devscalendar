@@ -10,6 +10,7 @@ const noFilters: CalendarFilters = {
   pmId: null,
   statuses: [...DEFAULT_STATUSES],
   priority: null,
+  includePms: false,
 };
 
 const row = (

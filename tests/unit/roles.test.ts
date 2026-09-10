@@ -8,6 +8,7 @@ import {
   isAdmin,
   isDeveloper,
   isPm,
+  isPmOnly,
   sortRoles,
 } from "@/lib/auth/roles";
 import { sortDevsByPrimaryPm } from "@/lib/bookings/options";
@@ -54,6 +55,20 @@ describe("roles", () => {
     expect(formatRoles(["developer"])).toBe("Developer");
     expect(formatRoles([])).toBeNull();
     expect(formatRoles(null)).toBeNull();
+  });
+
+  // T4.4 — feature 014. La definición de "PM puro" tiene que salir de acá
+  // porque la usan dos consumidores (el query y el badge del dropdown), y un
+  // desajuste vuelve un PM invisible del lado del filtro pero visible del
+  // dropdown, o al revés (R-1).
+  it("recognises a pure PM but not a pm+developer hybrid", () => {
+    expect(isPmOnly(["pm"])).toBe(true);
+    expect(isPmOnly(["pm", "admin"])).toBe(true);
+    expect(isPmOnly(["pm", "developer"])).toBe(false);
+    expect(isPmOnly(["developer"])).toBe(false);
+    expect(isPmOnly([])).toBe(false);
+    expect(isPmOnly(null)).toBe(false);
+    expect(isPmOnly(undefined)).toBe(false);
   });
 });
 
