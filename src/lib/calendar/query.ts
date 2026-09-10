@@ -76,6 +76,7 @@ export type DevDayLoadRow = {
 // relationship to follow.
 const BOOKING_COLUMNS = `
   id,
+  dev_id,
   starts_at,
   ends_at,
   updated_at,
@@ -133,12 +134,14 @@ export const getPmOnlyDevIds = cache(async (supabase: Client): Promise<string[]>
  * Client, PM and priority live on `projects`, so they are filtered through the
  * inner embed — RLS on projects and clients still applies underneath.
  *
- * **Feature 014 — exclusión de PMs puros:** cuando `includePms=false` y
- * `devId` no está seleccionado, se agregan los PM puros al `.not("dev_id",
- * "in", …)`. Si `devId` está seleccionado, la equality de arriba ya alcanza
- * (si es un PM, se ve — selección explícita gana, AC-3.1).
+ * **Feature 014 — no filtra PMs acá.** La exclusión se hace en JS después de
+ * la query, en `excludePmOnlyRows()`, para no depender del comportamiento de
+ * `.not("dev_id","in",…)` de PostgREST en distintos backends (un intento
+ * inicial pasó locally y en smoke pero devolvió empty en el stack efímero de
+ * E2E — probablemente encoding). Con la lista de bookings ya en memoria y en
+ * el orden de decenas de filas, el filtro en JS es ~O(n) sobre un Set.
  */
-async function bookingsQuery<Columns extends string>(
+function bookingsQuery<Columns extends string>(
   supabase: Client,
   columns: Columns,
   { from, to }: CalendarRange,
@@ -157,14 +160,22 @@ async function bookingsQuery<Columns extends string>(
   if (filters.pmId) query = query.eq("project.pm_id", filters.pmId);
   if (filters.priority) query = query.eq("project.priority", filters.priority);
 
-  if (!filters.includePms && !filters.devId) {
-    const pmOnlyIds = await getPmOnlyDevIds(supabase);
-    if (pmOnlyIds.length > 0) {
-      query = query.not("dev_id", "in", `(${pmOnlyIds.join(",")})`);
-    }
-  }
-
   return query.order("starts_at");
+}
+
+/**
+ * Feature 014: descarta filas cuyo `dev_id` pertenezca a un PM puro. `devId`
+ * explícito en el filtro salta el descarte (AC-3.1: selección explícita gana).
+ */
+async function excludePmOnlyRows<Row extends { dev_id: string }>(
+  supabase: Client,
+  rows: Row[],
+  filters: CalendarFilters,
+): Promise<Row[]> {
+  if (filters.includePms || filters.devId) return rows;
+  const pmOnlyIds = new Set(await getPmOnlyDevIds(supabase));
+  if (pmOnlyIds.size === 0) return rows;
+  return rows.filter((row) => !pmOnlyIds.has(row.dev_id));
 }
 
 /** Bookings for the day view, with everything a block needs to render. */
@@ -174,7 +185,8 @@ export async function getBookingsInRange(
 ): Promise<CalendarBooking[]> {
   const { data, error } = await bookingsQuery(supabase, BOOKING_COLUMNS, range, filters);
   if (error) throw error;
-  return (data ?? []).map(toCalendarBooking);
+  const rows = await excludePmOnlyRows(supabase, data ?? [], filters);
+  return rows.map(toCalendarBooking);
 }
 
 /**
@@ -264,8 +276,9 @@ export async function getDayLoad(
 
   if (spansResult.error) throw spansResult.error;
 
+  const filtered = await excludePmOnlyRows(supabase, spansResult.data ?? [], filters);
   return {
-    spans: (spansResult.data ?? []).map((row): BookingSpan => ({
+    spans: filtered.map((row): BookingSpan => ({
       id: row.id,
       devId: row.dev_id,
       startsAt: row.starts_at,
@@ -301,20 +314,22 @@ export async function getFilterFacets(
   supabase: Client,
   { range, filters }: { range: CalendarRange; filters: CalendarFilters },
 ): Promise<FacetRow[]> {
-  const { data, error } = await bookingsQuery(supabase, FACET_COLUMNS, range, {
+  const facetFilters = {
     ...filters,
     clientId: null,
     projectId: null,
     devId: null,
     pmId: null,
-  });
+  };
+  const { data, error } = await bookingsQuery(supabase, FACET_COLUMNS, range, facetFilters);
 
   if (error) throw error;
 
+  const rows = await excludePmOnlyRows(supabase, data ?? [], facetFilters);
   const named = (person: { full_name: string | null; email: string }) =>
     person.full_name ?? person.email;
 
-  return (data ?? []).map((row): FacetRow => {
+  return rows.map((row): FacetRow => {
     const { dev, project } = row;
     return {
       devId: dev.id,
@@ -402,29 +417,26 @@ export async function getDevDayLoad(
   { from, to }: CalendarRange,
   { includePms }: { includePms: boolean },
 ): Promise<DevDayLoadRow[]> {
-  let query = supabase
+  const { data, error } = await supabase
     .from("bookings")
     .select("dev_id, starts_at, ends_at, project:projects!inner (id, name)")
     .lt("starts_at", to)
     .gt("ends_at", from)
     .in("status", ["approved", "pending"]);
 
-  if (!includePms) {
-    const pmOnlyIds = await getPmOnlyDevIds(supabase);
-    if (pmOnlyIds.length > 0) {
-      query = query.not("dev_id", "in", `(${pmOnlyIds.join(",")})`);
-    }
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) => ({
-    devId: row.dev_id,
-    projectId: row.project.id,
-    projectName: row.project.name,
-    startsAt: row.starts_at,
-    endsAt: row.ends_at,
-  }));
+
+  const rows = data ?? [];
+  const pmOnlyIds = includePms ? new Set<string>() : new Set(await getPmOnlyDevIds(supabase));
+  return rows
+    .filter((row) => !pmOnlyIds.has(row.dev_id))
+    .map((row) => ({
+      devId: row.dev_id,
+      projectId: row.project.id,
+      projectName: row.project.name,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+    }));
 }
 
 /** Capacity denominator for the occupancy ramp — see `DayLoadData.devCount`. */
