@@ -175,13 +175,28 @@ export function isOverloaded(hours: number | undefined): boolean {
  * hours coming from the projects the filter hid. That is the exact failure
  * mode of `plan.md` R-1.
  */
+export type OverloadContribution = {
+  projectId: string;
+  projectName: string;
+  hours: number;
+  /**
+   * The same hours split by commitment. R-5 of `plan.md` §10: the grid obeys the
+   * status filter and this total does not, so a PM looking at approved-only
+   * hours can read an overload bigger than anything on screen. Naming which
+   * hours are confirmed and which are still pending is what lets the two
+   * figures be reconciled by reading, instead of looking like a contradiction.
+   */
+  hoursApproved: number;
+  hoursPending: number;
+};
+
 export function overloadContributions(
   devId: string,
   isoDate: string,
   rows: readonly DevDayLoadRow[],
   tz: string,
-): Array<{ projectId: string; projectName: string; hours: number }> {
-  const perProject = new Map<string, { projectName: string; hours: number }>();
+): OverloadContribution[] {
+  const perProject = new Map<string, Omit<OverloadContribution, "projectId">>();
 
   for (const row of rows) {
     if (row.devId !== devId) continue;
@@ -190,13 +205,18 @@ export function overloadContributions(
       const entry = perProject.get(row.projectId) ?? {
         projectName: row.projectName,
         hours: 0,
+        hoursApproved: 0,
+        hoursPending: 0,
       };
-      entry.hours += share.minutes / 60;
+      const hours = share.minutes / 60;
+      entry.hours += hours;
+      if (row.status === "approved") entry.hoursApproved += hours;
+      else entry.hoursPending += hours;
       perProject.set(row.projectId, entry);
     }
   }
 
   return Array.from(perProject.entries())
-    .map(([projectId, { projectName, hours }]) => ({ projectId, projectName, hours }))
+    .map(([projectId, entry]) => ({ projectId, ...entry }))
     .sort((a, b) => b.hours - a.hours);
 }

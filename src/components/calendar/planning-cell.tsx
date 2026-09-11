@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { formatTimeRange } from "@/lib/calendar/format";
 import { formatHours } from "@/lib/calendar/load";
+import type { OverloadContribution } from "@/lib/calendar/planning";
 import type { CalendarBooking } from "@/lib/calendar/query";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ export function PlanningCell({
   bookings: CalendarBooking[];
   overloaded: boolean;
   overloadHours: number;
-  contributions: Array<{ projectId: string; projectName: string; hours: number }>;
+  contributions: OverloadContribution[];
   devName: string;
   tz: string;
   dayHref: string;
@@ -97,7 +98,7 @@ export function PlanningCell({
     <Popover>
       <PopoverTrigger
         aria-label={label}
-        className={cn(cellClasses, "cursor-pointer hover:ring-foreground/15 hover:ring-1")}
+        className={cn(cellClasses, "hover:ring-foreground/15 cursor-pointer hover:ring-1")}
       >
         <span
           className={cn(
@@ -121,9 +122,20 @@ export function PlanningCell({
             <p className="font-medium">Sobrecarga: {formatCellHours(overloadHours)}</p>
             <ul className="mt-1 space-y-0.5">
               {contributions.map((entry) => (
-                <li key={entry.projectId} className="flex justify-between gap-2">
-                  <span className="truncate">{entry.projectName}</span>
-                  <span className="font-data shrink-0">{formatCellHours(entry.hours)}</span>
+                <li key={entry.projectId}>
+                  <span className="flex justify-between gap-2">
+                    <span className="truncate">{entry.projectName}</span>
+                    <span className="font-data shrink-0">{formatCellHours(entry.hours)}</span>
+                  </span>
+                  {/* R-5: este total ignora los filtros y la grilla no, así que
+                      puede ser mayor que cualquier número en pantalla. Decir qué
+                      parte está confirmada y qué parte sigue pendiente es lo que
+                      hace reconciliables las dos cifras. */}
+                  {describeCommitment(entry) && (
+                    <span className="text-caption block opacity-80">
+                      {describeCommitment(entry)}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -143,19 +155,14 @@ export function PlanningCell({
                 {booking.project.priority === "high" && (
                   <FlagIcon aria-hidden="true" className="text-priority-high size-3 shrink-0" />
                 )}
-                <span className="text-secondary-foreground truncate">
-                  {booking.project.name}
-                </span>
+                <span className="text-secondary-foreground truncate">{booking.project.name}</span>
               </div>
             </li>
           ))}
         </ul>
 
         <div className="border-border border-t pt-2">
-          <Link
-            href={dayHref}
-            className="text-ui text-primary hover:underline"
-          >
+          <Link href={dayHref} className="text-ui text-primary hover:underline">
             Ver el día en el calendario
           </Link>
         </div>
@@ -181,7 +188,7 @@ function accessibleLabel({
   workday: boolean;
   overloaded: boolean;
   overloadHours: number;
-  contributions: Array<{ projectId: string; projectName: string; hours: number }>;
+  contributions: OverloadContribution[];
 }): string {
   const shortDate = `${Number(day.slice(8, 10))}/${Number(day.slice(5, 7))}`;
   if (totalHours === 0) {
@@ -199,6 +206,17 @@ function accessibleLabel({
     parts.push(`sobrecarga: ${formatCellHours(overloadHours)}${detail ? ` (${detail})` : ""}`);
   }
   return parts.join(", ");
+}
+
+/**
+ * Which part of a project's hours is confirmed. `null` when everything is
+ * approved, because that is the assumption a reader already makes — saying it
+ * out loud on every line would bury the case that matters.
+ */
+function describeCommitment(entry: OverloadContribution): string | null {
+  if (entry.hoursPending === 0) return null;
+  if (entry.hoursApproved === 0) return `${formatCellHours(entry.hoursPending)} pendientes`;
+  return `${formatCellHours(entry.hoursApproved)} aprobadas · ${formatCellHours(entry.hoursPending)} pendientes`;
 }
 
 /** `4 h`, `2.5 h` — same rule as `formatHours` but takes hours, not minutes. */

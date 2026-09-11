@@ -55,19 +55,13 @@ function booking(seed: BookingSeed): CalendarBooking {
 
 describe("splitBookingByDay", () => {
   it("attributes an intra-day booking to a single day", () => {
-    const shares = splitBookingByDay(
-      { startsAt: on("05", 9), endsAt: on("05", 13) },
-      AR,
-    );
+    const shares = splitBookingByDay({ startsAt: on("05", 9), endsAt: on("05", 13) }, AR);
     expect(shares).toEqual([{ isoDate: "2026-08-05", minutes: 240 }]);
   });
 
   it("splits a 22:00–02:00 booking across both days", () => {
     // 22:00 del 5 → 02:00 del 6, hora local.
-    const shares = splitBookingByDay(
-      { startsAt: on("05", 22), endsAt: on("06", 2) },
-      AR,
-    );
+    const shares = splitBookingByDay({ startsAt: on("05", 22), endsAt: on("06", 2) }, AR);
     expect(shares).toEqual([
       { isoDate: "2026-08-05", minutes: 120 },
       { isoDate: "2026-08-06", minutes: 120 },
@@ -76,10 +70,7 @@ describe("splitBookingByDay", () => {
 
   it("splits a booking that spans three calendar days", () => {
     // 23:00 del 5 → 08:00 del 7 local = 1 h + 24 h + 8 h = 33 h.
-    const shares = splitBookingByDay(
-      { startsAt: on("05", 23), endsAt: on("07", 8) },
-      AR,
-    );
+    const shares = splitBookingByDay({ startsAt: on("05", 23), endsAt: on("07", 8) }, AR);
     expect(shares).toEqual([
       { isoDate: "2026-08-05", minutes: 60 },
       { isoDate: "2026-08-06", minutes: 24 * 60 },
@@ -102,12 +93,8 @@ describe("splitBookingByDay", () => {
   });
 
   it("ignores a zero- or negative-duration booking", () => {
-    expect(
-      splitBookingByDay({ startsAt: on("05", 9), endsAt: on("05", 9) }, AR),
-    ).toEqual([]);
-    expect(
-      splitBookingByDay({ startsAt: on("05", 10), endsAt: on("05", 9) }, AR),
-    ).toEqual([]);
+    expect(splitBookingByDay({ startsAt: on("05", 9), endsAt: on("05", 9) }, AR)).toEqual([]);
+    expect(splitBookingByDay({ startsAt: on("05", 10), endsAt: on("05", 9) }, AR)).toEqual([]);
   });
 });
 
@@ -254,10 +241,22 @@ describe("computeDevDayLoad", () => {
   it("sums a dev's hours across projects", () => {
     const loads = computeDevDayLoad(
       [
-        { devId: "dev-1", projectId: "p", projectName: "P",
-          startsAt: on("05", 9), endsAt: on("05", 13) },
-        { devId: "dev-1", projectId: "p", projectName: "P",
-          startsAt: on("05", 14), endsAt: on("05", 19) },
+        {
+          devId: "dev-1",
+          projectId: "p",
+          projectName: "P",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 13),
+        },
+        {
+          devId: "dev-1",
+          projectId: "p",
+          projectName: "P",
+          status: "approved",
+          startsAt: on("05", 14),
+          endsAt: on("05", 19),
+        },
       ],
       days,
       AR,
@@ -268,10 +267,22 @@ describe("computeDevDayLoad", () => {
   it("keeps different devs on different keys", () => {
     const loads = computeDevDayLoad(
       [
-        { devId: "dev-1", projectId: "p", projectName: "P",
-          startsAt: on("05", 9), endsAt: on("05", 17) },
-        { devId: "dev-2", projectId: "p", projectName: "P",
-          startsAt: on("05", 9), endsAt: on("05", 12) },
+        {
+          devId: "dev-1",
+          projectId: "p",
+          projectName: "P",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 17),
+        },
+        {
+          devId: "dev-2",
+          projectId: "p",
+          projectName: "P",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 12),
+        },
       ],
       days,
       AR,
@@ -283,8 +294,14 @@ describe("computeDevDayLoad", () => {
   it("distributes a cross-midnight booking to both days", () => {
     const loads = computeDevDayLoad(
       [
-        { devId: "dev-1", projectId: "p", projectName: "P",
-          startsAt: on("05", 22), endsAt: on("06", 2) },
+        {
+          devId: "dev-1",
+          projectId: "p",
+          projectName: "P",
+          status: "approved",
+          startsAt: on("05", 22),
+          endsAt: on("06", 2),
+        },
       ],
       days,
       AR,
@@ -320,20 +337,83 @@ describe("overloadContributions", () => {
       "dev-1",
       "2026-08-05",
       [
-        { devId: "dev-1", projectId: "p1", projectName: "Alfa",
-          startsAt: on("05", 9), endsAt: on("05", 12) },
-        { devId: "dev-1", projectId: "p2", projectName: "Beta",
-          startsAt: on("05", 13), endsAt: on("05", 19) },
+        {
+          devId: "dev-1",
+          projectId: "p1",
+          projectName: "Alfa",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 12),
+        },
+        {
+          devId: "dev-1",
+          projectId: "p2",
+          projectName: "Beta",
+          status: "approved",
+          startsAt: on("05", 13),
+          endsAt: on("05", 19),
+        },
         // Otro dev — no cuenta.
-        { devId: "dev-2", projectId: "p3", projectName: "Gamma",
-          startsAt: on("05", 9), endsAt: on("05", 15) },
+        {
+          devId: "dev-2",
+          projectId: "p3",
+          projectName: "Gamma",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 15),
+        },
       ],
       AR,
     );
 
     expect(rows).toEqual([
-      { projectId: "p2", projectName: "Beta", hours: 6 },
-      { projectId: "p1", projectName: "Alfa", hours: 3 },
+      { projectId: "p2", projectName: "Beta", hours: 6, hoursApproved: 6, hoursPending: 0 },
+      { projectId: "p1", projectName: "Alfa", hours: 3, hoursApproved: 3, hoursPending: 0 },
+    ]);
+  });
+
+  /**
+   * R-5 de `plan.md` §10: la grilla obedece el filtro de estado y este total no.
+   * Un PM mirando solo aprobadas puede ver una sobrecarga mayor que cualquier
+   * número en pantalla, y lo que vuelve reconciliables las dos cifras es decir
+   * qué parte está confirmada.
+   */
+  it("splits each project's hours into approved and pending", () => {
+    const rows = overloadContributions(
+      "dev-1",
+      "2026-08-05",
+      [
+        {
+          devId: "dev-1",
+          projectId: "p1",
+          projectName: "Alfa",
+          status: "approved",
+          startsAt: on("05", 9),
+          endsAt: on("05", 15),
+        },
+        {
+          devId: "dev-1",
+          projectId: "p1",
+          projectName: "Alfa",
+          status: "pending",
+          startsAt: on("05", 15),
+          endsAt: on("05", 17),
+        },
+        {
+          devId: "dev-1",
+          projectId: "p2",
+          projectName: "Beta",
+          status: "pending",
+          startsAt: on("05", 17),
+          endsAt: on("05", 20),
+        },
+      ],
+      AR,
+    );
+
+    expect(rows).toEqual([
+      { projectId: "p1", projectName: "Alfa", hours: 8, hoursApproved: 6, hoursPending: 2 },
+      { projectId: "p2", projectName: "Beta", hours: 3, hoursApproved: 0, hoursPending: 3 },
     ]);
   });
 });

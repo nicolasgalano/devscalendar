@@ -69,6 +69,16 @@ export type DevDayLoadRow = {
   projectName: string;
   startsAt: string;
   endsAt: string;
+  /**
+   * `approved` or `pending` — the query excludes everything else.
+   *
+   * It travels for R-5 of `011/plan.md` §10: the grid obeys the status filter
+   * and this number does not, so a PM looking at approved-only hours can see an
+   * overload total larger than anything on screen. Saying which hours are
+   * confirmed and which are still pending is what makes the two figures
+   * reconcilable instead of contradictory.
+   */
+  status: Extract<BookingStatus, "approved" | "pending">;
 };
 
 // `dev:profiles!bookings_dev_id_fkey` — bookings points at profiles twice
@@ -419,7 +429,7 @@ export async function getDevDayLoad(
 ): Promise<DevDayLoadRow[]> {
   const { data, error } = await supabase
     .from("bookings")
-    .select("dev_id, starts_at, ends_at, project:projects!inner (id, name)")
+    .select("dev_id, starts_at, ends_at, status, project:projects!inner (id, name)")
     .lt("starts_at", to)
     .gt("ends_at", from)
     .in("status", ["approved", "pending"]);
@@ -436,6 +446,7 @@ export async function getDevDayLoad(
       projectName: row.project.name,
       startsAt: row.starts_at,
       endsAt: row.ends_at,
+      status: row.status as DevDayLoadRow["status"],
     }));
 }
 

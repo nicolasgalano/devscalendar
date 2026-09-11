@@ -1,10 +1,6 @@
 import { PlanningCell } from "@/components/calendar/planning-cell";
 import { WEEKDAY_INITIALS } from "@/lib/calendar/format";
-import {
-  isOverloaded,
-  overloadContributions,
-  type PlanningRow,
-} from "@/lib/calendar/planning";
+import { isOverloaded, overloadContributions, type PlanningRow } from "@/lib/calendar/planning";
 import type { CalendarBooking, DevDayLoadRow } from "@/lib/calendar/query";
 import { calendarHref } from "@/lib/calendar/url";
 import { isWorkday } from "@/lib/calendar/workdays";
@@ -59,7 +55,12 @@ export function PlanningView({
     // columna izquierda se anclan a *este* elemento, no al viewport, así el
     // scroll horizontal y el vertical se resuelven cada uno por su lado sin
     // romper la ancla del otro (DESIGN.md §6).
-    <div className="border-border relative max-h-[calc(100vh-14rem)] overflow-auto rounded-lg border">
+    <div
+      // Gancho estable para los tests E2E, igual criterio que `data-lane-header`
+      // en la vista día: engancharse a clases de Tailwind las volvería API.
+      data-planning-grid=""
+      className="border-border relative max-h-[calc(100vh-14rem)] overflow-auto rounded-lg border"
+    >
       <div className="inline-grid min-w-full" style={{ gridTemplateColumns }}>
         <WeekHeader spans={weekSpans} />
         <DayHeader days={days} />
@@ -123,9 +124,7 @@ export function PlanningView({
                     overloaded={overloaded}
                     overloadHours={overloadHours ?? 0}
                     contributions={
-                      overloaded
-                        ? overloadContributions(data.dev.id, day, devDayLoad, tz)
-                        : []
+                      overloaded ? overloadContributions(data.dev.id, day, devDayLoad, tz) : []
                     }
                     devName={data.dev.name}
                     tz={tz}
@@ -215,15 +214,15 @@ function DayHeader({ days }: { days: string[] }) {
         return (
           <div
             key={day}
+            data-planning-day={day}
+            data-workday={workday ? "true" : "false"}
             className={cn(
               "border-border sticky top-[28px] z-20 flex flex-col items-center justify-center border-b border-l",
               workday ? "bg-background" : "bg-muted",
             )}
             style={{ minHeight: 32 }}
           >
-            <span className="text-caption text-muted-foreground leading-none">
-              {weekday}
-            </span>
+            <span className="text-caption text-muted-foreground leading-none">{weekday}</span>
             <span
               className={cn(
                 "font-data text-caption leading-none",
@@ -257,7 +256,7 @@ function HeaderRow({
     <div className="contents">
       <div
         className={cn(
-          "border-border bg-background sticky left-0 z-10 flex items-center border-t border-r truncate",
+          "border-border bg-background sticky left-0 z-10 flex items-center truncate border-t border-r",
           labelClass,
           labelPad,
         )}
@@ -267,7 +266,7 @@ function HeaderRow({
       </div>
       <div
         aria-hidden="true"
-        className="border-border border-t border-l bg-background"
+        className="border-border bg-background border-t border-l"
         style={{ minHeight: ROW_HEIGHT, gridColumn: `span ${dayCount}` }}
       />
     </div>
@@ -310,9 +309,7 @@ function addIso(isoDate: string, amount: number): string {
   const year = Number(isoDate.slice(0, 4));
   const month = Number(isoDate.slice(5, 7));
   const day = Number(isoDate.slice(8, 10));
-  return new Date(Date.UTC(year, month - 1, day + amount))
-    .toISOString()
-    .slice(0, 10);
+  return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
 }
 
 function weekdayInitial(isoDate: string): string {
