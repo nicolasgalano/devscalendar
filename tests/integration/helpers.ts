@@ -100,11 +100,16 @@ export async function createProjectRow(input: {
   clientId: string;
   pmId: string;
   priority?: string;
+  key?: string;
 }) {
   const { data, error } = await adminClient()
     .from("projects")
     .insert({
       name: testName(input.name),
+      // `key` es unique global; entre tests distintos el nombre puede compartir
+      // el prefijo derivado (`testName` empieza igual siempre), así que a menos
+      // que el test pase uno explícito, generamos uno aleatorio.
+      key: input.key ?? randomTestProjectKey(),
       client_id: input.clientId,
       pm_id: input.pmId,
       priority: input.priority ?? "normal",
@@ -113,6 +118,18 @@ export async function createProjectRow(input: {
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Clave aleatoria valida para `projects.key` (`^[A-Z][A-Z0-9]{1,7}$`, 2-8
+ * chars). Usar cuando un test inserta proyectos directamente y no le importa
+ * qué clave termine teniendo.
+ */
+export function randomTestProjectKey(): string {
+  // Prefijo de letra + 5 chars alfanuméricos. crypto.randomUUID sirve porque
+  // los hex chars (0-9a-f) caen dentro del set permitido, y prefijar con "T"
+  // garantiza que empiece con letra.
+  return "T" + crypto.randomUUID().replace(/-/g, "").slice(0, 5).toUpperCase();
 }
 
 /**
