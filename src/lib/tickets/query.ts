@@ -1,0 +1,190 @@
+import { cache } from "react";
+
+import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
+
+import { formatTicketKey, parseTicketKey } from "./keys";
+import type { TicketFilters } from "./url";
+
+type TicketStatus = Database["public"]["Enums"]["ticket_status"];
+type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
+
+/**
+ * Fila del listado. `key` viene armada acá para que el UI no tenga que
+ * recomponerla en cada render (y no se le escape mal formada).
+ */
+export type TicketListItem = {
+  id: string;
+  key: string;
+  numero: number;
+  title: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  updatedAt: string;
+  project: { id: string; key: string; name: string };
+};
+
+/** Detalle de ticket para `/tickets/:key`. Suma `description` y datos del alta. */
+export type TicketDetail = TicketListItem & {
+  description: string | null;
+  createdBy: string;
+  createdById: string;
+  createdAt: string;
+  project: TicketListItem["project"] & { pmId: string; active: boolean };
+};
+
+/**
+ * Listado de tickets. Todas las queries pasan por RLS: un usuario que no es
+ * miembro de un proyecto no ve sus tickets aunque los pida explícitamente,
+ * porque `tickets: read for project members` los filtra en silencio.
+ *
+ * `assigneeId = 'me'` se resuelve acá contra el `viewerId` que la page pasa
+ * (leído con `getCurrentUser()`). `'unassigned'` va como `is null` a
+ * PostgREST.
+ *
+ * Se hace `cache()` para que si dos componentes de la misma page piden el
+ * listado con los mismos filtros, la query solo corra una vez.
+ */
+export const getTicketsList = cache(
+  async (filters: TicketFilters, viewerId: string | null): Promise<TicketListItem[]> => {
+    const supabase = await createClient();
+
+    let query = supabase
+      .from("tickets")
+      .select(
+        `
+          id,
+          numero,
+          title,
+          status,
+          priority,
+          assignee_id,
+          updated_at,
+          project:projects!inner ( id, key, name ),
+          assignee:profiles!tickets_assignee_id_fkey ( full_name )
+        `,
+      )
+      .order("updated_at", { ascending: false });
+
+    if (filters.projectId) query = query.eq("project_id", filters.projectId);
+    if (filters.statuses.length > 0) query = query.in("status", filters.statuses);
+    if (filters.priorities.length > 0) query = query.in("priority", filters.priorities);
+
+    if (filters.assigneeId === "me" && viewerId) {
+      query = query.eq("assignee_id", viewerId);
+    } else if (filters.assigneeId === "unassigned") {
+      query = query.is("assignee_id", null);
+    } else if (filters.assigneeId && filters.assigneeId !== "me") {
+      query = query.eq("assignee_id", filters.assigneeId);
+    }
+
+    // ILIKE con % en ambos extremos: para 6 personas y ~100 tickets/mes es más
+    // que suficiente. Full-text (pg_trgm) queda para cuando duela.
+    if (filters.q) {
+      query = query.ilike("title", `%${filters.q}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data ?? []).map((row): TicketListItem => {
+      // `project` y `assignee` son embeds — PostgREST los devuelve como objeto
+      // o array según la cardinalidad; el `!inner` de project fuerza objeto,
+      // pero assignee es nullable así que puede venir null.
+      const project = row.project;
+      const assignee = row.assignee;
+      return {
+        id: row.id,
+        numero: row.numero,
+        key: formatTicketKey({ key: project.key, numero: row.numero }),
+        title: row.title,
+        status: row.status,
+        priority: row.priority,
+        assigneeId: row.assignee_id,
+        assigneeName: assignee?.full_name ?? null,
+        updatedAt: row.updated_at,
+        project: {
+          id: project.id,
+          key: project.key,
+          name: project.name,
+        },
+      };
+    });
+  },
+);
+
+/**
+ * Detalle por `PROJ-N`. Devuelve `null` en tres casos que la page trata
+ * igual — todos como 404 (AC-6.1 del spec, R-4 del plan):
+ *
+ *   - La clave no parsea (`parseTicketKey` devuelve null).
+ *   - El proyecto con esa `key` no existe (o RLS lo esconde).
+ *   - El ticket con ese `numero` en ese proyecto no existe (o RLS lo esconde).
+ *
+ * La API no revela cuál de los tres es; una page que respondiera 403 en el
+ * tercer caso pero 404 en el segundo estaría diciendo "el ticket existe pero
+ * no lo podés ver", que es exactamente lo que la feature no puede hacer.
+ */
+export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail | null> => {
+  const parsed = parseTicketKey(rawKey);
+  if (!parsed) return null;
+
+  const supabase = await createClient();
+
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, key, name, pm_id, active")
+    .eq("key", parsed.projectKey)
+    .maybeSingle();
+
+  if (!project) return null;
+
+  const { data: ticket } = await supabase
+    .from("tickets")
+    .select(
+      `
+        id,
+        numero,
+        title,
+        description,
+        status,
+        priority,
+        assignee_id,
+        updated_at,
+        created_at,
+        created_by,
+        assignee:profiles!tickets_assignee_id_fkey ( full_name ),
+        creator:profiles!tickets_created_by_fkey ( full_name )
+      `,
+    )
+    .eq("project_id", project.id)
+    .eq("numero", parsed.numero)
+    .maybeSingle();
+
+  if (!ticket) return null;
+
+  return {
+    id: ticket.id,
+    numero: ticket.numero,
+    key: formatTicketKey({ key: project.key, numero: ticket.numero }),
+    title: ticket.title,
+    description: ticket.description,
+    status: ticket.status,
+    priority: ticket.priority,
+    assigneeId: ticket.assignee_id,
+    assigneeName: ticket.assignee?.full_name ?? null,
+    updatedAt: ticket.updated_at,
+    createdAt: ticket.created_at,
+    createdBy: ticket.creator?.full_name ?? ticket.created_by,
+    createdById: ticket.created_by,
+    project: {
+      id: project.id,
+      key: project.key,
+      name: project.name,
+      pmId: project.pm_id,
+      active: project.active,
+    },
+  };
+});
