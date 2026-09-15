@@ -2,7 +2,7 @@
 
 - **ID:** 015-project-membership-and-tickets
 - **Spec de referencia:** `./spec.md`
-- **Estado:** draft
+- **Estado:** ready
 - **Depende de:** `001-auth-and-permissions`, `002-entities-admin`, `010-notifications-and-audit`, `012-multiple-roles-and-active-enforcement`
 
 ---
