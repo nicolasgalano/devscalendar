@@ -35,6 +35,23 @@ Flujo por feature: **spec → plan → tasks → implementación**. Ver `specs/R
 
 ---
 
+## Branches
+
+Toda feature nueva se desarrolla en **un branch propio que sale de `develop`** y **mergea de vuelta a `develop`** al terminar. `develop` es la rama integradora; `main` es la de deploy y se actualiza aparte —un push a `main` dispara Vercel (ver "Deploy")—, así que trabajar directo sobre `main` mezcla desarrollo con release.
+
+Esto vale también cuando el trabajo lo hace la IA: si arrancás una conversación con Claude Code parado en `develop` para empezar una feature, el primer paso es crear el branch, no editar archivos. Cualquier dev que abra este repo tiene que seguir el mismo flujo.
+
+Flujo:
+
+1. Antes de arrancar: `git checkout develop && git pull`.
+2. Crear el branch: `git checkout -b feature/NNN-<slug>`, con el mismo `NNN-<slug>` de `specs/features/`.
+3. Commits, PRs y revisiones sobre ese branch.
+4. Al terminar la feature: merge a `develop`. El pasaje `develop → main` es un paso separado, no parte de este flujo.
+
+**Nada de commits directos sobre `develop` ni sobre `main`.** La única excepción son cambios que no son de una feature (typos en docs, ajustes de config puntuales), y aun así preferí un branch corto antes que ensuciar el historial de `develop` con commits sueltos.
+
+---
+
 ## Idiomas y convenciones
 
 - **Español:** specs, plans, glosario, ADRs de producto, copy de UI.
