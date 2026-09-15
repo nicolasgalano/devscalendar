@@ -67,10 +67,10 @@ Una migration `YYYYMMDDHHMMSS_015_project_membership_and_tickets.sql` con el ord
 
 ## Phase 6 — Markdown
 
-- [ ] **T6.1** — Deps: `pnpm add react-markdown remark-gfm rehype-sanitize`. Verificar bundle: son ~30–40 kB gz sumadas; si es más, revisar. _DoD: `pnpm build` OK, bundle report sin sorpresas._
-- [ ] **T6.2** — Schema de `rehype-sanitize` en `src/lib/markdown/sanitize.ts` según whitelist de `plan.md` §8.1. Deny explícito de imágenes, iframes, `html` crudo, `on*`, `style`, `class`, schemes distintos a `http/https/mailto`. _DoD: T7.1 (unit) cubre `<script>`, `<iframe>`, `javascript:` URLs, `<img>`, atributos peligrosos._
-- [ ] **T6.3** — `<MarkdownViewer content />` en `src/lib/markdown/viewer.tsx`. Server-safe (sin `"use client"`). Empty state italicizado "Sin descripción". _DoD: manual, con contenidos de `plan.md` §8.1._
-- [ ] **T6.4** — `<MarkdownEditor value onChange placeholder maxLength />` en `src/lib/markdown/editor.tsx`. `"use client"`, `<Tabs>` de shadcn con "Escribir" y "Vista previa", mini-toolbar de tres botones (`bold`, `italic`, `link`) que insertan sintaxis en el textarea. _DoD: manual — tipear un ticket real desde el dialog._
+- [x] **T6.1** — Deps: `pnpm add react-markdown remark-gfm rehype-sanitize`. Build OK. _DoD cumplido._
+- [x] **T6.2** — Schema de `rehype-sanitize` en `src/lib/markdown/sanitize.ts`: whitelist explícita sobre `defaultSchema` (headings h1–h4, énfasis, code inline/block, listas + task lists, blockquotes, links con `http/https/mailto`, tablas gfm). Excluye imágenes, iframes, `<html>` crudo, atributos `on*`/`style`/`class`. **Tip**: `rehype-sanitize` re-exporta el tipo como `Options`, no `Schema`. _DoD: T9.1._
+- [x] **T6.3** — `<MarkdownViewer content />` en `src/lib/markdown/viewer.tsx`. Server-safe. Empty state italicizado "Sin descripción". Links con `target="_blank" rel="noopener noreferrer"`. Estilos con clases `prose` de Tailwind. _DoD: manual (Phase 7)._
+- [x] **T6.4** — `<MarkdownEditor value onChange placeholder maxLength />` en `src/lib/markdown/editor.tsx`. `"use client"`. **Sin shadcn `<Tabs>`** (no está instalado; para dos tabs, dos botones que togglean state alcanzan). Mini-toolbar `bold`/`italic`/`link` que envuelve la selección; `link` deja el cursor dentro de `(url)` para escribir la URL. Contador `X / 10.000`. _DoD: manual (Phase 7)._
 
 ## Phase 7 — UI: tickets
 
