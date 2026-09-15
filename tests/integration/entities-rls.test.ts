@@ -8,6 +8,7 @@ import {
   createTestUser,
   createUserWithRole,
   deleteTestUser,
+  randomTestProjectKey,
   signInClient,
 } from "./helpers";
 import { testEmail } from "../run-id";
@@ -95,6 +96,7 @@ describe("clients / projects / profile_invites / profiles RLS", () => {
     const client = await signInClient(developer.email, password);
     const { error } = await client.from("projects").insert({
       name: `nope-${randomUUID()}`,
+      key: randomTestProjectKey(),
       client_id: seededClientId,
       pm_id: developer.id,
     });

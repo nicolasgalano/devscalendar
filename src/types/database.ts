@@ -152,6 +152,7 @@ export type Database = {
           payload: Json;
           read_at: string | null;
           recipient_id: string;
+          ticket_id: string | null;
           type: string;
         };
         Insert: {
@@ -165,6 +166,7 @@ export type Database = {
           payload?: Json;
           read_at?: string | null;
           recipient_id: string;
+          ticket_id?: string | null;
           type: string;
         };
         Update: {
@@ -178,6 +180,7 @@ export type Database = {
           payload?: Json;
           read_at?: string | null;
           recipient_id?: string;
+          ticket_id?: string | null;
           type?: string;
         };
         Relationships: [
@@ -193,6 +196,13 @@ export type Database = {
             columns: ["recipient_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "tickets";
             referencedColumns: ["id"];
           },
         ];
@@ -270,6 +280,51 @@ export type Database = {
           },
         ];
       };
+      project_members: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          id: string;
+          project_id: string;
+          role_in_project: Database["public"]["Enums"]["project_member_role"];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          project_id: string;
+          role_in_project?: Database["public"]["Enums"]["project_member_role"];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          project_id?: string;
+          role_in_project?: Database["public"]["Enums"]["project_member_role"];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_members_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       projects: {
         Row: {
           active: boolean;
@@ -277,7 +332,9 @@ export type Database = {
           created_at: string;
           id: string;
           jira_enabled: boolean;
+          key: string;
           name: string;
+          next_ticket_number: number;
           pm_id: string;
           priority: string;
           slack_enabled: boolean;
@@ -289,7 +346,9 @@ export type Database = {
           created_at?: string;
           id?: string;
           jira_enabled?: boolean;
+          key: string;
           name: string;
+          next_ticket_number?: number;
           pm_id: string;
           priority?: string;
           slack_enabled?: boolean;
@@ -301,7 +360,9 @@ export type Database = {
           created_at?: string;
           id?: string;
           jira_enabled?: boolean;
+          key?: string;
           name?: string;
+          next_ticket_number?: number;
           pm_id?: string;
           priority?: string;
           slack_enabled?: boolean;
@@ -324,15 +385,92 @@ export type Database = {
           },
         ];
       };
+      tickets: {
+        Row: {
+          assignee_id: string | null;
+          created_at: string;
+          created_by: string;
+          description: string | null;
+          id: string;
+          numero: number;
+          priority: Database["public"]["Enums"]["ticket_priority"];
+          project_id: string;
+          status: Database["public"]["Enums"]["ticket_status"];
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          assignee_id?: string | null;
+          created_at?: string;
+          created_by: string;
+          description?: string | null;
+          id?: string;
+          numero: number;
+          priority?: Database["public"]["Enums"]["ticket_priority"];
+          project_id: string;
+          status?: Database["public"]["Enums"]["ticket_status"];
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          assignee_id?: string | null;
+          created_at?: string;
+          created_by?: string;
+          description?: string | null;
+          id?: string;
+          numero?: number;
+          priority?: Database["public"]["Enums"]["ticket_priority"];
+          project_id?: string;
+          status?: Database["public"]["Enums"]["ticket_status"];
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tickets_assignee_id_fkey";
+            columns: ["assignee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tickets_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tickets_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
       can_manage_booking: { Args: { target_project: string }; Returns: boolean };
+      can_view_project: {
+        Args: { p_project_id: string; p_user_id?: string };
+        Returns: boolean;
+      };
       has_any_role: { Args: never; Returns: boolean };
       has_role: {
         Args: { target: Database["public"]["Enums"]["user_role"] };
+        Returns: boolean;
+      };
+      is_admin: { Args: { p_user_id?: string }; Returns: boolean };
+      is_pm_of_project: {
+        Args: { p_project_id: string; p_user_id?: string };
+        Returns: boolean;
+      };
+      is_project_member: {
+        Args: { p_project_id: string; p_user_id?: string };
         Returns: boolean;
       };
       mark_notifications_read: { Args: { ids: string[] }; Returns: number };
@@ -342,6 +480,15 @@ export type Database = {
           notification_type: string;
           target_booking: string;
           target_recipient: string;
+        };
+        Returns: undefined;
+      };
+      notify_user_for_ticket: {
+        Args: {
+          notification_payload: Json;
+          notification_type: string;
+          target_recipient: string;
+          target_ticket: string;
         };
         Returns: undefined;
       };
@@ -357,8 +504,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      role_in_project: {
+        Args: { p_project_id: string; p_user_id?: string };
+        Returns: Database["public"]["Enums"]["project_member_role"];
+      };
     };
     Enums: {
+      project_member_role: "viewer" | "contributor" | "lead";
+      ticket_priority: "low" | "medium" | "high" | "critical";
+      ticket_status: "todo" | "in_progress" | "in_review" | "blocked" | "done" | "cancelled";
       user_role: "admin" | "pm" | "developer";
     };
     CompositeTypes: {
@@ -481,6 +635,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      project_member_role: ["viewer", "contributor", "lead"],
+      ticket_priority: ["low", "medium", "high", "critical"],
+      ticket_status: ["todo", "in_progress", "in_review", "blocked", "done", "cancelled"],
       user_role: ["admin", "pm", "developer"],
     },
   },

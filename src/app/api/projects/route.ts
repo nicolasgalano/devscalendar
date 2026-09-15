@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/api/read-json";
 import { requireAdmin } from "@/lib/api/require-admin";
 import { isPm } from "@/lib/auth/roles";
+import { deriveProjectKey } from "@/lib/projects/keys";
 import { createProjectSchema } from "@/lib/validation/projects";
 
 export async function POST(request: Request) {
@@ -35,10 +36,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // `key` se deriva del nombre hasta que T8.1 agregue el input explícito en el
+  // form de admin. La derivación replica el backfill de la migration 14.
   const { data, error } = await supabase
     .from("projects")
     .insert({
       name,
+      key: deriveProjectKey(name),
       client_id: clientId,
       pm_id: pmId,
       priority,
@@ -50,6 +54,17 @@ export async function POST(request: Request) {
 
   if (error) {
     if (error.code === "23505") {
+      // Dos unique constraints: (client_id, name) por proyecto/cliente, y (key)
+      // global. Distinguir por el nombre del constraint que dispara el error.
+      if (error.message?.includes("projects_key_unique")) {
+        return NextResponse.json(
+          {
+            error:
+              "La clave derivada del nombre ya está en uso por otro proyecto. Ajustá el nombre para que las primeras letras sean distintas.",
+          },
+          { status: 409 },
+        );
+      }
       return NextResponse.json(
         { error: "Ya existe un proyecto con ese nombre para este cliente" },
         { status: 409 },

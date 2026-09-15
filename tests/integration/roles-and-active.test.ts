@@ -12,6 +12,7 @@ import {
   createTestUser,
   createUserWithRole,
   deleteTestUser,
+  randomTestProjectKey,
   signInClient,
 } from "./helpers";
 import { testEmail } from "../run-id";
@@ -227,7 +228,12 @@ describe("multiple roles and active enforcement", () => {
     // viejo hacía imposible: `projects.pm_id` exigía `role = 'pm'` exacto.
     const { data: project, error: projectError } = await client
       .from("projects")
-      .insert({ name: `012 proyecto ${randomUUID()}`, client_id: created!.id, pm_id: pmAdmin.id })
+      .insert({
+        name: `012 proyecto ${randomUUID()}`,
+        key: randomTestProjectKey(),
+        client_id: created!.id,
+        pm_id: pmAdmin.id,
+      })
       .select("id, pm_id")
       .single();
 
