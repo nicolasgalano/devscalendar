@@ -60,10 +60,10 @@ Una migration `YYYYMMDDHHMMSS_015_project_membership_and_tickets.sql` con el ord
 
 ## Phase 5 — API
 
-- [ ] **T5.1** — `POST /api/tickets` con `readJsonBody` + `createTicketSchema` + `requireProjectMembership(body.project_id, 'contributor')`. `assignee_id` validado contra `is_project_member` (AC-2.3 del spec) — el chequeo lo puede hacer el mismo handler antes de insertar, o dejar que el `check` del insert la rechace y traducir el error. Preferir el chequeo explícito para el mensaje. Responde `201 { ticket, key }`. _DoD: T7.3 (integración) verifica los 200/400/403/409 esperados._
-- [ ] **T5.2** — `PATCH /api/tickets/:id` con `updateTicketSchema` + `requireTicketAccess(id)`. Traduce los errores del trigger contributor-scope (`check_violation` con `hint`) a `403` con `reason`. Traduce ausencia del ticket a `404` (AC-6.1). _DoD: T7.3._
-- [ ] **T5.3** — `POST /api/project-members` con `createMemberSchema` + `requireProjectMembership(body.project_id, 'pm')` (o admin). _DoD: T7.3._
-- [ ] **T5.4** — `PATCH /api/project-members/:id` con `updateMemberSchema`. Deriva el `projectId` del member antes de pedir el guard. _DoD: T7.3._
+- [x] **T5.1** — `POST /api/tickets` con `readJsonBody` + `createTicketSchema` + `requireProjectMembership(body.project_id, 'contributor')`. `assignee_id` validado con `rpc('can_view_project')` — cubre admin/PM/miembro con un solo llamado, misma unión que la RLS. Chequea proyecto activo (AC-2.5). Devuelve `201 { ...ticket, key }` con la clave formateada. `numero` la asigna el trigger; se hace cast a `Insert` porque el codegen la marca como required (columna sin default de tabla). _DoD: T9.2._
+- [x] **T5.2** — `PATCH /api/tickets/:id` con `updateTicketSchema` + `requireTicketAccess(id)`. Traduce `check_violation` con `hint` a `403` con `reason` (el trigger contributor-scope); `check_violation` sin hint a `400` (title length). Reasignar valida al nuevo asignado igual que el POST. Cuando el update no devuelve fila (RLS filtró en silencio), responde `403` explícito. _DoD: T9.2._
+- [x] **T5.3** — `POST /api/project-members` con `createMemberSchema` + `requireProjectMembership(body.project_id, 'pm')`. **No hace upsert a propósito**: el 23505 sobre `(project_id, user_id)` responde `409` con mensaje "usá PATCH para reactivarlo" — evita bajar el rol de un `lead` a `contributor` sin querer. _DoD: T9.2._
+- [x] **T5.4** — `PATCH /api/project-members/:id` con `updateMemberSchema`. Lee el `project_id` del member con cliente autenticado (RLS filtra) antes de pedir el guard `requireProjectMembership(pm)` — mismo patrón que `PATCH /api/bookings/:id`. Cuando el update no devuelve fila, `403` explícito. _DoD: T9.2._
 
 ## Phase 6 — Markdown
 
