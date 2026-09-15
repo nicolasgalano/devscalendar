@@ -54,9 +54,9 @@ Una migration `YYYYMMDDHHMMSS_015_project_membership_and_tickets.sql` con el ord
 
 ## Phase 4 — Notificaciones
 
-- [ ] **T4.1** — Agregar `ticket_assigned` y `ticket_status_changed` a `src/lib/notifications/events.ts` (`plan.md` §6). Los payloads guardan hechos (IDs, status crudos, actor); el copy vive en el builder — cambia sin migration (ADR 0012).
-- [ ] **T4.2** — El sender (`src/lib/notifications/dispatch.ts` o donde viva hoy la resolución de `ctx`) tiene que armar `ticketKey` con un join a `projects.key` + `tickets.numero`. **No lo hace el trigger** — el trigger solo guarda IDs. _DoD: T5.2 valida el copy resultante con un mock del sender._
-- [ ] **T4.3** — Email templates (subject + HTML minimalista, patrón `010`). Sin `RESEND_API_KEY` las filas quedan `pending` y no rompe nada (CLAUDE.md §Notificaciones). _DoD: manual — mandar uno de prueba a tu propio email si la key está._
+- [x] **T4.1** — Agregar `ticket_assigned` y `ticket_status_changed` a `NOTIFICATION_TYPES` en `src/lib/notifications/events.ts`. `NotificationRow` gana `ticketId` y `ticketKey` (`PROJ-N`); `NotificationPayload` gana los campos de tickets (`title`, `project_id`, `from_status`, `to_status`, actores). `notificationTitle(type, ticketKey?)` incluye la clave para los dos nuevos; `notificationDetail` traduce el par de estados con `TICKET_STATUS_LABELS`; `notificationHref(row)` acepta la row entera para decidir entre `/calendar` y `/tickets/PROJ-N`.
+- [x] **T4.2** — `ticketKey` se resuelve al leer con join a `tickets → projects (key)`, no en el trigger — que solo guarda IDs. **Es seguro** por `enforce_project_key_immutable`: si hay ticket, la key no cambia. Aplicado en `src/lib/notifications/query.ts` (bandeja) y `src/app/api/notifications/dispatch/route.ts` (email); ambos pasan `ticketKey` a `emailSubject`/`emailBody`/`notificationTitle`/`notificationHref`.
+- [x] **T4.3** — Emails: `emailSubject` y `emailBody` aceptan `ticketKey` opcional para armar el asunto con `PROJ-N`. El template en texto plano ya soportaba cualquier tipo — no hace falta HTML aparte, sigue el patrón de `010`. Sin `RESEND_API_KEY` las filas quedan `pending` como antes.
 
 ## Phase 5 — API
 

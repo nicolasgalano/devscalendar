@@ -62,13 +62,27 @@ export async function POST(request: Request) {
   // pasa a `sending` con `returning`, así que si el drenaje inline y el cron
   // corren a la vez, cada uno se lleva filas distintas y nadie manda dos veces
   // el mismo aviso.
+  //
+  // El embed a `tickets → projects` es lo que le permite al subject/body armar
+  // el `PROJ-N` sin congelarlo en el payload. Seguro porque
+  // `enforce_project_key_immutable` (migration 14) prohíbe cambiar la key con
+  // tickets existentes.
   const { data: claimed, error: claimError } = await admin
     .from("notifications")
     .update({ email_status: "sending" })
     .eq("email_status", "pending")
     .lt("email_attempts", MAX_ATTEMPTS)
     .select(
-      "id, type, payload, booking_id, email_attempts, recipient:profiles!inner(email, active)",
+      `
+        id,
+        type,
+        payload,
+        booking_id,
+        ticket_id,
+        email_attempts,
+        recipient:profiles!inner(email, active),
+        ticket:tickets ( numero, project:projects ( key ) )
+      `,
     )
     .limit(BATCH);
 
@@ -100,12 +114,19 @@ export async function POST(request: Request) {
     // un tipo nuevo rompa el compilador en vez de mandar un mail sin texto.
     const type = row.type as NotificationType;
     const payload = (row.payload ?? {}) as NotificationPayload;
-    const href = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${notificationHref(row.booking_id)}`;
+    const ticketKey =
+      row.ticket && row.ticket.project
+        ? `${row.ticket.project.key}-${row.ticket.numero}`
+        : null;
+    const href = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${notificationHref({
+      bookingId: row.booking_id,
+      ticketKey,
+    })}`;
 
     const result = await sendEmail({
       to: recipient.email,
-      subject: emailSubject(type, payload),
-      body: emailBody(type, payload, href),
+      subject: emailSubject(type, payload, ticketKey),
+      body: emailBody(type, payload, href, ticketKey),
     });
 
     if (result.status === "sent") {
