@@ -40,9 +40,9 @@ Una migration `YYYYMMDDHHMMSS_015_project_membership_and_tickets.sql` con el ord
 
 ## Phase 2 — Auth y validación
 
-- [ ] **T2.1** — Zod schemas en `src/lib/validation/tickets.ts` (`plan.md` §7.2): `createTicketSchema`, `updateTicketSchema` (partial + refine no-vacío), `createMemberSchema`, `updateMemberSchema`. `description` tope 10 000 chars. _DoD: unit test con casos límite (title vacío, description gigante, priority inválida, assignee_id no-uuid)._
-- [ ] **T2.2** — `requireProjectMembership(projectId, minRole)` en `src/lib/api/require-project-membership.ts` (`plan.md` §7.3). Traduce a `NotFoundError` / `UnauthorizedError` / `ForbiddenError` según el patrón de `requireAdmin` / `requireBookingAccess`. **Regla crítica**: si el proyecto no existe → `NotFoundError`, no `ForbiddenError` (AC-6.1). _DoD: T5.1._
-- [ ] **T2.3** — `requireTicketAccess(ticketId)` en `src/lib/api/require-ticket-access.ts`: hace `select` del ticket + proyecto, y de ahí delega a `requireProjectMembership`. Si el `select` devuelve `null`, `NotFoundError`. _DoD: T5.1 y T5.4 (E2E de 404)._
+- [x] **T2.1** — Zod schemas en `src/lib/validation/tickets.ts` (`plan.md` §7.2): `createTicketSchema`, `updateTicketSchema` (partial + refine no-vacío), `createMemberSchema`, `updateMemberSchema`. `description` tope 10 000 chars, se normaliza `""` a `null`. Se re-exportan también las tres constantes de enum (`ticketStatus`, `ticketPriority`, `projectMemberRole`) con `satisfies` contra `Database["public"]["Enums"]`. _DoD: T9.1 (unit tests, pendiente en Phase 9)._
+- [x] **T2.2** — `requireProjectMembership(projectId, minRole)` en `src/lib/api/require-project-membership.ts` (`plan.md` §7.3). Sigue el patrón discriminado `{ ok, supabase, userId, role } | { ok, response }` de `requireAdmin` / `requireBookingAccess` — no throws, no NotFoundError como excepción. Devuelve el rol otorgado (`admin`/`pm`/`lead`/`contributor`) para que los handlers puedan aplicar reglas más finas. **Cuando el proyecto no existe / no es visible → 404, no 403** (AC-6.1). _DoD: T9.2._
+- [x] **T2.3** — `requireTicketAccess(ticketId)` en `src/lib/api/require-ticket-access.ts`: hace `select` del ticket con cliente autenticado (RLS filtra); si `null`, 404 sin distinguir "no existe" de "no autorizado". Después delega en `requireProjectMembership(project_id, 'contributor')` — así los viewers reciben 403 aunque puedan hacer select. _DoD: T9.2 y T9.4 (E2E)._
 
 ## Phase 3 — Dominio del cliente
 
