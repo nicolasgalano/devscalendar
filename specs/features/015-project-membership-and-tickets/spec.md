@@ -1,7 +1,7 @@
 # Spec — Membresía por proyecto y tickets
 
 - **ID:** 015-project-membership-and-tickets
-- **Estado:** draft
+- **Estado:** ready
 - **Referencias en la spec funcional:** § nueva (módulo tickets); complementa §4 (calendario), §11 (roles).
 
 ---

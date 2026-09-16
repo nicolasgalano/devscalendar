@@ -431,6 +431,23 @@ Aplicado en la feature `011-planning-view`:
 - **Días no laborables tratados igual que en las otras vistas** (§5, §8) — sábados, domingos y feriados argentinos van con fondo `--muted` y no interactivos. Es la misma coherencia que impone la rampa de ocupación: si la vista Mes muestra un booking de sábado con su tratamiento y la vista Planificación lo esconde, un PM que salta entre las dos pierde información. Reusa el helper `isWorkday()`.
 - **Empty state estructural en las cuatro vistas** (§9, sobrescribe la regla del "título más verbo") — sin filtros y sin reservas, la vista renderiza su grilla vacía en vez del cartel `Sin reservas en este período`. La acción primaria `Crear reserva` **se muda del cartel al encabezado** y ahí se queda. El cartel se conserva **solo para el caso filtrado** (`Ninguna reserva coincide con cliente Nimbus SRL…`), que es el único donde nombrar el filtro sí aporta algo que la grilla vacía no puede transmitir. Este cambio rompe deliberadamente el punto de "un botón con verbo en el vacío" (§9): sin filtros la vista no está vacía como decisión ausente, está vacía como estado del mundo — y una grilla en blanco es más honesta que un cartel.
 
+Aplicado en la feature `015-project-membership-and-tickets`:
+
+- **Kanban como sistema de estado propio, sin colores nuevos** (§8) — el tablero de proyecto usa **icono + texto** para el estado en cada tarjeta (mismo criterio que `BookingStatusTag` de `003`): `todo`/`in_progress`/`in_review` en `--secondary-foreground`, `blocked` sube a `--attention` porque es el único que reclama acción, `done`/`cancelled` a `--muted-foreground` porque son terminales. El header de columna usa el mismo label. Cero fondos de color en superficies grandes — la columna sigue siendo `--surface` neutra.
+- **Prioridad de ticket estira la escala de dos a cuatro niveles sin agregar tokens** (§3, nota) — `low` es `outline` (borde neutro), `medium` es `priority-normal` (gris relleno), `high` es `priority-high` (naranja), `critical` es `danger` (rojo). La `--attention` no se usa acá porque el conjunto ya tiene un rojo que dice "urgencia" mejor que el ámbar. La regla original ("común no lleva color, prioritario sí") se conserva en `low`/`medium`.
+
+Aplicado en la feature `017-workspaces-and-boards`:
+
+**Excepciones deliberadas a `DESIGN.md` §1 y §6**, acotadas y documentadas:
+
+- **La home (`/`) es un dispatcher, no un dashboard** — rompe "no es un sitio web, no hay contenedor centrado con ancho máximo" de §1/§6. El contenido va contenido a `max-w-3xl` centrado, con dos a cuatro cards según rol (DevCalendar, Proyectos, Bandeja, Administración). El motivo: un dispatcher pegado al ancho de pantalla se lee como error de layout, no como "densidad", y esta pantalla no tiene datos que mostrar densamente — su única función es elegir a dónde ir. La excepción **no propaga**: el resto de la app conserva la regla, y la home sigue siendo sin hero, sin emojis, sin gradientes ni sombras decorativas.
+- **La home no aparece como ítem del sidebar** (§7) — el criterio de "un ítem activo, siempre" se resuelve dejando la home fuera del nav. El acceso es por el logo/nombre del top-left del sidebar. Cuando el usuario está en la home, ningún ítem está activo — es coherente: la home es "no estás en ninguna vista de trabajo".
+- **Tabs de workspace de proyecto** (§7) — "Tablero" y "Backlog" dentro de `/projects/[key]` son un patrón nuevo: dos vistas alternativas del mismo dataset. Se resuelven como `<Link>` con `aria-current="page"`, subrayado en `--primary` sobre el activo, `--secondary-foreground` sobre el inactivo. La determinación de activo por segmento del path — mismo criterio que el sidebar. No es una excepción sino una extensión: aplica los principios de §7 a un nivel más adentro de la jerarquía.
+
+Aplicado como **infra transversal** con `017`:
+
+- **Sync indicator flotante (bottom-right)** — `<SyncIndicatorProvider>` + `useSyncIndicator()` en `src/components/sync-indicator.tsx`. Pill de 32px con spinner + label, `fixed right-6 bottom-6`, fade in/out de 180ms con `cubic-bezier(0.2,0,0,1)` (§10) y `motion-reduce:transition-none`. Sombra permitida por §2 (elemento flotante). Refcount interno: dos operaciones simultáneas cuentan como dos entradas y el indicador se apaga cuando ambas terminan. Es la base para todo trabajo asíncrono que le importa al usuario ver — arrastrar en el kanban es el primero que lo usa.
+
 Pendiente, por depender de features todavía no construidas:
 
 - **Navegación por teclado en filas** (§7) — cuando exista una vista de detalle a la que abrir.

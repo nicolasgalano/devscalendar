@@ -48,7 +48,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
     // Navegar primero y marcar después: si el POST falla, el usuario igual llegó
     // a donde quería. Un aviso que no se marca es ruido; uno que no lleva a
     // ningún lado es un bug.
-    router.push(notificationHref(notification.bookingId));
+    router.push(notificationHref(notification));
 
     if (notification.readAt === null) {
       await fetch("/api/notifications/read", {
@@ -112,7 +112,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
                   )}
                 >
                   <span className="text-emphasis text-ui font-medium">
-                    {notificationTitle(notification.type)}
+                    {notificationTitle(notification.type, notification.ticketKey)}
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {describeSlot(notification.payload)}

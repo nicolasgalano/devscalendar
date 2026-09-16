@@ -12,24 +12,47 @@ const LIMIT = 15;
  * ningún `.eq("recipient_id", …)` a propósito — agregarlo daría la impresión de
  * que la seguridad vive en el query, y el día que alguien lo saque no pasaría
  * nada, que es peor que si pasara.
+ *
+ * El embed a `tickets → projects` resuelve `ticketKey` (`PROJ-N`) al leer, sin
+ * congelarlo en el payload. Es seguro por `enforce_project_key_immutable`
+ * (migration 14): una vez que hay tickets, `projects.key` no cambia — y si
+ * hay notificación con `ticket_id`, hay ticket.
  */
 export async function getMyNotifications(): Promise<NotificationRow[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, type, booking_id, payload, read_at, created_at")
+    .select(
+      `
+        id,
+        type,
+        booking_id,
+        ticket_id,
+        payload,
+        read_at,
+        created_at,
+        ticket:tickets ( numero, project:projects ( key ) )
+      `,
+    )
     .order("created_at", { ascending: false })
     .limit(LIMIT);
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    type: row.type as NotificationType,
-    bookingId: row.booking_id,
-    payload: (row.payload ?? {}) as NotificationPayload,
-    readAt: row.read_at,
-    createdAt: row.created_at,
-  }));
+  return (data ?? []).map((row) => {
+    const ticket = row.ticket;
+    const ticketKey =
+      ticket && ticket.project ? `${ticket.project.key}-${ticket.numero}` : null;
+    return {
+      id: row.id,
+      type: row.type as NotificationType,
+      bookingId: row.booking_id,
+      ticketId: row.ticket_id,
+      ticketKey,
+      payload: (row.payload ?? {}) as NotificationPayload,
+      readAt: row.read_at,
+      createdAt: row.created_at,
+    };
+  });
 }

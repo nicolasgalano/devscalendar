@@ -19,3 +19,23 @@ export function deriveProjectKey(name: string): string {
   const cleaned = name.replace(/[^A-Za-z]/g, "").slice(0, 6).toUpperCase();
   return cleaned.length >= 2 ? cleaned : "PROJ";
 }
+
+/**
+ * Parser de `projects.key` para rutas `/projects/[projectKey]`. Mismo patrón
+ * que `parseTicketKey` de `src/lib/tickets/keys.ts`: nunca tira, case-insensitive
+ * en el input, canónico en mayúsculas en el output.
+ *
+ * El regex refleja el check constraint de la tabla: primera letra alfabética,
+ * luego 1–7 alfanuméricos. `parseTicketKey` rechaza estos inputs (porque exige
+ * `-N` al final), y `parseProjectKey` rechaza los de ticket. Sin ambigüedad.
+ *
+ * Devuelve `null` en lugar de tirar para que la page `/projects/[projectKey]`
+ * pueda responder 404 sin explotar.
+ */
+const PROJECT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9]{1,7}$/;
+
+export function parseProjectKey(input: string | null | undefined): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  return PROJECT_KEY_PATTERN.test(trimmed) ? trimmed.toUpperCase() : null;
+}

@@ -24,9 +24,14 @@ export type EmailResult =
 
 const ENDPOINT = "https://api.resend.com/emails";
 
-export function emailSubject(type: NotificationType, payload: NotificationPayload): string {
+export function emailSubject(
+  type: NotificationType,
+  payload: NotificationPayload,
+  ticketKey?: string | null,
+): string {
+  const title = notificationTitle(type, ticketKey);
   const slot = describeSlot(payload);
-  return slot ? `${notificationTitle(type)} — ${slot}` : notificationTitle(type);
+  return slot ? `${title} — ${slot}` : title;
 }
 
 /**
@@ -40,8 +45,9 @@ export function emailBody(
   type: NotificationType,
   payload: NotificationPayload,
   href: string,
+  ticketKey?: string | null,
 ): string {
-  const lines = [notificationTitle(type)];
+  const lines = [notificationTitle(type, ticketKey)];
 
   const slot = describeSlot(payload);
   if (slot) lines.push(slot);

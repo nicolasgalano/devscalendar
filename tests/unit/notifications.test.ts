@@ -70,8 +70,21 @@ describe("notification copy", () => {
   });
 
   it("links to the booking, and to the calendar when there is none", () => {
-    expect(notificationHref("abc")).toBe("/calendar?booking=abc");
-    expect(notificationHref(null)).toBe("/calendar");
+    expect(notificationHref({ bookingId: "abc", ticketKey: null })).toBe(
+      "/calendar?booking=abc",
+    );
+    expect(notificationHref({ bookingId: null, ticketKey: null })).toBe("/calendar");
+  });
+
+  it("links to the ticket detail when the notification carries a ticketKey", () => {
+    expect(notificationHref({ bookingId: null, ticketKey: "WDW-42" })).toBe(
+      "/tickets/WDW-42",
+    );
+    // El ticketKey gana sobre el bookingId — un aviso no debería tener ambos,
+    // pero si los tuviera, es un aviso de ticket.
+    expect(notificationHref({ bookingId: "abc", ticketKey: "WDW-42" })).toBe(
+      "/tickets/WDW-42",
+    );
   });
 
   it("counts only unread", () => {
