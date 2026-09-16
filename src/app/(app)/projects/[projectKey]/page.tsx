@@ -11,5 +11,7 @@ export default async function ProjectWorkspaceRoot({
   params: Promise<{ projectKey: string }>;
 }) {
   const { projectKey } = await params;
-  redirect(`/projects/${projectKey}/board`);
+  // 018: el default del workspace pasa de "Tablero" a "Sprint" — la vista del
+  // sprint activo es la que el equipo mira el 95% del tiempo.
+  redirect(`/projects/${projectKey}/sprint`);
 }

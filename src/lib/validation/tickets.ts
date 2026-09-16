@@ -76,6 +76,12 @@ export const updateTicketSchema = z
     status: ticketStatus.optional(),
     priority: ticketPriority.optional(),
     assignee_id: z.string().uuid().nullable().optional(),
+    // 018: sprint_id nullable => backlog. Solo lead+ puede tocarlo (trigger
+    // enforce_ticket_contributor_scope extendido en migration 16).
+    sprint_id: z.string().uuid().nullable().optional(),
+    // 018: horas estimadas para el reporte de sprint. numeric(5,2) en la
+    // base => max 999.99. Opcional (Q-1: fricción cero al alta).
+    estimated_hours: z.number().nonnegative().max(999.99).nullable().optional(),
   })
   .refine((body) => Object.values(body).some((value) => value !== undefined), {
     message: "Nada para actualizar",

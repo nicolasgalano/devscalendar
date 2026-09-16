@@ -334,6 +334,7 @@ export type Database = {
           jira_enabled: boolean;
           key: string;
           name: string;
+          next_sprint_number: number;
           next_ticket_number: number;
           pm_id: string;
           priority: string;
@@ -348,6 +349,7 @@ export type Database = {
           jira_enabled?: boolean;
           key: string;
           name: string;
+          next_sprint_number?: number;
           next_ticket_number?: number;
           pm_id: string;
           priority?: string;
@@ -362,6 +364,7 @@ export type Database = {
           jira_enabled?: boolean;
           key?: string;
           name?: string;
+          next_sprint_number?: number;
           next_ticket_number?: number;
           pm_id?: string;
           priority?: string;
@@ -385,16 +388,71 @@ export type Database = {
           },
         ];
       };
+      sprints: {
+        Row: {
+          closed_at: string | null;
+          created_at: string;
+          ends_at: string;
+          goal: string | null;
+          id: string;
+          name: string | null;
+          numero: number;
+          project_id: string;
+          report: Json | null;
+          starts_at: string;
+          status: Database["public"]["Enums"]["sprint_status"];
+          updated_at: string;
+        };
+        Insert: {
+          closed_at?: string | null;
+          created_at?: string;
+          ends_at: string;
+          goal?: string | null;
+          id?: string;
+          name?: string | null;
+          numero: number;
+          project_id: string;
+          report?: Json | null;
+          starts_at: string;
+          status?: Database["public"]["Enums"]["sprint_status"];
+          updated_at?: string;
+        };
+        Update: {
+          closed_at?: string | null;
+          created_at?: string;
+          ends_at?: string;
+          goal?: string | null;
+          id?: string;
+          name?: string | null;
+          numero?: number;
+          project_id?: string;
+          report?: Json | null;
+          starts_at?: string;
+          status?: Database["public"]["Enums"]["sprint_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sprints_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tickets: {
         Row: {
           assignee_id: string | null;
           created_at: string;
           created_by: string;
           description: string | null;
+          estimated_hours: number | null;
           id: string;
           numero: number;
           priority: Database["public"]["Enums"]["ticket_priority"];
           project_id: string;
+          sprint_id: string | null;
           status: Database["public"]["Enums"]["ticket_status"];
           title: string;
           updated_at: string;
@@ -404,10 +462,12 @@ export type Database = {
           created_at?: string;
           created_by: string;
           description?: string | null;
+          estimated_hours?: number | null;
           id?: string;
           numero: number;
           priority?: Database["public"]["Enums"]["ticket_priority"];
           project_id: string;
+          sprint_id?: string | null;
           status?: Database["public"]["Enums"]["ticket_status"];
           title: string;
           updated_at?: string;
@@ -417,10 +477,12 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           description?: string | null;
+          estimated_hours?: number | null;
           id?: string;
           numero?: number;
           priority?: Database["public"]["Enums"]["ticket_priority"];
           project_id?: string;
+          sprint_id?: string | null;
           status?: Database["public"]["Enums"]["ticket_status"];
           title?: string;
           updated_at?: string;
@@ -447,6 +509,13 @@ export type Database = {
             referencedRelation: "projects";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "tickets_sprint_id_fkey";
+            columns: ["sprint_id"];
+            isOneToOne: false;
+            referencedRelation: "sprints";
+            referencedColumns: ["id"];
+          },
         ];
       };
     };
@@ -458,6 +527,10 @@ export type Database = {
       can_view_project: {
         Args: { p_project_id: string; p_user_id?: string };
         Returns: boolean;
+      };
+      close_sprint_with_rollover: {
+        Args: { p_next_sprint_id: string; p_sprint_id: string };
+        Returns: Json;
       };
       has_any_role: { Args: never; Returns: boolean };
       has_role: {
@@ -511,6 +584,7 @@ export type Database = {
     };
     Enums: {
       project_member_role: "viewer" | "contributor" | "lead";
+      sprint_status: "planned" | "active" | "completed";
       ticket_priority: "low" | "medium" | "high" | "critical";
       ticket_status: "todo" | "in_progress" | "in_review" | "blocked" | "done" | "cancelled";
       user_role: "admin" | "pm" | "developer";
@@ -636,6 +710,7 @@ export const Constants = {
   public: {
     Enums: {
       project_member_role: ["viewer", "contributor", "lead"],
+      sprint_status: ["planned", "active", "completed"],
       ticket_priority: ["low", "medium", "high", "critical"],
       ticket_status: ["todo", "in_progress", "in_review", "blocked", "done", "cancelled"],
       user_role: ["admin", "pm", "developer"],

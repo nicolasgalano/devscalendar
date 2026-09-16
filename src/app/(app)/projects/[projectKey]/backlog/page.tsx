@@ -5,7 +5,9 @@ import { EmptyState, NoResultsState } from "@/components/empty-state";
 import { TicketList } from "@/components/tickets/ticket-list";
 import { TicketListFilters } from "@/components/tickets/ticket-list-filters";
 import { buttonVariants } from "@/components/ui/button";
+import { isAdmin } from "@/lib/auth/roles";
 import { getProjectByKey } from "@/lib/projects/workspace";
+import { getOpenSprints } from "@/lib/sprints/query";
 import { getTicketFacets } from "@/lib/tickets/facets";
 import { getTicketsList } from "@/lib/tickets/query";
 import {
@@ -18,7 +20,7 @@ import {
   parseTicketFilters,
   type TicketFilters,
 } from "@/lib/tickets/url";
-import { getCurrentUser } from "@/lib/supabase/session";
+import { getCurrentProfile, getCurrentUser } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +53,24 @@ export default async function BacklogPage({
   const parsed = parseTicketFilters(raw);
   const filters: TicketFilters = { ...parsed, projectId: project.id };
 
-  const user = await getCurrentUser();
+  const [user, profile] = await Promise.all([getCurrentUser(), getCurrentProfile()]);
   const viewerId = user?.id ?? null;
 
-  const [tickets, facets] = await Promise.all([
+  const [tickets, facets, openSprints] = await Promise.all([
     getTicketsList(filters, viewerId),
     getTicketFacets(),
+    getOpenSprints(project.id),
   ]);
+
+  // 018: admin / PM / lead pueden mover tickets entre sprints y estimar horas
+  // desde la tabla del backlog. La verdad la tiene el trigger de la base;
+  // esto es UX.
+  const canPlan = Boolean(
+    profile &&
+      (isAdmin(profile.roles) ||
+        project.pm?.id === profile.id ||
+        project.roleInProject === "lead"),
+  );
 
   // "Activo" en este contexto = algún filtro ADEMÁS del `projectId` fijo.
   // `hasActiveTicketFilters` mira todos los filtros, incluido `projectId`, y
@@ -97,7 +110,10 @@ export default async function BacklogPage({
           />
         )
       ) : (
-        <TicketList tickets={tickets} />
+        <TicketList
+          tickets={tickets}
+          sprintControls={{ openSprints, canPlan }}
+        />
       )}
     </>
   );
