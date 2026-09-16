@@ -84,12 +84,17 @@ values
   ('00000000-0000-4000-8000-000000000032', 'Nimbus SRL')
 on conflict (id) do nothing;
 
-insert into public.projects (id, client_id, name, pm_id, priority, jira_enabled, slack_enabled)
+-- `key` es not null desde la migration 14 (015) y no tiene default de tabla;
+-- se llena explícitamente acá con el mismo criterio del backfill de esa
+-- migration — mayúsculas de los primeros seis alfabéticos del nombre. Sin
+-- esto, el seed se rompía con `null value in column "key"` en cuanto la
+-- migration 14 corre antes que él (CI, siempre).
+insert into public.projects (id, client_id, name, key, pm_id, priority, jira_enabled, slack_enabled)
 values
   ('00000000-0000-4000-8000-000000000041', '00000000-0000-4000-8000-000000000031',
-   'Website Revamp', '00000000-0000-4000-8000-000000000011', 'normal', true, false),
+   'Website Revamp', 'WEBSIT', '00000000-0000-4000-8000-000000000011', 'normal', true, false),
   ('00000000-0000-4000-8000-000000000042', '00000000-0000-4000-8000-000000000032',
-   'Portal de reservas', '00000000-0000-4000-8000-000000000012', 'high', false, true)
+   'Portal de reservas', 'PORTAL', '00000000-0000-4000-8000-000000000012', 'high', false, true)
 on conflict (id) do nothing;
 
 -- ─────────────────────────────────────────────────────────────
