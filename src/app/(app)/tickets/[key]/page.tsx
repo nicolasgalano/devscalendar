@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { TicketDetail } from "@/components/tickets/ticket-detail";
+import { getOpenSprints } from "@/lib/sprints/query";
 import { getProjectMembers } from "@/lib/tickets/facets";
 import { getTicketByKey } from "@/lib/tickets/query";
 import { createClient } from "@/lib/supabase/server";
@@ -34,7 +35,10 @@ export default async function TicketPage({
     roleInProject = data ?? null;
   }
 
-  const members = await getProjectMembers(ticket.project.id);
+  const [members, openSprints] = await Promise.all([
+    getProjectMembers(ticket.project.id),
+    getOpenSprints(ticket.project.id),
+  ]);
 
   return (
     <TicketDetail
@@ -42,6 +46,7 @@ export default async function TicketPage({
       viewer={profile ? { id: profile.id, roles: profile.roles } : null}
       roleInProject={roleInProject}
       members={members}
+      openSprints={openSprints}
     />
   );
 }

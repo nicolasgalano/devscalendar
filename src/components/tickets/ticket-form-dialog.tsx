@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/lib/markdown/editor";
+import type { SprintListItem } from "@/lib/sprints/query";
+import { formatSprintDisplayName } from "@/lib/sprints/status";
 import {
   TICKET_PRIORITY_LABELS,
   TICKET_PRIORITY_ORDER,
@@ -31,6 +33,7 @@ type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
 type TicketStatus = Database["public"]["Enums"]["ticket_status"];
 
 const UNASSIGNED = "__unassigned__";
+const BACKLOG = "__backlog__";
 
 export type TicketFormInitial = {
   /** Solo presente en modo edit. */
@@ -41,6 +44,10 @@ export type TicketFormInitial = {
   priority: TicketPriority;
   assigneeId: string | null;
   status?: TicketStatus;
+  /** 018: sprint asignado (null = backlog). */
+  sprintId?: string | null;
+  /** 018: horas estimadas (null = sin estimar). */
+  estimatedHours?: number | null;
 };
 
 type Project = { id: string; key: string; name: string };
@@ -65,8 +72,11 @@ export function TicketFormDialog({
   projects,
   members,
   membersByProject,
+  openSprints,
+  openSprintsByProject,
   canEditFields = true,
   canReassign = true,
+  canSprintPlan = false,
 }: {
   mode: "create" | "edit";
   open: boolean;
@@ -78,8 +88,14 @@ export function TicketFormDialog({
   members?: Person[];
   /** Miembros por proyecto — usado en `create` cuando el usuario cambia el proyecto. */
   membersByProject?: Record<string, Person[]>;
+  /** 018: sprints no-cerrados del proyecto activo (edit). */
+  openSprints?: SprintListItem[];
+  /** 018: sprints por proyecto (create — el sprint depende del proyecto elegido). */
+  openSprintsByProject?: Record<string, SprintListItem[]>;
   canEditFields?: boolean;
   canReassign?: boolean;
+  /** 018: si el viewer puede tocar sprint_id / estimated_hours (admin/PM/lead). */
+  canSprintPlan?: boolean;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -102,6 +118,12 @@ export function TicketFormDialog({
     return membersByProject?.[form.projectId] ?? [];
   }, [mode, members, membersByProject, form.projectId]);
 
+  const availableSprints: SprintListItem[] = useMemo(() => {
+    if (mode === "edit") return openSprints ?? [];
+    if (!form.projectId) return [];
+    return openSprintsByProject?.[form.projectId] ?? [];
+  }, [mode, openSprints, openSprintsByProject, form.projectId]);
+
   // Si al cambiar de proyecto el asignado deja de ser miembro, se limpia
   // — evita que el POST rebote con "El asignado no es miembro del proyecto".
   useEffect(() => {
@@ -111,6 +133,16 @@ export function TicketFormDialog({
       setForm((current) => ({ ...current, assigneeId: null }));
     }
   }, [mode, form.assigneeId, availableMembers]);
+
+  // Misma limpieza para sprint: si al cambiar de proyecto el sprint no existe,
+  // se manda a backlog.
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (!form.sprintId) return;
+    if (!availableSprints.some((sprint) => sprint.id === form.sprintId)) {
+      setForm((current) => ({ ...current, sprintId: null }));
+    }
+  }, [mode, form.sprintId, availableSprints]);
 
   const canSubmit = form.title.trim().length > 0 && form.projectId && !submitting;
 
@@ -125,6 +157,13 @@ export function TicketFormDialog({
         priority: form.priority,
         assignee_id: form.assigneeId,
       };
+      // 018: mandamos sprint_id / estimated_hours solo si el viewer tiene
+      // permiso — el trigger igual rechaza, pero mandar lo prohibido garantiza
+      // un 403 innecesario.
+      if (canSprintPlan) {
+        body.sprint_id = form.sprintId ?? null;
+        body.estimated_hours = form.estimatedHours ?? null;
+      }
       const url = mode === "create" ? "/api/tickets" : `/api/tickets/${initial.id}`;
       if (mode === "create") body.project_id = form.projectId;
 
@@ -263,6 +302,73 @@ export function TicketFormDialog({
               </p>
             )}
           </div>
+
+          {canSprintPlan && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label>Sprint</Label>
+                <Select
+                  value={form.sprintId ?? BACKLOG}
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      sprintId: value === BACKLOG ? null : (value as string),
+                    })
+                  }
+                  disabled={mode === "create" && !form.projectId}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {form.sprintId
+                        ? (() => {
+                            const sprint = availableSprints.find(
+                              (s) => s.id === form.sprintId,
+                            );
+                            return sprint ? formatSprintDisplayName(sprint) : "—";
+                          })()
+                        : "Backlog"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={BACKLOG}>Backlog</SelectItem>
+                    {availableSprints.map((sprint) => (
+                      <SelectItem key={sprint.id} value={sprint.id}>
+                        {formatSprintDisplayName(sprint)}
+                        {sprint.status === "active" && (
+                          <span className="text-caption text-muted-foreground ml-1">
+                            (activo)
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ticket-hours">Horas estimadas</Label>
+                <Input
+                  id="ticket-hours"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={form.estimatedHours === null || form.estimatedHours === undefined ? "" : String(form.estimatedHours)}
+                  placeholder="—"
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    const next = raw === "" ? null : Number(raw);
+                    setForm({
+                      ...form,
+                      estimatedHours:
+                        next === null || (Number.isFinite(next) && next >= 0)
+                          ? next
+                          : form.estimatedHours ?? null,
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>Descripción</Label>

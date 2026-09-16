@@ -8,13 +8,12 @@ import type { ProjectDetail } from "@/lib/projects/workspace";
 import type { PersonFacet, ProjectFacet } from "@/lib/tickets/facets";
 import { cn } from "@/lib/utils";
 
-type Tab = "sprint" | "backlog" | "board" | "sprints" | "members";
+type Tab = "sprint" | "backlog" | "sprints" | "members";
 
 function detectTab(pathname: string): Tab {
   if (pathname.endsWith("/sprint")) return "sprint";
   if (pathname.endsWith("/backlog")) return "backlog";
-  if (pathname.endsWith("/board")) return "board";
-  // /sprints/[N] cae también en "sprints"; startsWith ancla el segmento.
+  // /sprints/[N] cae también en "sprints"; el includes ancla el segmento.
   if (pathname.includes("/sprints")) return "sprints";
   if (pathname.endsWith("/members")) return "members";
   // Default para /projects/[key] (el redirect apunta a /sprint, así que en la
@@ -97,11 +96,6 @@ export function ProjectWorkspaceHeader({
           href={`/projects/${project.key}/backlog`}
           active={currentTab === "backlog"}
           label="Backlog"
-        />
-        <TabLink
-          href={`/projects/${project.key}/board`}
-          active={currentTab === "board"}
-          label="Tablero completo"
         />
         <TabLink
           href={`/projects/${project.key}/sprints`}
