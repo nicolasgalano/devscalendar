@@ -8,6 +8,7 @@ import {
   CalendarDaysIcon,
   FolderKanbanIcon,
   InboxIcon,
+  ListChecksIcon,
   LogOutIcon,
   MenuIcon,
   PanelLeftIcon,
@@ -18,6 +19,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
+import { SyncIndicatorProvider } from "@/components/sync-indicator";
 import { isAdmin, isDeveloper, type UserRole } from "@/lib/auth/roles";
 import type { NotificationRow } from "@/lib/notifications/events";
 import { cn } from "@/lib/utils";
@@ -45,7 +47,21 @@ type NavGroup = { label: string | null; items: NavItem[] };
 // que encabeza la navegación y `/` redirige a él: la home de bienvenida de
 // `002` era un placeholder hasta que esta pantalla existiera.
 const BASE_NAV: NavGroup[] = [
-  { label: null, items: [{ href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon }] },
+  {
+    label: null,
+    items: [
+      { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon },
+      // `017` T1.4 — reemplazo del ítem "Tickets" de `015` T7.1. Ahora la
+      // entrada al sistema de tareas es por proyecto: `/projects` lista los
+      // proyectos visibles, y adentro de cada uno vive el tablero y el
+      // backlog. El listado global cross-project se movió a "Mi trabajo".
+      { href: "/projects", label: "Proyectos", Icon: FolderKanbanIcon },
+      // `017` T1.4 — vista personal cross-project (antes vivía en `/tickets`).
+      // Visible para todo autenticado; quien no sea miembro de nada ve el
+      // empty state, no un 403.
+      { href: "/my-work", label: "Mi trabajo", Icon: ListChecksIcon },
+    ],
+  },
 ];
 
 const ADMIN_NAV: NavGroup = {
@@ -185,6 +201,7 @@ export function AppShell({
   const currentLabel = activeItem?.label ?? null;
 
   return (
+    <SyncIndicatorProvider>
     <div className="flex h-full">
       {mobileOpen && (
         <button
@@ -311,5 +328,6 @@ export function AppShell({
         <main className="min-h-0 flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
+    </SyncIndicatorProvider>
   );
 }

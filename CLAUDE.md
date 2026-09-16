@@ -6,7 +6,7 @@
 
 > **El registro de deuda técnica quedó en cero el 2026-09-08.** Los nueve puntos levantados el 2026-09-07 se saldaron con `012`, `013` y una verificación manual. `docs/deuda-tecnica.md` **no se archiva**: sigue siendo el lugar donde se anota la deuda nueva, y las entradas viejas se conservan tachadas porque explican por qué el código es como es. **La regla sigue vigente para todo lo que se anote de acá en adelante: NO se salda sin OK explícito del usuario.** Leelo antes de tocar autorización o roles, las pantallas de `/admin/*`, o los handlers de `/api/clients`, `/api/projects` y `/api/users`: ahí está escrito **por qué** cada uno quedó como quedó, y varias de esas razones no se deducen del código. **Encontrar deuda nueva es bienvenido; se anota ahí y en el `tasks.md` de su feature, no se resuelve de paso.**
 
-**Estado:** en desarrollo — features `001` a `006`, `010` y `011` terminadas, más `012` (roles múltiples y `active` aplicado de verdad) y `013` (el resto de la deuda registrada). Todo del 2026-09-08, con el registro de deuda en cero. **Falta una tarea que no es de código: configurar el proveedor de email** (cuenta, dominio verificado y `RESEND_API_KEY` en Vercel); hasta entonces los avisos in-app funcionan y los mails se acumulan en cola.
+**Estado:** en desarrollo — features `001` a `006`, `010`, `011`, `012`, `013` y `014` terminadas; **`015`** (project membership + tickets) con Phases 1–7 en producción y Phases 8–10 abiertas (panel de miembros en `/admin/projects/:id`, tests, cierre); **`017`** (home + workspace por proyecto + tablero kanban) done. **Falta una tarea que no es de código: configurar el proveedor de email** (cuenta, dominio verificado y `RESEND_API_KEY` en Vercel); hasta entonces los avisos in-app funcionan y los mails se acumulan en cola.
 
 ---
 
@@ -86,9 +86,18 @@ devscalendar/
 │   │   ├── (app)/                    # route group: todo lo logueado, con shell
 │   │   │   ├── layout.tsx            # gate de sesión + AppShell
 │   │   │   ├── error.tsx             # error boundary de la app
-│   │   │   ├── page.tsx              # redirige a /calendar
+│   │   │   ├── page.tsx              # home landing — selector de producto (017)
 │   │   │   ├── calendar/             # pantalla principal (día/mes/año)
 │   │   │   ├── inbox/                # bandeja del dev: sus reservas pendientes
+│   │   │   ├── projects/             # raíz del sistema de tareas (017)
+│   │   │   │   ├── page.tsx          # lista de proyectos visibles
+│   │   │   │   └── [projectKey]/     # workspace del proyecto
+│   │   │   │       ├── layout.tsx    # header + tabs (Tablero / Backlog)
+│   │   │   │       ├── page.tsx      # redirige a /board
+│   │   │   │       ├── board/        # tab tablero kanban (@dnd-kit)
+│   │   │   │       └── backlog/      # tab backlog (reuso de TicketList)
+│   │   │   ├── tickets/[key]/        # detalle flat de ticket (015)
+│   │   │   ├── my-work/              # vista personal cross-project (017)
 │   │   │   └── admin/                # ABM de maestros (solo admin)
 │   │   │       ├── layout.tsx        # guard de rol
 │   │   │       ├── clients/          # page + loading + tabla (client)
@@ -104,6 +113,10 @@ devscalendar/
 │   ├── components/
 │   │   ├── ui/                       # shadcn/ui, comiteado y ajustado a DESIGN.md
 │   │   ├── calendar/                 # grilla, bloques, filtros, estados de reserva
+│   │   ├── tickets/                  # tabla, filtros, badges, form-dialog (015)
+│   │   ├── projects/                 # project-list, workspace-header, kanban (017)
+│   │   ├── home-dispatcher.tsx       # selector de producto de la home (017)
+│   │   ├── sync-indicator.tsx        # provider + hook + pill flotante (017)
 │   │   └── *.tsx                     # app-shell, theme-toggle, status, etc.
 │   ├── lib/
 │   │   ├── env.ts                    # validación de env con Zod
@@ -111,6 +124,9 @@ devscalendar/
 │   │   ├── api/                      # guards de route handlers + lectura de body
 │   │   ├── bookings/                 # transiciones, conflictos, formulario, permisos
 │   │   ├── calendar/                 # rangos, layout, ocupación, paleta, query
+│   │   ├── tickets/                  # queries, permisos, keys, url, status, facets (015)
+│   │   ├── projects/                 # keys + workspace queries (017)
+│   │   ├── markdown/                 # viewer, editor, sanitize (015)
 │   │   ├── validation/               # schemas Zod por entidad
 │   │   └── supabase/                 # server/client/middleware/session helpers
 │   └── types/
@@ -237,6 +253,9 @@ Las variables de entorno viven en Vercel → Settings → Environment Variables.
 - En route handlers, la autorización pasa por `requireAdmin()` de `@/lib/api/require-admin` —o `requireBookingAccess(projectId)` para reservas—, y el payload por un schema de `@/lib/validation/`.
 - **El body se lee con `readJsonBody()` de `@/lib/api/read-json`, nunca con `request.json()` directo.** `request.json()` tira ante un body vacío o mal formado, y eso sale como un 500 con stack trace: un cliente que manda basura queda registrado como una falla del servidor. El helper devuelve `undefined` y el schema lo rechaza con el 400 de siempre.
 - **La sesión se pide con `getCurrentUser()` / `getCurrentProfile()`** de `@/lib/supabase/session`, nunca llamando a `supabase.auth.getUser()` directo en una page o layout. Están envueltas en el `cache()` de React y se deduplican por request: `getUser()` es un round trip HTTP al servidor de auth (~200ms medidos), y los layouts anidados lo pagaban dos veces por navegación.
+- **La home (`/`) es un dispatcher, no una redirección.** Desde `017` reemplaza al `redirect('/calendar')` que existía desde `002` — el `page.tsx` de `(app)/` renderiza `<HomeDispatcher roles={profile.roles} />` con dos–cuatro cards según rol. **No aparece como ítem del sidebar**: el acceso es por el logo/nombre del top-left, que ya linkeaba a `/` desde siempre. Cuando el usuario está en la home, ningún ítem del nav está activo — es coherente, no un bug de matching.
+- **Sistema de tareas por proyecto.** Desde `017` la puerta de tickets es `/projects` (nav item "Proyectos"). Adentro de un proyecto (`/projects/[projectKey]`) el `layout.tsx` resuelve el proyecto con `getProjectByKey()` (cacheada por request) y renderiza tabs "Tablero" / "Backlog"; el `page.tsx` de la raíz del segmento hace `redirect(.../board)` para que el activo de la tab se determine por segmento del path. **El detalle de ticket sigue flat en `/tickets/[key]`** — los links viejos y los emails de `010` no se rompen. La vista personal cross-project es `/my-work` (donde vivía la tabla global de `015`).
+- **`useSyncIndicator()`** de `@/components/sync-indicator` es la infra transversal para avisar trabajo asíncrono: `start(label)` devuelve `stop`, con refcount adentro del provider (dos operaciones simultáneas suman dos entradas y el pill se apaga cuando ambas terminan). Montado en `AppShell`, así que cualquier client component tiene acceso. **Usalo en vez de un `savingCount` local** cada vez que un fetch de fondo dure más que un click.
 
 ### Roles y `active`
 
@@ -316,4 +335,6 @@ Ver `specs/features/README.md` para el índice completo y estado.
 - **010-notifications-and-audit** — done. Cerró lo que `005` y `006` habían diferido: bandeja in-app con campana en el shell, email transaccional, y `audit_log` completo con `create` y `update`, que hasta acá no se registraban. Las filas las escribe un trigger en la misma transacción que el evento y el envío es un paso aparte, reintentable (ADR 0012). **Salió con `010` el gate que faltaba antes del primer usuario real.** Q-9 se respondió con **in-app + email** y no con el default de solo in-app, porque una bandeja sola no arregla "se entera si mira el calendario".
 - **011-planning-view** — done. Cuarta vista del calendario (`/calendar?view=planning`): grilla de 4 semanas con **cliente > proyecto > dev** en filas y días en columnas, con la suma de horas por celda. Reusa `getBookingsInRange` y suma una segunda query **sin filtros de entidad** (`getDevDayLoad`) para la sobrecarga por dev-día — sin eso, un PM que filtra por su cliente ve a "sus" devs siempre libres cuando en realidad no lo están (R-1). Cero migrations, cero policies, cero API routes: es JS puro sobre la RLS existente. Solo lectura por diseño; la creación se queda en la vista Día. **Q-P1** cerrada con **`>8h` estricto** (jornada completa no es sobrecarga); **Q-P2** con partición por día calendario en zona local. La empty state de las cuatro vistas cambió en el mismo commit: sin filtros y sin reservas, la grilla se renderiza vacía en vez del cartel — el cartel queda para el caso filtrado, que es el único donde nombrar el filtro sí importa.
 - **014-hide-pms-in-calendar** — done. El calendario esconde por default a los PM puros (`roles={pm}` sin `developer`), y un toggle "Incluir PMs" en el panel de filtros los trae de vuelta con `?includePms=1`. Sin migrations ni RLS: es un `.not("dev_id","in",…)` en `bookingsQuery` y en `getDevDayLoad`, alimentado por `getPmOnlyDevIds()` (query cacheada por request). La regla "PM puro" vive en `isPmOnly()` de `@/lib/auth/roles` para que query y dropdown decidan igual (R-1). **Selección explícita gana:** una URL con `devId=<PM>` muestra a ese PM aunque el toggle esté off, y el select lo marca con un badge para que sea obvio por qué solo se ven sus reservas.
+- **015-project-membership-and-tickets** — Phases 1–7 en producción; **Phases 8 (panel de miembros en `/admin/projects/:id`), 9 (tests) y 10 (cierre) quedan abiertas.** Lo que salió: tabla `project_members` y tabla `tickets`, con enums `project_member_role` (`viewer|contributor|lead`) y `ticket_status` / `ticket_priority`. Cinco helpers `security definer` y cinco triggers (numeración correlativa `PROJ-N`, auto-add del PM como lead, inmutabilidad de `key` con tickets ya numerados, notificaciones de assign / status change, audit). API `POST/PATCH /api/tickets` y `POST/PATCH /api/project-members`. Vista global `/tickets` (movida a `/my-work` en 017), detalle flat `/tickets/[key]`, dialog de alta/edición, viewer + editor de markdown propios (`react-markdown` + `rehype-sanitize` con schema local). **La regla "el trigger es la verdad" se hereda de bookings (ADR 0009):** el guard de contributor-scope compara `to_jsonb(new) - {whitelist} = to_jsonb(old) - {...}` — cualquier columna nueva nace protegida. **Migration 15 arregla un bug del `audit_ticket_events`** que rompía todo UPDATE (`jsonb - jsonb` no existe en Postgres); anotado como F6 y como brecha de cobertura para Phase 9.
+- **017-workspaces-and-boards** — done. Restructure de rutas al estilo Jira. **`/` deja de redirigir al calendario** y pasa a ser un dispatcher con dos–cuatro cards según rol (DevCalendar, Proyectos, Bandeja si dev, Administración si admin). El logo del top-left del sidebar es el único acceso a la home — no aparece como ítem del nav. El sidebar renombra "Tickets" a **"Proyectos"** (`/projects`) y suma **"Mi trabajo"** (`/my-work` — donde vivía la tabla global de 015). `/projects` lista los proyectos donde el usuario participa (admin ve todos, no-admin ve donde es PM primario o miembro activo — más restrictivo que la RLS de `projects` que sigue siendo `has_any_role()` para no romper el calendario). Adentro de un proyecto viven dos tabs: **Tablero** (kanban con `@dnd-kit`, seis columnas fijas por status, drag & drop con keyboard sensor por accesibilidad) y **Backlog** (reuso de `<TicketList>` scoped al proyecto). Detalle de ticket sigue en `/tickets/[key]` flat — links viejos y emails de `010` no se rompen. **`useState` local + rollback puntual** en el kanban en vez de `useOptimistic`: la card se queda en la columna nueva desde el drop y solo revierte si el server rechaza, sin flash — `useOptimistic` requería mantener la transition pending durante el fetch, y no lo lograba con un callback sincrónico. **`<SyncIndicatorProvider>` transversal** al `AppShell`: `useSyncIndicator().start(label)` devuelve un `stop`, refcount adentro; el pill fijo bottom-right avisa cualquier trabajo asíncrono, primero en el kanban y de acá en adelante en cualquier feature que lo necesite.
 - **Próxima:** las tres integraciones (`007-google-calendar`, `008-jira`, `009-slack`), que ya no tienen nada delante. Ver `specs/features/README.md`.

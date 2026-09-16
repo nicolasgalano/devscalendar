@@ -24,6 +24,9 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 012 | Roles múltiples y `active` con dientes            | done   | 001, 002           | §3, §12 (seguridad) |
 | 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
 | 014 | PMs fuera del calendario por default              | done   | 003, 011, 012      | §4                  |
+| 015 | Project membership y tickets                      | en progreso | 001, 002, 010, 012 | fuera de spec original |
+| 016 | Time tracking                                     | draft  | 015                | fuera de spec original |
+| 017 | Home, workspace por proyecto y tablero kanban     | done   | 015                | fuera de spec original |
 
 ## Orden sugerido de implementación
 

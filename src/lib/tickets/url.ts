@@ -7,7 +7,17 @@ import { TICKET_STATUS_CLOSED, TICKET_STATUS_OPEN } from "./status";
 type TicketStatus = Database["public"]["Enums"]["ticket_status"];
 type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
 
-export const TICKETS_PATH = "/tickets";
+/**
+ * Base default del listado: la vista personal cross-project. En `017` se
+ * renombró de `/tickets` (donde vivía en `015`) a `/my-work`, porque `/tickets`
+ * dejó de existir como listado y `/projects/[projectKey]/backlog` es la
+ * variante scopeada por proyecto.
+ *
+ * Los helpers aceptan `basePath` para que un `<TicketListFilters>` embebido en
+ * el backlog construya URLs con `/projects/[projectKey]/backlog` en vez de
+ * `/my-work`.
+ */
+export const TICKETS_PATH = "/my-work";
 
 const ticketStatusSchema = z.enum([
   "todo",
@@ -126,6 +136,7 @@ export type TicketFiltersPatch = Partial<TicketFilters>;
 export function buildTicketsHref(
   current: TicketFilters,
   patch: TicketFiltersPatch = {},
+  basePath: string = TICKETS_PATH,
 ): string {
   const next: TicketFilters = { ...current, ...patch };
   const params = new URLSearchParams();
@@ -146,10 +157,10 @@ export function buildTicketsHref(
   if (next.q) params.set("q", next.q);
 
   const query = params.toString();
-  return query ? `${TICKETS_PATH}?${query}` : TICKETS_PATH;
+  return query ? `${basePath}?${query}` : basePath;
 }
 
-/** Limpia todos los filtros. La URL queda en `/tickets` sin querystring. */
-export function clearTicketFiltersHref(): string {
-  return TICKETS_PATH;
+/** Limpia todos los filtros. La URL queda en `basePath` sin querystring. */
+export function clearTicketFiltersHref(basePath: string = TICKETS_PATH): string {
+  return basePath;
 }
