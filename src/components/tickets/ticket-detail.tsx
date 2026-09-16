@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { MarkdownViewer } from "@/lib/markdown/viewer";
 import type { UserRole } from "@/lib/auth/roles";
+import type { SprintListItem } from "@/lib/sprints/query";
+import { formatSprintDisplayName } from "@/lib/sprints/status";
 import {
   canChangeTicketStatus,
   canEditTicket,
@@ -40,6 +42,7 @@ type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
 type ProjectRole = Database["public"]["Enums"]["project_member_role"];
 
 const UNASSIGNED = "__unassigned__";
+const BACKLOG = "__backlog__";
 
 /**
  * Detalle de ticket. Layout de `plan.md` §8.3: encabezado con `KEY · título`,
@@ -67,16 +70,22 @@ export function TicketDetail({
   viewer,
   roleInProject,
   members,
+  openSprints,
 }: {
   ticket: TicketDetailData;
   viewer: { id: string; roles: UserRole[] } | null;
   roleInProject: ProjectRole | null;
   members: { id: string; name: string }[];
+  /** Sprints no-cerrados del proyecto — para el Select de Sprint. */
+  openSprints: SprintListItem[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [hoursDraft, setHoursDraft] = useState<string>(
+    ticket.estimatedHours === null ? "" : String(ticket.estimatedHours),
+  );
 
   const [optimistic, setOptimistic] = useOptimistic(ticket);
 
@@ -90,6 +99,14 @@ export function TicketDetail({
   const mayChangeStatus = canChangeTicketStatus(viewer, project, roleInProject);
   const mayEditFields = canEditTicketFields(viewer, ticketForCheck, project, roleInProject);
   const showEditButton = canEditTicket(viewer, ticketForCheck, project, roleInProject);
+  // Sprint y estimated_hours siguen la misma regla que reassign: solo lead+
+  // (el trigger de contributor-scope los bloquea para contributor). Se separa
+  // como constante para leer mejor.
+  const maySprintPlan = mayReassign;
+  // El sprint actual puede estar cerrado (ticket que estuvo en un sprint que
+  // ya se cerró — el rollover no lo movió porque era `done`). En ese caso no
+  // se puede reasignar (AC-3.4 spec): el Select queda disabled.
+  const currentSprintIsCompleted = optimistic.sprintStatus === "completed";
 
   async function patch(patchBody: Record<string, unknown>, next: Partial<TicketDetailData>) {
     setError(null);
@@ -123,6 +140,8 @@ export function TicketDetail({
     priority: ticket.priority,
     assigneeId: ticket.assigneeId,
     status: ticket.status,
+    sprintId: ticket.sprintId,
+    estimatedHours: ticket.estimatedHours,
   };
 
   return (
@@ -264,6 +283,120 @@ export function TicketDetail({
             </span>
           </span>
         </MetaRow>
+
+        <MetaRow label="Sprint">
+          {maySprintPlan && !currentSprintIsCompleted ? (
+            <Select
+              value={optimistic.sprintId ?? BACKLOG}
+              onValueChange={(next) => {
+                const value = next === BACKLOG ? null : (next as string);
+                const sprint = openSprints.find((s) => s.id === value);
+                patch(
+                  { sprint_id: value },
+                  {
+                    sprintId: value,
+                    sprintName: sprint?.name ?? null,
+                    sprintNumero: sprint?.numero ?? null,
+                    sprintStatus: sprint?.status ?? null,
+                  },
+                );
+              }}
+              disabled={pending}
+            >
+              <SelectTrigger size="sm" className="w-fit min-w-40" aria-label="Sprint">
+                <SelectValue>
+                  {optimistic.sprintId ? (
+                    (() => {
+                      const sprint = openSprints.find((s) => s.id === optimistic.sprintId);
+                      return sprint
+                        ? formatSprintDisplayName(sprint)
+                        : optimistic.sprintNumero
+                          ? formatSprintDisplayName({
+                              numero: optimistic.sprintNumero,
+                              name: optimistic.sprintName,
+                            })
+                          : "—";
+                    })()
+                  ) : (
+                    <span className="text-muted-foreground">Backlog</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false}>
+                <SelectItem value={BACKLOG}>Backlog</SelectItem>
+                {openSprints.map((sprint) => (
+                  <SelectItem key={sprint.id} value={sprint.id}>
+                    {formatSprintDisplayName(sprint)}
+                    {sprint.status === "active" && (
+                      <span className="text-caption text-muted-foreground ml-1">
+                        (activo)
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-ui">
+              {optimistic.sprintId && optimistic.sprintNumero ? (
+                <>
+                  {formatSprintDisplayName({
+                    numero: optimistic.sprintNumero,
+                    name: optimistic.sprintName,
+                  })}
+                  {currentSprintIsCompleted && (
+                    <span className="text-caption text-muted-foreground ml-2">
+                      (cerrado)
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground">Backlog</span>
+              )}
+            </span>
+          )}
+        </MetaRow>
+
+        <MetaRow label="Est. hs">
+          {maySprintPlan ? (
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              value={hoursDraft}
+              onChange={(e) => setHoursDraft(e.target.value)}
+              onBlur={() => {
+                const trimmed = hoursDraft.trim();
+                const next = trimmed === "" ? null : Number(trimmed);
+                if (next !== null && (!Number.isFinite(next) || next < 0)) {
+                  setError("Ingresá un número válido (o vacío para quitar).");
+                  setHoursDraft(
+                    optimistic.estimatedHours === null
+                      ? ""
+                      : String(optimistic.estimatedHours),
+                  );
+                  return;
+                }
+                if (next === optimistic.estimatedHours) return;
+                patch({ estimated_hours: next }, { estimatedHours: next });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              disabled={pending}
+              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-7 w-24 rounded-md border bg-transparent px-2 text-right font-data outline-none focus-visible:ring-3 disabled:opacity-50"
+              placeholder="—"
+            />
+          ) : (
+            <span className="font-data">
+              {optimistic.estimatedHours !== null ? (
+                optimistic.estimatedHours
+              ) : (
+                <span className="text-muted-foreground">Sin estimar</span>
+              )}
+            </span>
+          )}
+        </MetaRow>
       </div>
 
       <section className="pt-4">
@@ -279,7 +412,7 @@ export function TicketDetail({
       )}
 
       <p className="mt-6 text-caption text-muted-foreground">
-        <Link href={`/projects/${ticket.project.key}/board`} className="hover:underline">
+        <Link href={`/projects/${ticket.project.key}/sprint`} className="hover:underline">
           ← Volver al proyecto
         </Link>
       </p>
@@ -297,8 +430,10 @@ export function TicketDetail({
           },
         ]}
         members={members}
+        openSprints={openSprints}
         canEditFields={mayEditFields}
         canReassign={mayReassign}
+        canSprintPlan={maySprintPlan}
       />
     </>
   );
