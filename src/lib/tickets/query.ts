@@ -32,7 +32,11 @@ export type TicketDetail = TicketListItem & {
   createdBy: string;
   createdById: string;
   createdAt: string;
-  project: TicketListItem["project"] & { pmId: string; active: boolean };
+  project: TicketListItem["project"] & {
+    pmId: string;
+    active: boolean;
+    client: { id: string; name: string } | null;
+  };
 };
 
 /**
@@ -135,7 +139,7 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
 
   const { data: project } = await supabase
     .from("projects")
-    .select("id, key, name, pm_id, active")
+    .select("id, key, name, pm_id, active, client:clients ( id, name )")
     .eq("key", parsed.projectKey)
     .maybeSingle();
 
@@ -185,6 +189,9 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
       name: project.name,
       pmId: project.pm_id,
       active: project.active,
+      client: project.client
+        ? { id: project.client.id, name: project.client.name }
+        : null,
     },
   };
 });
