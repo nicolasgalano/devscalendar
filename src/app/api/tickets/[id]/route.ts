@@ -51,6 +51,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  // 018: si se cambia sprint_id (no a null), el sprint tiene que pertenecer al
+  // mismo proyecto y no estar completado (AC-3.4). Un ticket con sprint
+  // completado congela historia — no se puede reasignar.
+  if (parsed.data.sprint_id !== undefined && parsed.data.sprint_id !== null) {
+    const { data: sprint } = await supabase
+      .from("sprints")
+      .select("project_id, status")
+      .eq("id", parsed.data.sprint_id)
+      .maybeSingle();
+
+    if (!sprint) {
+      return NextResponse.json(
+        { error: "Sprint no encontrado" },
+        { status: 400 },
+      );
+    }
+    if (sprint.project_id !== ticket.project_id) {
+      return NextResponse.json(
+        { error: "El sprint pertenece a otro proyecto" },
+        { status: 400 },
+      );
+    }
+    if (sprint.status === "completed") {
+      return NextResponse.json(
+        {
+          error: "No se puede mover un ticket a un sprint cerrado",
+          reason: "sprint_completed",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("tickets")
     .update({
@@ -59,6 +92,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ...(parsed.data.status !== undefined && { status: parsed.data.status }),
       ...(parsed.data.priority !== undefined && { priority: parsed.data.priority }),
       ...(parsed.data.assignee_id !== undefined && { assignee_id: parsed.data.assignee_id }),
+      ...(parsed.data.sprint_id !== undefined && { sprint_id: parsed.data.sprint_id }),
+      ...(parsed.data.estimated_hours !== undefined && {
+        estimated_hours: parsed.data.estimated_hours,
+      }),
     })
     .eq("id", id)
     .select("*")

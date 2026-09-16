@@ -8,10 +8,26 @@ import type { ProjectDetail } from "@/lib/projects/workspace";
 import type { PersonFacet, ProjectFacet } from "@/lib/tickets/facets";
 import { cn } from "@/lib/utils";
 
+type Tab = "sprint" | "backlog" | "board" | "sprints" | "members";
+
+function detectTab(pathname: string): Tab {
+  if (pathname.endsWith("/sprint")) return "sprint";
+  if (pathname.endsWith("/backlog")) return "backlog";
+  if (pathname.endsWith("/board")) return "board";
+  // /sprints/[N] cae también en "sprints"; startsWith ancla el segmento.
+  if (pathname.includes("/sprints")) return "sprints";
+  if (pathname.endsWith("/members")) return "members";
+  // Default para /projects/[key] (el redirect apunta a /sprint, así que en la
+  // práctica no se ve): asumimos sprint activo.
+  return "sprint";
+}
+
 /**
- * Header compartido entre `/projects/[projectKey]/board` y `/projects/[projectKey]/backlog`
- * (feature 017 T2.6). Breadcrumb + KEY + cliente/PM, acción primaria (Crear
- * ticket) y tabs "Tablero" / "Backlog".
+ * Header compartido entre todos los tabs del workspace de proyecto. Breadcrumb
+ * + KEY + cliente/PM, acción primaria (Crear ticket) y barra de tabs.
+ *
+ * Tabs (018 extiende a 5): **Sprint** (default) | **Backlog** | **Tablero
+ * completo** | **Old Sprints** | **Miembros** (condicional).
  *
  * El activo de las tabs se determina por segmento final del path — igual
  * criterio que el nav del sidebar. Sin esto, o se marcan las dos o ninguna.
@@ -29,11 +45,7 @@ export function ProjectWorkspaceHeader({
   canManageMembers?: boolean;
 }) {
   const pathname = usePathname();
-  const currentTab: "board" | "backlog" | "members" = pathname.endsWith("/members")
-    ? "members"
-    : pathname.endsWith("/backlog")
-      ? "backlog"
-      : "board";
+  const currentTab = detectTab(pathname);
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -77,14 +89,24 @@ export function ProjectWorkspaceHeader({
 
       <nav aria-label="Vistas del proyecto" className="border-border flex gap-4 border-b">
         <TabLink
-          href={`/projects/${project.key}/board`}
-          active={currentTab === "board"}
-          label="Tablero"
+          href={`/projects/${project.key}/sprint`}
+          active={currentTab === "sprint"}
+          label="Sprint"
         />
         <TabLink
           href={`/projects/${project.key}/backlog`}
           active={currentTab === "backlog"}
           label="Backlog"
+        />
+        <TabLink
+          href={`/projects/${project.key}/board`}
+          active={currentTab === "board"}
+          label="Tablero completo"
+        />
+        <TabLink
+          href={`/projects/${project.key}/sprints`}
+          active={currentTab === "sprints"}
+          label="Old Sprints"
         />
         {canManageMembers && (
           <TabLink

@@ -24,6 +24,13 @@ export type TicketListItem = {
   assigneeName: string | null;
   updatedAt: string;
   project: { id: string; key: string; name: string };
+  // 018: datos del sprint (null si el ticket está en backlog). El name/numero
+  // vienen del embed para que la tabla del backlog los muestre sin re-query.
+  sprintId: string | null;
+  sprintName: string | null;
+  sprintNumero: number | null;
+  sprintStatus: Database["public"]["Enums"]["sprint_status"] | null;
+  estimatedHours: number | null;
 };
 
 /** Detalle de ticket para `/tickets/:key`. Suma `description` y datos del alta. */
@@ -39,6 +46,24 @@ export type TicketDetail = TicketListItem & {
   };
 };
 
+const TICKET_DETAIL_SELECT = `
+  id,
+  numero,
+  title,
+  description,
+  status,
+  priority,
+  assignee_id,
+  updated_at,
+  created_at,
+  created_by,
+  estimated_hours,
+  sprint_id,
+  assignee:profiles!tickets_assignee_id_fkey ( full_name ),
+  creator:profiles!tickets_created_by_fkey ( full_name ),
+  sprint:sprints ( name, numero, status )
+` as const;
+
 /**
  * Listado de tickets. Todas las queries pasan por RLS: un usuario que no es
  * miembro de un proyecto no ve sus tickets aunque los pida explícitamente,
@@ -51,8 +76,27 @@ export type TicketDetail = TicketListItem & {
  * Se hace `cache()` para que si dos componentes de la misma page piden el
  * listado con los mismos filtros, la query solo corra una vez.
  */
+/**
+ * Scope adicional que NO viene de la URL — usado por el tab Sprint para
+ * filtrar por sprint id (que sale del path, no de query params), y por el
+ * Backlog scoped para pedir "solo sin sprint activo" si algún día se decide
+ * mostrar backlog "puro".
+ *
+ * `sprintId`:
+ *   - `undefined` — sin filtro extra.
+ *   - `null` — solo tickets con `sprint_id is null` (backlog "puro").
+ *   - uuid — solo tickets de ese sprint.
+ */
+export type TicketQueryScope = {
+  sprintId?: string | null;
+};
+
 export const getTicketsList = cache(
-  async (filters: TicketFilters, viewerId: string | null): Promise<TicketListItem[]> => {
+  async (
+    filters: TicketFilters,
+    viewerId: string | null,
+    scope: TicketQueryScope = {},
+  ): Promise<TicketListItem[]> => {
     const supabase = await createClient();
 
     let query = supabase
@@ -66,8 +110,11 @@ export const getTicketsList = cache(
           priority,
           assignee_id,
           updated_at,
+          estimated_hours,
+          sprint_id,
           project:projects!inner ( id, key, name ),
-          assignee:profiles!tickets_assignee_id_fkey ( full_name )
+          assignee:profiles!tickets_assignee_id_fkey ( full_name ),
+          sprint:sprints ( name, numero, status )
         `,
       )
       .order("updated_at", { ascending: false });
@@ -90,6 +137,14 @@ export const getTicketsList = cache(
       query = query.ilike("title", `%${filters.q}%`);
     }
 
+    // 018: scope de sprint. `undefined` = sin filtro (default). `null` = solo
+    // los sin sprint asignado. uuid = solo ese sprint.
+    if (scope.sprintId === null) {
+      query = query.is("sprint_id", null);
+    } else if (scope.sprintId !== undefined) {
+      query = query.eq("sprint_id", scope.sprintId);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
 
@@ -99,6 +154,7 @@ export const getTicketsList = cache(
       // pero assignee es nullable así que puede venir null.
       const project = row.project;
       const assignee = row.assignee;
+      const sprint = row.sprint;
       return {
         id: row.id,
         numero: row.numero,
@@ -114,6 +170,11 @@ export const getTicketsList = cache(
           key: project.key,
           name: project.name,
         },
+        sprintId: row.sprint_id,
+        sprintName: sprint?.name ?? null,
+        sprintNumero: sprint?.numero ?? null,
+        sprintStatus: sprint?.status ?? null,
+        estimatedHours: row.estimated_hours,
       };
     });
   },
@@ -147,22 +208,7 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
 
   const { data: ticket } = await supabase
     .from("tickets")
-    .select(
-      `
-        id,
-        numero,
-        title,
-        description,
-        status,
-        priority,
-        assignee_id,
-        updated_at,
-        created_at,
-        created_by,
-        assignee:profiles!tickets_assignee_id_fkey ( full_name ),
-        creator:profiles!tickets_created_by_fkey ( full_name )
-      `,
-    )
+    .select(TICKET_DETAIL_SELECT)
     .eq("project_id", project.id)
     .eq("numero", parsed.numero)
     .maybeSingle();
@@ -193,5 +239,10 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
         ? { id: project.client.id, name: project.client.name }
         : null,
     },
+    sprintId: ticket.sprint_id,
+    sprintName: ticket.sprint?.name ?? null,
+    sprintNumero: ticket.sprint?.numero ?? null,
+    sprintStatus: ticket.sprint?.status ?? null,
+    estimatedHours: ticket.estimated_hours,
   };
 });
