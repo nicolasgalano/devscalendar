@@ -20,13 +20,21 @@ export type UserRole = Database["public"]["Enums"]["user_role"];
  */
 
 /** Display order, and the order the checkboxes are drawn in. */
-export const ROLE_ORDER: readonly UserRole[] = ["admin", "pm", "developer"] as const;
+export const ROLE_ORDER: readonly UserRole[] = [
+  "admin",
+  "pm",
+  "developer",
+  "staff",
+] as const;
 
 /** UI vocabulary, never the database's (`DESIGN.md` §11). */
 export const ROLE_LABEL: Record<UserRole, string> = {
   admin: "Admin",
   pm: "PM",
   developer: "Developer",
+  // 016: staff es administración / comercial. Cargan horas, no aparecen como
+  // recurso reservable en el calendario, no tienen bandeja de pending.
+  staff: "Staff",
 };
 
 export function hasRole(roles: UserRole[] | null | undefined, role: UserRole): boolean {
@@ -43,6 +51,16 @@ export function isPm(roles: UserRole[] | null | undefined): boolean {
 
 export function isDeveloper(roles: UserRole[] | null | undefined): boolean {
   return hasRole(roles, "developer");
+}
+
+/**
+ * `staff` — administración / comercial que carga horas (feature 016). No es
+ * reservable en el calendario ni tiene bandeja. Un profile con `{staff}` puro
+ * usa Mi Tiempo pero no aparece en el desplegable de "Desarrollador" de las
+ * vistas del calendario.
+ */
+export function isStaff(roles: UserRole[] | null | undefined): boolean {
+  return hasRole(roles, "staff");
 }
 
 /**
