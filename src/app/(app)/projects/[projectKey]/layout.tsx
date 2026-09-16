@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { ProjectWorkspaceHeader } from "@/components/projects/project-workspace-header";
+import { isAdmin } from "@/lib/auth/roles";
 import { getProjectByKey } from "@/lib/projects/workspace";
 import { getTicketFacets } from "@/lib/tickets/facets";
+import { getCurrentProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +24,21 @@ export default async function ProjectWorkspaceLayout({
   children: React.ReactNode;
 }) {
   const { projectKey } = await params;
-  const project = await getProjectByKey(projectKey);
+  const [project, profile] = await Promise.all([
+    getProjectByKey(projectKey),
+    getCurrentProfile(),
+  ]);
   if (!project) notFound();
 
   const facets = await getTicketFacets();
+
+  // 015 T8.3: gestión de miembros solo para admin o PM del proyecto. Los
+  // `lead` NO administran miembros a propósito — la decisión de agregar o
+  // sacar gente del proyecto la mantiene el PM primario, que es quien rinde
+  // cuentas por él.
+  const canManageMembers = Boolean(
+    profile && (isAdmin(profile.roles) || project.pm?.id === profile.id),
+  );
 
   return (
     <>
@@ -33,6 +46,7 @@ export default async function ProjectWorkspaceLayout({
         project={project}
         projectFacets={facets.projects}
         membersByProject={facets.membersByProject}
+        canManageMembers={canManageMembers}
       />
       {children}
     </>

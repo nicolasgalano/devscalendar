@@ -20,13 +20,20 @@ export function ProjectWorkspaceHeader({
   project,
   projectFacets,
   membersByProject,
+  canManageMembers = false,
 }: {
   project: ProjectDetail;
   projectFacets: ProjectFacet[];
   membersByProject: Record<string, PersonFacet[]>;
+  /** Solo admin o PM del proyecto — determina si aparece el tab "Miembros". */
+  canManageMembers?: boolean;
 }) {
   const pathname = usePathname();
-  const currentTab: "board" | "backlog" = pathname.endsWith("/backlog") ? "backlog" : "board";
+  const currentTab: "board" | "backlog" | "members" = pathname.endsWith("/members")
+    ? "members"
+    : pathname.endsWith("/backlog")
+      ? "backlog"
+      : "board";
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -79,6 +86,13 @@ export function ProjectWorkspaceHeader({
           active={currentTab === "backlog"}
           label="Backlog"
         />
+        {canManageMembers && (
+          <TabLink
+            href={`/projects/${project.key}/members`}
+            active={currentTab === "members"}
+            label="Miembros"
+          />
+        )}
       </nav>
     </div>
   );

@@ -122,6 +122,87 @@ export type ProjectDetail = {
  * — el chequeo de permisos del cliente ya sabe que admin/PM tienen acceso
  * total sin importar el rol_in_project.
  */
+/**
+ * Miembro del panel de gestión (feature 015 P8). A diferencia del listado de
+ * asignables del ticket (activos únicamente), acá se muestran los inactivos
+ * para poder reactivarlos.
+ */
+export type ProjectMemberRow = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  roleInProject: Database["public"]["Enums"]["project_member_role"];
+  active: boolean;
+  isProjectPm: boolean;
+};
+
+/**
+ * Miembros de un proyecto para el panel de gestión — activos e inactivos.
+ * Ordenados por nombre; el PM primario queda arriba para que su badge se lea
+ * antes que el resto. Sin `cache()` porque el panel muta datos y necesita
+ * refrescar tras cada acción; el layout hace su propia query cacheada.
+ */
+export async function getProjectMembersDetailed(
+  projectId: string,
+  pmId: string | null,
+): Promise<ProjectMemberRow[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("project_members")
+    .select(
+      "id, user_id, role_in_project, active, profiles:profiles!project_members_user_id_fkey ( full_name, email )",
+    )
+    .eq("project_id", projectId);
+
+  const rows: ProjectMemberRow[] = (data ?? []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    name: row.profiles?.full_name ?? row.profiles?.email ?? row.user_id,
+    email: row.profiles?.email ?? "",
+    roleInProject: row.role_in_project,
+    active: row.active,
+    isProjectPm: pmId !== null && row.user_id === pmId,
+  }));
+
+  rows.sort((a, b) => {
+    if (a.isProjectPm !== b.isProjectPm) return a.isProjectPm ? -1 : 1;
+    return a.name.localeCompare(b.name, "es-AR");
+  });
+
+  return rows;
+}
+
+/**
+ * Usuarios activos que **todavía no** son miembros del proyecto — para el
+ * autocomplete de "Agregar miembro". Filtra el PM primario también (ya es
+ * miembro por el trigger `autoadd_pm_as_lead`).
+ */
+export async function getAddableUsers(
+  currentMemberUserIds: string[],
+): Promise<PersonFacet[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("active", true)
+    .order("full_name", { ascending: true });
+
+  const excluded = new Set(currentMemberUserIds);
+  return (data ?? [])
+    .filter((profile) => !excluded.has(profile.id))
+    .map((profile) => ({
+      id: profile.id,
+      name: profile.full_name ?? profile.email,
+    }));
+}
+
+// PersonFacet es el mismo shape que en tickets/facets.ts; se re-declara acá
+// para que el panel no arrastre ese import (mismo shape, distinto dueño).
+type PersonFacet = { id: string; name: string };
+
 export const getProjectByKey = cache(async (rawKey: string): Promise<ProjectDetail | null> => {
   const { parseProjectKey } = await import("./keys");
   const key = parseProjectKey(rawKey);
