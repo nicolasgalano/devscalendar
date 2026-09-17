@@ -354,7 +354,7 @@ Complementariamente, `transformPastedText` autoconvierte URLs solas en links (AC
 
 ## 6. Migración de datos
 
-### 6.1 Script `scripts/migrate-ticket-descriptions.mjs`
+### 6.1 Script `scripts/migrate-ticket-descriptions.ts` (TypeScript, corre con `pnpm exec tsx` — necesita importar el converter de `src/lib/editor/convert.ts`)
 
 Nuevo. Node script one-shot. Se corre **una sola vez** contra el proyecto Supabase después de aplicar la migration 19 y antes de deployar el código que consume `description_doc`.
 
@@ -383,8 +383,8 @@ Nuevo. Node script one-shot. Se corre **una sola vez** contra el proyecto Supaba
 
 Se documenta en el `tasks.md` como un paso manual del deploy:
 1. `pnpm db:push` (aplica migration 19).
-2. `node scripts/migrate-ticket-descriptions.mjs --dry-run` → revisar output.
-3. `node scripts/migrate-ticket-descriptions.mjs` → correr real.
+2. `pnpm exec tsx scripts/migrate-ticket-descriptions.ts --dry-run` → revisar output.
+3. `pnpm exec tsx scripts/migrate-ticket-descriptions.ts` → correr real.
 4. Verificar en dashboard de Supabase: `select count(*) from tickets where description_doc is not null` matchea lo esperado.
 5. Deploy del código (`git push` a `main`).
 6. Verificación manual en el detalle de 3-5 tickets viejos.

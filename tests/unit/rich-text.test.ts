@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { markdownToProseMirrorDoc } from "@/lib/editor/convert";
 import { renderDocToHtml } from "@/lib/editor/render";
 import { RICH_TEXT_SCHEMA } from "@/lib/editor/schema";
 import { validateProseMirrorDoc } from "@/lib/editor/validate";
@@ -220,5 +221,92 @@ describe("019 rich text — schema, validator, renderer", () => {
     const html = renderDocToHtml(doc);
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Converter markdown → ProseMirror (T6.1)
+// ─────────────────────────────────────────────────────────────
+
+describe("019 converter markdown → ProseMirror", () => {
+  it("convierte un markdown básico y valida contra el schema", () => {
+    const md = [
+      "# Título",
+      "",
+      "Un párrafo con **negrita** y *cursiva* y un [link](https://ejemplo.com).",
+      "",
+      "- Uno",
+      "- Dos",
+      "",
+      "1. Primero",
+      "2. Segundo",
+      "",
+      "> Cita relevante",
+      "",
+      "```javascript",
+      "const x = 1;",
+      "```",
+    ].join("\n");
+
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("convierte task lists GFM a taskList con checked correcto", () => {
+    const md = ["- [ ] pendiente", "- [x] hecho"].join("\n");
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+    // El primer bloque debe ser un taskList con dos taskItem
+    const first = doc.content?.[0];
+    expect(first?.type).toBe("taskList");
+    expect(first?.content?.length).toBe(2);
+    expect(first?.content?.[0]?.attrs?.checked).toBe(false);
+    expect(first?.content?.[1]?.attrs?.checked).toBe(true);
+  });
+
+  it("descarta imágenes pero conserva el alt como texto", () => {
+    const md = "Mira esto: ![captura](https://ejemplo.com/foo.png) por favor.";
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+    // El JSON del doc no debe tener ningún nodo image
+    expect(JSON.stringify(doc)).not.toContain('"type":"image"');
+    // El alt sobrevive como texto
+    expect(JSON.stringify(doc)).toContain("captura");
+  });
+
+  it("clamp de heading > 3 a heading 3", () => {
+    const md = "###### Muy chiquito";
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+    expect(doc.content?.[0]?.type).toBe("heading");
+    expect(doc.content?.[0]?.attrs?.level).toBe(3);
+  });
+
+  it("descarta links con protocolo javascript: pero conserva el texto", () => {
+    const md = "Un [link malo](javascript:alert(1)) acá.";
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+    expect(JSON.stringify(doc)).not.toContain("javascript:");
+    expect(JSON.stringify(doc)).toContain("link malo");
+  });
+
+  it("markdown vacío → doc vacío válido", () => {
+    const doc = markdownToProseMirrorDoc("");
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("code block con language fuera de la whitelist → plaintext", () => {
+    const md = ["```cobol", "IDENTIFICATION DIVISION.", "```"].join("\n");
+    const doc = markdownToProseMirrorDoc(md);
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+    expect(doc.content?.[0]?.type).toBe("codeBlock");
+    expect(doc.content?.[0]?.attrs?.language).toBe("plaintext");
   });
 });

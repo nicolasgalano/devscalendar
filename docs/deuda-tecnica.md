@@ -66,6 +66,7 @@ persona real". Ese día se acerca y las que importaban ya no están:
 | ~~D-08~~ | ~~Nada impide reservar sobre un proyecto desactivado~~                                                                         | 004     | **saldada 2026-09-08** (`013`)  |
 | ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
 | D-10     | Migration `time_entries_start_time` (versión 18) aplicada en prod sin archivo local; reconstruida como stub idempotente     | 016     | investigar origen antes de saldarla     |
+| D-11     | Fase 2 de 019: drop de `tickets.description` + borrado de `src/lib/markdown/*` + remoción de deps `react-markdown` etc.       | 019     | ≥ 1 semana en prod con 100% `description_doc` no nulo |
 
 ---
 
@@ -630,3 +631,52 @@ que la 19 ni siquiera se miraba. El síntoma: los types regenerados con
 4. Considerar un check en CI que corra `supabase migration list` y falle si
    hay versiones remotas sin archivo local. Requiere credenciales en CI — puede
    no ser trivial.
+
+---
+
+## D-11 — Fase 2 de 019: drop de `tickets.description` + limpieza markdown
+
+**Feature:** `019-ticket-rich-editor` · **Gate:** ≥ 1 semana en producción con
+`select count(*) from tickets where description_doc is null and description is not null` = 0
+y sin issues reportados por usuarios.
+
+Es **deuda intencional**, no un olvido: `019` salió a propósito con la columna
+vieja `description` viva como fallback de lectura para tickets no migrados y
+para tickets que el script skipeó (parseo roto). La regla de dos fases del
+`CLAUDE.md` — agregar, deployar, borrar — obliga a que el drop llegue en una
+migration posterior, en una feature aparte (`019.5`).
+
+Sin ese wait period, borrar la columna deja tres agujeros:
+
+1. **`<MarkdownViewer>` como fallback en `<TicketDescription>`** dejaría de
+   recibir datos y siempre mostraría el placeholder para tickets no migrados.
+2. **`ticket-detail.tsx` importa `markdownToProseMirrorDoc`** para convertir
+   al vuelo si un ticket llega al editor sin migrar. Sin `description`, esa
+   ruta no se dispara nunca pero el import queda muerto — es señal de que
+   algo se puede simplificar.
+3. **Los tickets que el script skipeó** por parseo roto perderían el texto
+   original: hoy sobreviven como markdown en `description` mientras un
+   operador los corrige a mano. Después del drop, ese contenido desaparece.
+
+**Alcance del `019.5`, cuando se dé el OK:**
+
+- Migration nueva: `alter table public.tickets drop column description;`.
+- Borrar `src/lib/markdown/viewer.tsx` y `src/lib/markdown/sanitize.ts`.
+- Borrar la rama de fallback en `<TicketDescription>` (helper en
+  `src/components/tickets/ticket-detail.tsx`) — queda `<RichTextViewer>` o
+  placeholder, y basta.
+- Borrar `markdownToProseMirrorDoc` de `src/lib/editor/convert.ts` **solo si
+  el script `scripts/migrate-ticket-descriptions.ts` también se retira** (o
+  se lo deja como archivo histórico si conviene documentar cómo se hizo la
+  conversión). El converter y el script son un par: uno sin el otro pierde
+  sentido.
+- Remover las deps del `package.json`: `react-markdown`, `remark-gfm`,
+  `rehype-sanitize`. **`unified` y `remark-parse` también** si se retira el
+  converter/script; si se dejan, quedan como deps sin caller — vale un
+  chequeo con `depcheck` antes.
+- Actualizar `CLAUDE.md`: sacar `markdown/` de la estructura del repo y la
+  sección "Editor rich text" — la frase "MarkdownViewer sigue vivo" deja de
+  ser cierta.
+
+**Riesgo si se salda antes del gate:** un ticket cuyo `description_doc` es
+null pierde su descripción. No hay recovery — la columna vieja se fue.

@@ -106,18 +106,18 @@ Las fases 1 a 4 se pueden desarrollar **en paralelo** por dos personas (una en 1
 
 ## Phase 6 — Migración de datos
 
-- [ ] **T6.1** — `src/lib/editor/convert.ts` — `markdownToProseMirrorDoc(md: string): JSONContent`. Usa `unified` + `remark-parse` + `remark-gfm` para parsear a mdast; camina el AST y emite JSON del schema (§3 del plan). Descarta imágenes, HTML crudo y tablas con log. Compartido entre el script (T6.2) y `convertMarkdownAdHoc` (T5.3).
-- [ ] **T6.2** — `scripts/migrate-ticket-descriptions.mjs` — Node script:
+- [x] **T6.1** — `src/lib/editor/convert.ts` — `markdownToProseMirrorDoc(md: string): JSONContent`. Usa `unified` + `remark-parse` + `remark-gfm` para parsear a mdast; camina el AST y emite JSON del schema (§3 del plan). Descarta imágenes, HTML crudo y tablas con log. Compartido entre el script (T6.2) y `convertMarkdownAdHoc` (T5.3).
+- [x] **T6.2** — `scripts/migrate-ticket-descriptions.ts` (TS en vez de mjs — necesita importar `convert.ts`; corre con `pnpm exec tsx`) — Node script:
   - Cliente Supabase con service role (leer de env).
   - Flags: `--dry-run`, `--limit N`.
   - Selecciona `id, key, description` where `description is not null and description <> '' and description_doc is null`.
   - Por cada uno: convierte con `markdownToProseMirrorDoc`, valida con `validateProseMirrorDoc`, escribe si OK, skippea con log si falla.
   - Log por lote de 100: `[N converted, M skipped, K remaining]`.
   - Al final: resumen total.
-- [ ] **T6.3** — Ejecución (paso manual del deploy, documentado en `plan.md` §6.3):
+- [ ] **T6.3** (pendiente — lo corre el usuario en el deploy) — Ejecución (paso manual del deploy, documentado en `plan.md` §6.3):
   1. Correr `pnpm db:push` (aplica migration 19).
-  2. `node scripts/migrate-ticket-descriptions.mjs --dry-run` → revisar output.
-  3. `node scripts/migrate-ticket-descriptions.mjs` → real.
+  2. `pnpm exec tsx scripts/migrate-ticket-descriptions.ts --dry-run` → revisar output.
+  3. `pnpm exec tsx scripts/migrate-ticket-descriptions.ts` → real.
   4. `select count(*) from tickets where description_doc is not null;` en el dashboard de Supabase.
   5. Push a `main` (deploy del código de `019`).
   6. Verificación en el browser: abrir 3-5 tickets viejos, ver que renderizan bien.
@@ -138,14 +138,14 @@ Sigue la política del proyecto: se documenta lo que la Phase debería cubrir; e
 
 ## Phase 8 — Cierre
 
-- [ ] **T8.1** — Actualizar `specs/features/README.md`: `019` como done con una línea de resumen (editor Tiptap + JSON storage + fase 2 pendiente).
-- [ ] **T8.2** — Actualizar `CLAUDE.md`:
+- [x] **T8.1** — Actualizar `specs/features/README.md`: `019` como done con una línea de resumen (editor Tiptap + JSON storage + fase 2 pendiente).
+- [x] **T8.2** — Actualizar `CLAUDE.md`:
   - Estructura del repo: agregar `src/lib/editor/` con sus archivos.
   - Sección "Convenciones de código > Editor rich text" nueva con las reglas (whitelist única, viewer server-side sin Tiptap, `MarkdownViewer` sigue vivo como fallback, contributor scope heredado).
   - Estado de features: línea para 019.
   - Sección "Migrations": nota de que la migration siguiente (fase 2 — drop de `description` + borrado de deps markdown) es intencional.
-- [ ] **T8.3** — Anotar en `docs/deuda-tecnica.md`: **fase 2 pendiente** (drop de `tickets.description` + borrado de `src/lib/markdown/*` + remoción de `react-markdown`, `remark-gfm`, `rehype-sanitize` del `package.json`). Dueño y motivo explícitos. **No saldar sin OK explícito** (regla del `CLAUDE.md`).
-- [ ] **T8.4** — Verificación visual del usuario en el browser:
+- [x] **T8.3** — Anotar en `docs/deuda-tecnica.md`: **fase 2 pendiente** (drop de `tickets.description` + borrado de `src/lib/markdown/*` + remoción de `react-markdown`, `remark-gfm`, `rehype-sanitize` del `package.json`). Dueño y motivo explícitos. **No saldar sin OK explícito** (regla del `CLAUDE.md`).
+- [ ] **T8.4** (pendiente — verificación visual del usuario) — Verificación visual del usuario en el browser:
   - Crear ticket con formato variado (headings, listas, checklist, code block, link, blockquote).
   - Editar el mismo ticket, cambiar el formato, guardar.
   - Cancelar una edición con cambios pendientes → aparece el confirm.

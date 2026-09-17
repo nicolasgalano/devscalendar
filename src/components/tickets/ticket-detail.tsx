@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { markdownToProseMirrorDoc } from "@/lib/editor/convert";
 import { RichTextViewer } from "@/lib/editor/rich-text-viewer";
 import type { ProseMirrorNode } from "@/lib/editor/validate";
 import { MarkdownViewer } from "@/lib/markdown/viewer";
@@ -154,16 +155,13 @@ export function TicketDetail({
     projectId: ticket.project.id,
     title: ticket.title,
     // 019: si el ticket ya fue migrado, `descriptionDoc` viaja tal cual. Si
-    // todavía tiene markdown viejo, se seedea el editor con el texto plano
-    // — el usuario pierde el formato al editar (headings quedan como texto,
-    // listas como líneas), y ese es un compromiso deliberado: la
-    // conversión markdown→ProseMirror completa vive en la fase 6 y hacer una
-    // "mini-conversión" acá duplicaría reglas que la migración ya sabe. Como
-    // la migración es coordinada con el deploy, en producción este fallback
-    // solo se dispara si el script skipeó el ticket (parseo roto).
+    // todavía tiene markdown viejo (el script de fase 6 no lo cubrió), se
+    // convierte al vuelo con el mismo converter que usa el script — así el
+    // usuario que edita un ticket no-migrado ve el mismo resultado que si
+    // hubiese esperado a la migración. Nunca se guarda hasta que confirme.
     descriptionDoc:
       optimistic.descriptionDoc ??
-      (optimistic.description ? seedPlainTextDoc(optimistic.description) : null),
+      (optimistic.description ? markdownToProseMirrorDoc(optimistic.description) : null),
     priority: ticket.priority,
     assigneeId: ticket.assigneeId,
     status: ticket.status,
@@ -525,24 +523,6 @@ function TicketDescription({
     return <MarkdownViewer content={description} />;
   }
   return <RichTextViewer doc={null} />;
-}
-
-// Seed inicial del editor para un ticket que solo tiene markdown viejo (sin
-// `descriptionDoc`). Deliberadamente ingenuo: mete todo el texto plano en un
-// único párrafo, sin interpretar headings, listas ni marks. La conversión
-// buena vive en `scripts/migrate-ticket-descriptions.mjs` (T6.2); una versión
-// paralela acá duplicaría reglas y arriesga divergencia. El costo lo paga solo
-// el operador que edita un ticket que el script skipeó.
-function seedPlainTextDoc(text: string): ProseMirrorNode {
-  return {
-    type: "doc",
-    content: [
-      {
-        type: "paragraph",
-        content: text.length > 0 ? [{ type: "text", text }] : [],
-      },
-    ],
-  };
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
