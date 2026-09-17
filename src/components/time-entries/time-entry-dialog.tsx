@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CalendarIcon, ClockIcon, PlusIcon, TimerIcon, XIcon } from "lucide-react";
 
 import { useSyncIndicator } from "@/components/sync-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -22,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 const NO_TICKET = "__none__";
 const NO_ACTIVITY = "__none__";
@@ -46,22 +46,31 @@ export type TimeEntryActivity = {
 };
 
 export type TimeEntryDialogInitial = {
-  id?: string; // edit only
+  id?: string;
   projectId: string | null;
   ticketId: string | null;
   activityId: string | null;
   minutes: number;
   loggedAt: string; // YYYY-MM-DD
+  startTime: string | null; // HH:MM
   description: string;
 };
 
 /**
- * Dialog reusado para crear y editar time entries (016 T4.5). En modo edit,
- * el proyecto queda fijo (cambiar de proyecto rompe supuestos de scope). En
- * create, cambiar el proyecto refresca las listas de actividades y tickets.
+ * Dialog de carga de tiempo, rediseñado en 016 T8 al estilo TrackingTime.
  *
- * Los inputs de minutos aceptan atajos rápidos: botones `+15` `+30` `+60` que
- * suman al valor actual (o setean si el valor era 0).
+ * Layout:
+ *   - Header compacto: fecha (con date picker inline) + selector de usuario
+ *     opcional a la derecha + X para cerrar.
+ *   - "Horas trabajadas": tres inputs — start (HH:MM), end (HH:MM), duración
+ *     calculada (readonly). Cualquiera se puede editar; el blur sincroniza.
+ *   - "Proyecto y tarea": selectores stacked single-column con "+" leader que
+ *     invita a completarlos. Actividad y ticket aparecen solo cuando aplica.
+ *   - "Detalles": textarea corto.
+ *   - Botones al pie (Cancelar / Cargar).
+ *
+ * Regla de múltiplos de 15: si `to - from` no da múltiplo, `to` se ajusta
+ * al múltiplo más cercano al blur. El check duro de la base sigue vigente.
  */
 export function TimeEntryDialog({
   mode,
@@ -71,17 +80,17 @@ export function TimeEntryDialog({
   projects,
   activitiesByProject,
   ticketsByProject,
+  userLabel,
 }: {
   mode: "create" | "edit";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial: TimeEntryDialogInitial;
-  /** Proyectos donde el user puede cargar (create) o el proyecto de la entry (edit). */
   projects: TimeEntryProject[];
-  /** Actividades activas por proyecto — clave = projectId. */
   activitiesByProject: Record<string, TimeEntryActivity[]>;
-  /** Tickets abiertos por proyecto — clave = projectId. Opcional. */
   ticketsByProject?: Record<string, TimeEntryTicket[]>;
+  /** Nombre a mostrar en el chip del header (solo visual). */
+  userLabel?: string;
 }) {
   const router = useRouter();
   const { start: startSync } = useSyncIndicator();
@@ -89,10 +98,18 @@ export function TimeEntryDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [startInput, setStartInput] = useState<string>(initial.startTime ?? "09:00");
+  const [endInput, setEndInput] = useState<string>(
+    computeEnd(initial.startTime ?? "09:00", initial.minutes),
+  );
+
   useEffect(() => {
     if (open) {
       setForm(initial);
       setError(null);
+      const start = initial.startTime ?? "09:00";
+      setStartInput(start);
+      setEndInput(computeEnd(start, initial.minutes));
     }
   }, [open, initial]);
 
@@ -106,8 +123,6 @@ export function TimeEntryDialog({
     return ticketsByProject[form.projectId] ?? [];
   }, [form.projectId, ticketsByProject]);
 
-  // Si cambio de proyecto y la actividad/ticket seleccionado ya no aplica, se
-  // limpia. Evita mandar valores que el server va a rebotar.
   useEffect(() => {
     if (mode !== "create") return;
     if (form.activityId && !availableActivities.some((a) => a.id === form.activityId)) {
@@ -119,6 +134,18 @@ export function TimeEntryDialog({
   }, [mode, form.activityId, form.ticketId, availableActivities, availableTickets]);
 
   const activityRequired = availableActivities.length > 0;
+
+  function syncFromRange(nextStart: string, nextEnd: string) {
+    const rawMinutes = minutesBetween(nextStart, nextEnd);
+    if (rawMinutes === null || rawMinutes <= 0) return;
+    const rounded = roundToStep(rawMinutes, 15);
+    const clamped = Math.max(15, Math.min(960, rounded));
+    const adjustedEnd = computeEnd(nextStart, clamped);
+    setStartInput(nextStart);
+    setEndInput(adjustedEnd);
+    setForm((current) => ({ ...current, startTime: nextStart, minutes: clamped }));
+  }
+
   const canSubmit =
     form.projectId !== null &&
     form.minutes > 0 &&
@@ -126,13 +153,6 @@ export function TimeEntryDialog({
     form.loggedAt.length === 10 &&
     (!activityRequired || form.activityId !== null) &&
     !submitting;
-
-  function addMinutes(delta: number) {
-    setForm((current) => ({
-      ...current,
-      minutes: Math.max(15, Math.min(960, current.minutes + delta)),
-    }));
-  }
 
   async function submit() {
     if (!canSubmit) return;
@@ -145,6 +165,7 @@ export function TimeEntryDialog({
       const body: Record<string, unknown> = {
         minutes: form.minutes,
         logged_at: form.loggedAt,
+        start_time: form.startTime,
         description: form.description.trim() || null,
         ticket_id: form.ticketId ?? null,
         activity_id: form.activityId ?? null,
@@ -176,204 +197,287 @@ export function TimeEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Cargar tiempo" : "Editar carga"}</DialogTitle>
+      <DialogContent className="max-w-lg">
+        <DialogHeader className="mb-2 flex flex-row items-center justify-between gap-3 space-y-0">
+          <div className="flex items-center gap-2">
+            <CalendarIcon aria-hidden="true" className="text-muted-foreground size-4" />
+            <DialogTitle className="text-emphasis font-medium">
+              <label className="cursor-pointer">
+                {formatHeaderDate(form.loggedAt)}
+                <input
+                  type="date"
+                  value={form.loggedAt}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setForm({ ...form, loggedAt: e.target.value })}
+                  className="ml-0 h-0 w-0 opacity-0"
+                  aria-label="Fecha"
+                />
+              </label>
+            </DialogTitle>
+          </div>
+          {userLabel && (
+            <div className="border-input flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-1">
+              <div className="bg-muted flex size-6 items-center justify-center rounded-full text-caption font-medium">
+                {initialsOf(userLabel)}
+              </div>
+              <span className="text-ui text-secondary-foreground">{userLabel}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-label="Cerrar"
+            className="text-muted-foreground hover:text-foreground rounded-md p-1"
+          >
+            <XIcon aria-hidden="true" className="size-4" />
+          </button>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {error && (
             <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           )}
 
+          {/* Horas trabajadas ─────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
-            <Label>Proyecto</Label>
-            <Select
-              value={form.projectId ?? ""}
-              onValueChange={(value) =>
-                setForm({ ...form, projectId: (value as string) || null })
-              }
-              disabled={mode === "edit" || projects.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Elegí un proyecto">
-                  {(() => {
-                    const p = projects.find((project) => project.id === form.projectId);
-                    return p ? p.name : undefined;
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.clientName ? (
-                      <span className="text-muted-foreground">
-                        {project.clientName} ·{" "}
-                      </span>
-                    ) : null}
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-caption text-muted-foreground font-medium">
+              Horas trabajadas
+            </Label>
+            <div className="grid grid-cols-[1fr_auto_1fr_1fr] items-center gap-2">
+              <div className="border-input flex items-center gap-2 rounded-md border bg-transparent px-2.5 py-1.5">
+                <ClockIcon aria-hidden="true" className="text-muted-foreground size-4" />
+                <input
+                  type="time"
+                  value={startInput}
+                  onChange={(e) => setStartInput(e.target.value)}
+                  onBlur={() => syncFromRange(startInput, endInput)}
+                  className="font-data text-foreground w-full bg-transparent outline-none"
+                />
+              </div>
+              <span aria-hidden="true" className="text-muted-foreground">
+                —
+              </span>
+              <div className="border-input flex items-center gap-2 rounded-md border bg-transparent px-2.5 py-1.5">
+                <ClockIcon aria-hidden="true" className="text-muted-foreground size-4" />
+                <input
+                  type="time"
+                  value={endInput}
+                  onChange={(e) => setEndInput(e.target.value)}
+                  onBlur={() => syncFromRange(startInput, endInput)}
+                  className="font-data text-foreground w-full bg-transparent outline-none"
+                />
+              </div>
+              <div className="border-input bg-muted flex items-center gap-2 rounded-md border px-2.5 py-1.5">
+                <TimerIcon aria-hidden="true" className="text-muted-foreground size-4" />
+                <span className="font-data text-foreground w-full">
+                  {formatDuration(form.minutes)}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label>Actividad {activityRequired && <span className="text-destructive">*</span>}</Label>
-              <Select
+          {/* Proyecto y tarea ─────────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-caption text-muted-foreground font-medium">
+              Proyecto y tarea
+            </Label>
+            <SelectorRow
+              placeholder="Elegí un proyecto"
+              value={form.projectId ?? ""}
+              disabled={mode === "edit" || projects.length === 0}
+              onChange={(value) =>
+                setForm({ ...form, projectId: (value as string) || null })
+              }
+              display={projects.find((p) => p.id === form.projectId)?.name}
+              iconTone={form.projectId ? "muted" : "primary"}
+            >
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.clientName ? (
+                    <span className="text-muted-foreground">
+                      {project.clientName} ·{" "}
+                    </span>
+                  ) : null}
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectorRow>
+
+            {form.projectId && availableActivities.length > 0 && (
+              <SelectorRow
+                placeholder={
+                  activityRequired ? "Elegí una actividad" : "Sin actividad"
+                }
                 value={form.activityId ?? (activityRequired ? "" : NO_ACTIVITY)}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setForm({
                     ...form,
                     activityId: value === NO_ACTIVITY ? null : (value as string),
                   })
                 }
-                disabled={!form.projectId}
+                display={availableActivities.find((a) => a.id === form.activityId)?.name}
+                iconTone={form.activityId ? "muted" : "primary"}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={activityRequired ? "Elegí una actividad" : "Sin actividad"}>
-                    {(() => {
-                      const a = availableActivities.find((x) => x.id === form.activityId);
-                      return a ? a.name : undefined;
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {!activityRequired && (
-                    <SelectItem value={NO_ACTIVITY}>Sin actividad</SelectItem>
-                  )}
-                  {availableActivities.map((activity) => (
-                    <SelectItem key={activity.id} value={activity.id}>
-                      {activity.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.projectId && availableActivities.length === 0 && (
-                <p className="text-caption text-muted-foreground">
-                  Este proyecto todavía no tiene actividades definidas.
-                </p>
-              )}
-            </div>
+                {!activityRequired && (
+                  <SelectItem value={NO_ACTIVITY}>Sin actividad</SelectItem>
+                )}
+                {availableActivities.map((activity) => (
+                  <SelectItem key={activity.id} value={activity.id}>
+                    {activity.name}
+                  </SelectItem>
+                ))}
+              </SelectorRow>
+            )}
+            {form.projectId && availableActivities.length === 0 && (
+              <p className="text-caption text-muted-foreground pl-1">
+                Este proyecto todavía no tiene actividades definidas.
+              </p>
+            )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label>Ticket (opcional)</Label>
-              <Select
+            {form.projectId && availableTickets.length > 0 && (
+              <SelectorRow
+                placeholder="Elegí un ticket (opcional)"
                 value={form.ticketId ?? NO_TICKET}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setForm({
                     ...form,
                     ticketId: value === NO_TICKET ? null : (value as string),
                   })
                 }
-                disabled={!form.projectId}
+                display={(() => {
+                  const t = availableTickets.find((x) => x.id === form.ticketId);
+                  return t ? `${t.key} · ${t.title}` : undefined;
+                })()}
+                iconTone={form.ticketId ? "muted" : "primary"}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sin ticket">
-                    {(() => {
-                      const t = availableTickets.find((x) => x.id === form.ticketId);
-                      return t ? `${t.key} · ${t.title}` : undefined;
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_TICKET}>Sin ticket</SelectItem>
-                  {availableTickets.map((ticket) => (
-                    <SelectItem key={ticket.id} value={ticket.id}>
-                      <span className="font-data text-muted-foreground">{ticket.key}</span>{" "}
-                      {ticket.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <SelectItem value={NO_TICKET}>Sin ticket</SelectItem>
+                {availableTickets.map((ticket) => (
+                  <SelectItem key={ticket.id} value={ticket.id}>
+                    <span className="font-data text-muted-foreground">{ticket.key}</span>{" "}
+                    {ticket.title}
+                  </SelectItem>
+                ))}
+              </SelectorRow>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="entry-date">Fecha</Label>
-              <Input
-                id="entry-date"
-                type="date"
-                value={form.loggedAt}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(event) => setForm({ ...form, loggedAt: event.target.value })}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="entry-minutes">Minutos (múltiplos de 15)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="entry-minutes"
-                  type="number"
-                  min="15"
-                  max="960"
-                  step="15"
-                  value={form.minutes || ""}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      minutes: Math.max(0, Math.min(960, Number(event.target.value) || 0)),
-                    })
-                  }
-                  className="w-24"
-                />
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addMinutes(15)}
-                  >
-                    +15
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addMinutes(30)}
-                  >
-                    +30
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addMinutes(60)}
-                  >
-                    +60
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          {/* Detalles ─────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="entry-description">Descripción (opcional)</Label>
+            <Label className="text-caption text-muted-foreground font-medium">
+              Detalles
+            </Label>
             <Textarea
-              id="entry-description"
               value={form.description}
               maxLength={500}
-              rows={3}
-              placeholder="Qué hiciste (opcional)"
+              rows={2}
+              placeholder="Añadir detalles (opcional)"
               onChange={(event) => setForm({ ...form, description: event.target.value })}
             />
           </div>
         </div>
 
-        <DialogFooter>
+        <div className="mt-4 flex items-center justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit} disabled={!canSubmit}>
-            {mode === "create" ? "Cargar" : "Guardar cambios"}
+          <Button onClick={submit} disabled={!canSubmit} className="min-w-24">
+            {mode === "create" ? "Cargar" : "Guardar"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+function SelectorRow({
+  placeholder,
+  value,
+  onChange,
+  disabled,
+  display,
+  iconTone,
+  children,
+}: {
+  placeholder: string;
+  value: string;
+  onChange: (value: string | null) => void;
+  disabled?: boolean;
+  display?: string;
+  iconTone: "muted" | "primary";
+  children: React.ReactNode;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <SelectTrigger className="w-full justify-start">
+        <PlusIcon
+          aria-hidden="true"
+          className={cn(
+            "size-4 shrink-0",
+            iconTone === "primary" ? "text-primary" : "text-muted-foreground",
+          )}
+        />
+        <SelectValue placeholder={placeholder}>{display}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>{children}</SelectContent>
+    </Select>
+  );
+}
+
+// Helpers de tiempo ──────────────────────────────────────────────
+
+function minutesBetween(from: string, to: string): number | null {
+  const f = parseTime(from);
+  const t = parseTime(to);
+  if (f === null || t === null) return null;
+  const diff = t - f;
+  return diff > 0 ? diff : null;
+}
+
+function parseTime(hhmm: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function computeEnd(startHhmm: string, minutes: number): string {
+  const start = parseTime(startHhmm);
+  if (start === null) return "09:00";
+  const total = (start + minutes) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+}
+
+function roundToStep(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+function formatHeaderDate(dateIso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return dateIso;
+  const d = new Date(`${dateIso}T00:00:00Z`);
+  const formatter = new Intl.DateTimeFormat("es-AR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  return formatter.format(d).replace(/\.$/, "");
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.charAt(0) ?? "?";
+  const last = parts.length > 1 ? parts[parts.length - 1]!.charAt(0) : "";
+  return (first + last).toUpperCase();
 }

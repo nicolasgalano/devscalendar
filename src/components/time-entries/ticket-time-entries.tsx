@@ -97,6 +97,7 @@ export function TicketTimeEntries({
     activityId: null,
     minutes: 60,
     loggedAt: new Date().toISOString().slice(0, 10),
+    startTime: null,
     description: "",
   };
 
@@ -109,6 +110,7 @@ export function TicketTimeEntries({
           activityId: dialogState.entry.activity?.id ?? null,
           minutes: dialogState.entry.minutes,
           loggedAt: dialogState.entry.loggedAt,
+          startTime: dialogState.entry.startTime,
           description: dialogState.entry.description ?? "",
         }
       : createInitial;

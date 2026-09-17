@@ -19,6 +19,9 @@ export type TimeEntryListItem = {
   createdByName: string | null;
   minutes: number;
   loggedAt: string;
+  /** 016 T8: hora del día en que arrancó ese bloque (HH:MM). Null para
+   *  entries viejas o cargas sin hora exacta. */
+  startTime: string | null;
   description: string | null;
   project: { id: string; name: string; key: string };
   ticket: { id: string; numero: number; title: string } | null;
@@ -36,7 +39,7 @@ type EmbedShape = TimeEntryRow & {
 };
 
 const ENTRY_SELECT = `
-  id, user_id, created_by, minutes, logged_at, description, created_at, updated_at,
+  id, user_id, created_by, minutes, logged_at, start_time, description, created_at, updated_at,
   user:profiles!time_entries_user_id_fkey ( full_name, email ),
   creator:profiles!time_entries_created_by_fkey ( full_name, email ),
   project:projects!inner ( id, name, key ),
@@ -56,6 +59,9 @@ function toListItem(row: EmbedShape): TimeEntryListItem {
         : null,
     minutes: row.minutes,
     loggedAt: row.logged_at,
+    // start_time viene como "HH:MM:SS" desde Postgres; el UI usa HH:MM. Se
+    // normaliza acortando.
+    startTime: row.start_time ? row.start_time.slice(0, 5) : null,
     description: row.description,
     project: {
       id: row.project!.id,
