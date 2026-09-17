@@ -36,8 +36,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { project_id, ticket_id, activity_id, minutes, logged_at, description } =
-    parsed.data;
+  const {
+    project_id,
+    ticket_id,
+    activity_id,
+    minutes,
+    logged_at,
+    start_time,
+    description,
+  } = parsed.data;
   const target_user_id = parsed.data.user_id ?? profile.id;
 
   // Guard 2: logged_at no puede ser futuro.
@@ -135,6 +142,7 @@ export async function POST(request: Request) {
     project_id,
     ticket_id: ticket_id ?? null,
     activity_id: activity_id ?? null,
+    start_time: start_time ?? null,
     minutes,
     logged_at,
     description: description ?? null,

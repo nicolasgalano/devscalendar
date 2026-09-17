@@ -128,6 +128,7 @@ export function WeeklyGridView({
           activityId: null,
           minutes: 60,
           loggedAt: dialogState.loggedAt,
+          startTime: null,
           description: "",
         }
       : {
@@ -136,6 +137,7 @@ export function WeeklyGridView({
           activityId: null,
           minutes: 60,
           loggedAt: currentWeekStart(),
+          startTime: null,
           description: "",
         };
 
@@ -148,6 +150,7 @@ export function WeeklyGridView({
           activityId: dialogState.entry.activity?.id ?? null,
           minutes: dialogState.entry.minutes,
           loggedAt: dialogState.entry.loggedAt,
+          startTime: dialogState.entry.startTime,
           description: dialogState.entry.description ?? "",
         }
       : createInitial;
@@ -322,6 +325,7 @@ export function WeeklyGridView({
         projects={projects}
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
+        userLabel={viewingUserName}
       />
 
       <TimeEntryDialog
@@ -332,6 +336,7 @@ export function WeeklyGridView({
         projects={projects}
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
+        userLabel={viewingUserName}
       />
     </>
   );

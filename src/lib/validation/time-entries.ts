@@ -25,6 +25,16 @@ const descriptionSchema = z
   .optional()
   .transform((v) => (v === "" || v == null ? null : v));
 
+// Hora en HH:MM (formato del <input type="time">). Postgres time acepta esto.
+// Nullable + opcional para compat con entries viejas y con carga sin hora
+// exacta (fecha + duración solo).
+const timeSchema = z
+  .string()
+  .regex(/^\d{2}:\d{2}(:\d{2})?$/, "Formato esperado: HH:MM")
+  .nullable()
+  .optional()
+  .transform((v) => (v === "" || v == null ? null : v));
+
 /**
  * Alta de time entry. `user_id` opcional en el body: si no viene, el handler
  * lo setea a `auth.uid()`. Si viene distinto al propio, el handler chequea
@@ -44,6 +54,7 @@ export const createTimeEntrySchema = z.object({
   activity_id: z.string().uuid().nullable().optional(),
   minutes: minutesSchema,
   logged_at: dateSchema,
+  start_time: timeSchema,
   description: descriptionSchema,
   user_id: z.string().uuid().optional(),
 });
@@ -59,6 +70,7 @@ export const updateTimeEntrySchema = z
     activity_id: z.string().uuid().nullable().optional(),
     minutes: minutesSchema.optional(),
     logged_at: dateSchema.optional(),
+    start_time: timeSchema,
     description: descriptionSchema,
   })
   .refine((body) => Object.values(body).some((v) => v !== undefined), {

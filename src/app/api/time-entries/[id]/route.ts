@@ -125,6 +125,9 @@ export async function PATCH(
       }),
       ...(parsed.data.minutes !== undefined && { minutes: parsed.data.minutes }),
       ...(parsed.data.logged_at !== undefined && { logged_at: parsed.data.logged_at }),
+      ...(parsed.data.start_time !== undefined && {
+        start_time: parsed.data.start_time,
+      }),
       ...(parsed.data.description !== undefined && {
         description: parsed.data.description,
       }),

@@ -623,6 +623,7 @@ export type Database = {
           logged_at: string;
           minutes: number;
           project_id: string;
+          start_time: string | null;
           ticket_id: string | null;
           updated_at: string;
           user_id: string;
@@ -636,6 +637,7 @@ export type Database = {
           logged_at: string;
           minutes: number;
           project_id: string;
+          start_time?: string | null;
           ticket_id?: string | null;
           updated_at?: string;
           user_id: string;
@@ -649,6 +651,7 @@ export type Database = {
           logged_at?: string;
           minutes?: number;
           project_id?: string;
+          start_time?: string | null;
           ticket_id?: string | null;
           updated_at?: string;
           user_id?: string;
