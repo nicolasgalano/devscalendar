@@ -77,6 +77,17 @@ export function hasAnyRole(roles: UserRole[] | null | undefined): boolean {
   return (roles?.length ?? 0) > 0;
 }
 
+/**
+ * 016: "puedo ver reportes y la carga de otros" — es admin o PM (rol
+ * global). Este helper NO chequea que sea PM de UN proyecto específico —
+ * es un gate de UI (mostrar el ítem "Reportes" en el sidebar, mostrar el
+ * selector de usuario en Mi Tiempo). El scope real de cada reporte lo pone
+ * la RLS + los filtros del server.
+ */
+export function hasPmScope(roles: UserRole[] | null | undefined): boolean {
+  return isAdmin(roles) || isPm(roles);
+}
+
 /** Sorted by `ROLE_ORDER` and deduped, mirroring the database trigger. */
 export function sortRoles(roles: UserRole[]): UserRole[] {
   return ROLE_ORDER.filter((role) => roles.includes(role));

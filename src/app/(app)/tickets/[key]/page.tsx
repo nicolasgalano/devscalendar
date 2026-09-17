@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { TicketDetail } from "@/components/tickets/ticket-detail";
+import { isAdmin } from "@/lib/auth/roles";
+import { getActivitiesForProject } from "@/lib/project-activities/query";
 import { getOpenSprints } from "@/lib/sprints/query";
+import { getTimeEntriesForTicket } from "@/lib/time-entries/query";
 import { getProjectMembers } from "@/lib/tickets/facets";
 import { getTicketByKey } from "@/lib/tickets/query";
 import { createClient } from "@/lib/supabase/server";
@@ -35,10 +38,22 @@ export default async function TicketPage({
     roleInProject = data ?? null;
   }
 
-  const [members, openSprints] = await Promise.all([
+  const [members, openSprints, timeEntries, projectActivities] = await Promise.all([
     getProjectMembers(ticket.project.id),
     getOpenSprints(ticket.project.id),
+    getTimeEntriesForTicket(ticket.id),
+    getActivitiesForProject(ticket.project.id, { includeInactive: false }),
   ]);
+
+  // 016 US-1/US-2: contributor+ del proyecto puede cargar horas. Admin y PM
+  // primario también. La verdad la tiene la RLS; esto es UX.
+  const canLogTime = Boolean(
+    profile &&
+      (isAdmin(profile.roles) ||
+        profile.id === ticket.project.pmId ||
+        roleInProject === "contributor" ||
+        roleInProject === "lead"),
+  );
 
   return (
     <TicketDetail
@@ -47,6 +62,13 @@ export default async function TicketPage({
       roleInProject={roleInProject}
       members={members}
       openSprints={openSprints}
+      timeEntries={timeEntries}
+      projectActivities={projectActivities.map((a) => ({
+        id: a.id,
+        name: a.name,
+        active: a.active,
+      }))}
+      canLogTime={canLogTime}
     />
   );
 }

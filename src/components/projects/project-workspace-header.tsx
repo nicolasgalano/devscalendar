@@ -8,13 +8,14 @@ import type { ProjectDetail } from "@/lib/projects/workspace";
 import type { PersonFacet, ProjectFacet } from "@/lib/tickets/facets";
 import { cn } from "@/lib/utils";
 
-type Tab = "sprint" | "backlog" | "sprints" | "members";
+type Tab = "sprint" | "backlog" | "sprints" | "activities" | "members";
 
 function detectTab(pathname: string): Tab {
   if (pathname.endsWith("/sprint")) return "sprint";
   if (pathname.endsWith("/backlog")) return "backlog";
   // /sprints/[N] cae también en "sprints"; el includes ancla el segmento.
   if (pathname.includes("/sprints")) return "sprints";
+  if (pathname.endsWith("/activities")) return "activities";
   if (pathname.endsWith("/members")) return "members";
   // Default para /projects/[key] (el redirect apunta a /sprint, así que en la
   // práctica no se ve): asumimos sprint activo.
@@ -103,11 +104,18 @@ export function ProjectWorkspaceHeader({
           label="Old Sprints"
         />
         {canManageMembers && (
-          <TabLink
-            href={`/projects/${project.key}/members`}
-            active={currentTab === "members"}
-            label="Miembros"
-          />
+          <>
+            <TabLink
+              href={`/projects/${project.key}/activities`}
+              active={currentTab === "activities"}
+              label="Actividades"
+            />
+            <TabLink
+              href={`/projects/${project.key}/members`}
+              active={currentTab === "members"}
+              label="Miembros"
+            />
+          </>
         )}
       </nav>
     </div>

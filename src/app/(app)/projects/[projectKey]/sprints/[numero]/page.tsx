@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { getProjectByKey } from "@/lib/projects/workspace";
 import { getCompletedSprintByNumero } from "@/lib/sprints/query";
 import { formatSprintDisplayName } from "@/lib/sprints/status";
+import { getSprintActualHours } from "@/lib/time-entries/query";
 import { formatAbsoluteFull } from "@/lib/tickets/relative-time";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,15 @@ export default async function SprintReportPage({
   const sprint = await getCompletedSprintByNumero(project.id, parsedNumero);
   if (!sprint) notFound();
 
+  // 016 T7.1: horas cargadas live-queried en el rango del sprint. Se corta
+  // en `closedAt` para que entries post-cierre con fecha post-cierre NO
+  // aparezcan; entries post-cierre con fecha PRE-cierre sí (el user cargó
+  // tarde pero la fecha es del sprint).
+  const closedDate = sprint.closedAt
+    ? sprint.closedAt.slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const actualHours = await getSprintActualHours(sprint.id, sprint.startsAt, closedDate);
+
   return (
     <>
       <PageHeader
@@ -45,7 +55,11 @@ export default async function SprintReportPage({
         </Link>
       </p>
 
-      <SprintReport sprint={sprint} projectKey={projectKey} />
+      <SprintReport
+        sprint={sprint}
+        projectKey={projectKey}
+        actualHours={actualHours}
+      />
     </>
   );
 }

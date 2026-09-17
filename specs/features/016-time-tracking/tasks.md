@@ -3,7 +3,7 @@
 - **ID:** 016-time-tracking
 - **Plan reference:** `./plan.md`
 - **Spec reference:** `./spec.md`
-- **Estado:** in progress
+- **Estado:** done — 2026-09-16 (código); verificación manual pendiente
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked.
 

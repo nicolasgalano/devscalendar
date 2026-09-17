@@ -7,6 +7,12 @@ import { PencilIcon } from "lucide-react";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status";
+import { TicketTimeEntries } from "@/components/time-entries/ticket-time-entries";
+import type {
+  TimeEntryActivity,
+  TimeEntryProject,
+} from "@/components/time-entries/time-entry-dialog";
+import type { TimeEntryListItem } from "@/lib/time-entries/query";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -71,6 +77,9 @@ export function TicketDetail({
   roleInProject,
   members,
   openSprints,
+  timeEntries,
+  projectActivities,
+  canLogTime,
 }: {
   ticket: TicketDetailData;
   viewer: { id: string; roles: UserRole[] } | null;
@@ -78,6 +87,12 @@ export function TicketDetail({
   members: { id: string; name: string }[];
   /** Sprints no-cerrados del proyecto — para el Select de Sprint. */
   openSprints: SprintListItem[];
+  /** 016: entries cargadas sobre este ticket. */
+  timeEntries: TimeEntryListItem[];
+  /** 016: actividades activas del proyecto (para el dialog de cargar tiempo). */
+  projectActivities: TimeEntryActivity[];
+  /** 016: si el viewer puede cargar tiempo sobre este proyecto (contributor+). */
+  canLogTime: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -403,6 +418,25 @@ export function TicketDetail({
         <h2 className="text-section pb-2 font-medium">Descripción</h2>
         <MarkdownViewer content={optimistic.description} />
       </section>
+
+      <TicketTimeEntries
+        ticketId={ticket.id}
+        ticketKey={ticket.key}
+        ticketTitle={ticket.title}
+        project={
+          {
+            id: ticket.project.id,
+            key: ticket.project.key,
+            name: ticket.project.name,
+            clientName: ticket.project.client?.name ?? null,
+          } as TimeEntryProject
+        }
+        activities={projectActivities}
+        estimatedHours={ticket.estimatedHours}
+        entries={timeEntries}
+        viewer={viewer}
+        canLog={canLogTime}
+      />
 
       {!ticket.project.active && (
         <p className="mt-6 text-caption text-muted-foreground">
