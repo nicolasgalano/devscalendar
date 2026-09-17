@@ -58,7 +58,7 @@ Sin `not null`, sin default. Los tickets viejos quedan con `description_doc = nu
 
 **No se modifica.** La whitelist positiva (§529 de `00000000000014_project_membership_and_tickets.sql`) diffea `to_jsonb(new) - {'status','updated_at'}` contra `to_jsonb(old) - ...`, así que cualquier columna nueva de `tickets` cae adentro del bloqueo automáticamente para contributors ajenos al ticket, y adentro del bloqueo total para viewers.
 
-La migration **sí agrega un comentario** al final del cuerpo de la función recordando la herencia — para el próximo lector que agregue otra columna y se pregunte si tiene que tocar el trigger.
+La migration **sí agrega un `comment on function public.enforce_ticket_contributor_scope() is ...`** recordando la herencia — para el próximo lector que agregue otra columna y se pregunte si tiene que tocar el trigger. Se eligió el comentario en el catálogo (visible con `\df+`) por sobre insertar un comentario dentro del cuerpo de la función: eso obligaría a un `create or replace` con el cuerpo copiado byte-a-byte desde migration 16, y cualquier divergencia introduciría un bug de contributor scope sin ganar visibilidad práctica.
 
 ### 2.4 Trigger `audit_ticket_events`
 
@@ -429,7 +429,7 @@ Se documenta en el `tasks.md` como un paso manual del deploy:
 
 ## 8. Migrations
 
-Una sola migration: `supabase/migrations/00000000000019_ticket_description_doc.sql`.
+Una sola migration: `supabase/migrations/00000000000019_ticket_description_doc.sql`. Terminó siendo la migration **19** (y no la 18 como preveía la primera versión del plan) por un accidente descubierto al implementar: la base de producción tenía la versión 18 aplicada (`time_entries_start_time`) sin archivo local — deuda D-10 en `docs/deuda-tecnica.md`. La mitigación fue crear un stub idempotente para la 18 y numerar la de esta feature como 19.
 
 Contenido:
 
@@ -439,7 +439,7 @@ Contenido:
 4. Comentario final en el trigger `enforce_ticket_contributor_scope` recordando la herencia de la whitelist positiva (§2.3).
 
 **Two-phase safety:**
-- Fase 1 (esta migration + deploy del código de `019`): coexistencia. Los deploys anteriores no conocen `description_doc` pero tampoco lo consultan — sus queries `select ... from tickets` no filtran por esa columna, así que ignorarla es transparente. Ningún PATCH del código viejo va a intentar escribirla.
+- Fase 1 (migration **19** + deploy del código de `019`): coexistencia. Los deploys anteriores no conocen `description_doc` pero tampoco lo consultan — sus queries `select ... from tickets` no filtran por esa columna, así que ignorarla es transparente. Ningún PATCH del código viejo va a intentar escribirla.
 - Fase 2 (feature `019.5`, migration aparte, después de verificar): `alter table tickets drop column description;` + borrar `MarkdownViewer`, `sanitize.ts`, `viewer.tsx`, dependencias `react-markdown`, `remark-gfm`, `rehype-sanitize`.
 
 ---

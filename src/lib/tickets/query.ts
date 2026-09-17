@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import type { ProseMirrorNode } from "@/lib/editor/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -35,6 +36,10 @@ export type TicketListItem = {
 
 /** Detalle de ticket para `/tickets/:key`. Suma `description` y datos del alta. */
 export type TicketDetail = TicketListItem & {
+  // 019: `descriptionDoc` es la fuente de verdad; `description` (markdown)
+  // queda como fallback de lectura hasta la fase 2. El componente que muestra
+  // el detalle elige la ruta (`<TicketDescription>`).
+  descriptionDoc: ProseMirrorNode | null;
   description: string | null;
   createdBy: string;
   createdById: string;
@@ -51,6 +56,7 @@ const TICKET_DETAIL_SELECT = `
   numero,
   title,
   description,
+  description_doc,
   status,
   priority,
   assignee_id,
@@ -221,6 +227,7 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
     key: formatTicketKey({ key: project.key, numero: ticket.numero }),
     title: ticket.title,
     description: ticket.description,
+    descriptionDoc: (ticket.description_doc as ProseMirrorNode | null) ?? null,
     status: ticket.status,
     priority: ticket.priority,
     assigneeId: ticket.assignee_id,

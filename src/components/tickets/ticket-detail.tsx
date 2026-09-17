@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RichTextViewer } from "@/lib/editor/rich-text-viewer";
+import type { ProseMirrorNode } from "@/lib/editor/validate";
 import { MarkdownViewer } from "@/lib/markdown/viewer";
 import type { UserRole } from "@/lib/auth/roles";
 import type { SprintListItem } from "@/lib/sprints/query";
@@ -151,7 +153,17 @@ export function TicketDetail({
     id: ticket.id,
     projectId: ticket.project.id,
     title: ticket.title,
-    description: ticket.description ?? "",
+    // 019: si el ticket ya fue migrado, `descriptionDoc` viaja tal cual. Si
+    // todavía tiene markdown viejo, se seedea el editor con el texto plano
+    // — el usuario pierde el formato al editar (headings quedan como texto,
+    // listas como líneas), y ese es un compromiso deliberado: la
+    // conversión markdown→ProseMirror completa vive en la fase 6 y hacer una
+    // "mini-conversión" acá duplicaría reglas que la migración ya sabe. Como
+    // la migración es coordinada con el deploy, en producción este fallback
+    // solo se dispara si el script skipeó el ticket (parseo roto).
+    descriptionDoc:
+      optimistic.descriptionDoc ??
+      (optimistic.description ? seedPlainTextDoc(optimistic.description) : null),
     priority: ticket.priority,
     assigneeId: ticket.assigneeId,
     status: ticket.status,
@@ -416,7 +428,13 @@ export function TicketDetail({
 
       <section className="pt-4">
         <h2 className="text-section pb-2 font-medium">Descripción</h2>
-        <MarkdownViewer content={optimistic.description} />
+        <TicketDescription
+          descriptionDoc={optimistic.descriptionDoc}
+          description={optimistic.description}
+          ticketId={ticket.id}
+          canEditChecklist={mayEditFields}
+          expectedUpdatedAt={optimistic.updatedAt}
+        />
       </section>
 
       <TicketTimeEntries
@@ -471,6 +489,60 @@ export function TicketDetail({
       />
     </>
   );
+}
+
+// 019: elige la ruta de renderizado según el estado de migración del ticket.
+// - `descriptionDoc` no null → viewer rich text (con checkboxes interactivos
+//   si el usuario puede editar).
+// - `description` (markdown) no vacío → fallback al viewer viejo. Cubre
+//   tickets creados antes de 019 cuya migración fue skippeada o que quedaron
+//   editados con el path de fallback antes de que fase 2 borre la columna.
+// - Ninguno → placeholder.
+function TicketDescription({
+  descriptionDoc,
+  description,
+  ticketId,
+  canEditChecklist,
+  expectedUpdatedAt,
+}: {
+  descriptionDoc: ProseMirrorNode | null;
+  description: string | null;
+  ticketId: string;
+  canEditChecklist: boolean;
+  expectedUpdatedAt: string;
+}) {
+  if (descriptionDoc) {
+    return (
+      <RichTextViewer
+        doc={descriptionDoc}
+        ticketId={ticketId}
+        canEditChecklist={canEditChecklist}
+        expectedUpdatedAt={expectedUpdatedAt}
+      />
+    );
+  }
+  if (description && description.trim().length > 0) {
+    return <MarkdownViewer content={description} />;
+  }
+  return <RichTextViewer doc={null} />;
+}
+
+// Seed inicial del editor para un ticket que solo tiene markdown viejo (sin
+// `descriptionDoc`). Deliberadamente ingenuo: mete todo el texto plano en un
+// único párrafo, sin interpretar headings, listas ni marks. La conversión
+// buena vive en `scripts/migrate-ticket-descriptions.mjs` (T6.2); una versión
+// paralela acá duplicaría reglas y arriesga divergencia. El costo lo paga solo
+// el operador que edita un ticket que el script skipeó.
+function seedPlainTextDoc(text: string): ProseMirrorNode {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: text.length > 0 ? [{ type: "text", text }] : [],
+      },
+    ],
+  };
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {

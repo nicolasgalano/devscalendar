@@ -65,6 +65,7 @@ persona real". Ese día se acerca y las que importaban ya no están:
 | ~~D-07~~ | ~~El `PATCH` de reservas no chequea el `active` del desarrollador~~                                                        | 004     | **saldada 2026-09-08 con D-01** (`012`) |
 | ~~D-08~~ | ~~Nada impide reservar sobre un proyecto desactivado~~                                                                         | 004     | **saldada 2026-09-08** (`013`)  |
 | ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
+| D-10     | Migration `time_entries_start_time` (versión 18) aplicada en prod sin archivo local; reconstruida como stub idempotente     | 016     | investigar origen antes de saldarla     |
 
 ---
 
@@ -569,3 +570,63 @@ plantan la cookie de sesión (`tests/e2e/session.ts`) en vez de pasar por el OAu
 de Google. Por eso hizo falta una persona una vez — y por eso, si algún día
 cambia el guard de `/admin/*`, conviene repetir el guion en vez de confiar solo
 en la suite.
+
+---
+
+## D-10 — Migration fantasma `time_entries_start_time` (versión 18)
+
+**Feature:** `016-time-tracking` (probablemente) · **Gate:** investigar el origen
+antes de saldarla.
+
+Descubierta el 2026-09-16 al arrancar `019-ticket-rich-editor`. La base de
+producción tenía la fila `(version=00000000000018, name=time_entries_start_time)`
+en `supabase_migrations.schema_migrations` y físicamente `time_entries.start_time`
+aplicada — pero **no había archivo local** en `supabase/migrations/` para esa
+versión. Cualquiera que levantara la base desde cero se hubiera perdido la columna
+sin darse cuenta.
+
+**Cómo se disparó:** al escribir la migration 19 de `019`, el `pnpm db:push`
+respondía "Remote database is up to date" (sin aplicar nada). El CLI compara por
+número de versión, no por hash — y la 18 ya figuraba en `schema_migrations`, así
+que la 19 ni siquiera se miraba. El síntoma: los types regenerados con
+`pnpm db:types` no incluían `description_doc`.
+
+**Mitigación aplicada** (el mismo día, sin OK — es el mínimo para desbloquear
+`019`, no la solución):
+
+- Se creó `supabase/migrations/00000000000018_time_entries_start_time.sql` con
+  `alter table public.time_entries add column if not exists start_time time without time zone;`.
+- Es idempotente contra prod (la columna ya existe, el `if not exists` la deja
+  igual) y funcional contra una base virgen.
+- Con el archivo local en su lugar, `pnpm db:push` reconoció la 19 como pendiente
+  y la aplicó correctamente.
+
+**Lo que sigue abierto y por qué:**
+
+- **Origen desconocido.** Nadie recuerda quién aplicó la migration original ni
+  cuándo. Lo más probable es que se coló durante `016-time-tracking` — un ajuste
+  manual desde el dashboard de Supabase o una versión temprana del archivo que
+  después se squasheó en la migration 17 sin recuperar el diff.
+- **El SQL reconstruido puede diverger del original.** El stub agrega la columna
+  con `null` como default. Si el ghost original tenía una cláusula distinta
+  (`default '09:00'`, un backfill, un check constraint), esa parte se perdió y
+  el estado local no matchea al de prod en ese detalle. Prod es la fuente de
+  verdad hasta que se investigue.
+- **No hay proceso que impida que vuelva a pasar.** Cualquiera con acceso al
+  dashboard puede correr `alter table` a mano; la CLI no chequea consistencia
+  local vs. remoto en cada push (el error `LegacyDbPushMissingLocalError` solo
+  aparece cuando local tiene un archivo con la misma versión que remoto pero
+  distinto nombre — el caso "remoto tiene versión que local no tiene" pasa
+  silencioso).
+
+**Por dónde se salda, cuando se dé el OK:**
+
+1. Buscar en el historial de commits de `016-time-tracking` (feature branch,
+   PRs, mensajes de Slack si aplicable) qué migration se pensó originalmente
+   para `start_time`.
+2. Si se encuentra: reemplazar el stub por el SQL histórico completo.
+3. Si no: dejar el stub, agregar un comentario definitivo diciendo que se
+   reconstruyó y aceptar que ese es el estado.
+4. Considerar un check en CI que corra `supabase migration list` y falle si
+   hay versiones remotas sin archivo local. Requiere credenciales en CI — puede
+   no ser trivial.

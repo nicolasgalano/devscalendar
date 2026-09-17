@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { project_id, title, description, priority, assignee_id } = parsed.data;
+  const { project_id, title, description_doc, priority, assignee_id } = parsed.data;
 
   const guard = await requireProjectMembership(project_id, "contributor");
   if (!guard.ok) return guard.response;
@@ -72,7 +72,10 @@ export async function POST(request: Request) {
   const insertPayload = {
     project_id,
     title,
-    description: description ?? null,
+    // 019: description_doc es la fuente de verdad. La columna `description`
+    // (markdown) queda `null` para escrituras nuevas — solo se lee como
+    // fallback en tickets viejos hasta la fase 2 (drop de columna).
+    description_doc: description_doc ?? null,
     priority,
     assignee_id: assignee_id ?? null,
     created_by: userId,

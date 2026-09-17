@@ -1,5 +1,7 @@
 "use client";
 
+import type { JSONContent } from "@tiptap/react";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -20,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MarkdownEditor } from "@/lib/markdown/editor";
+import { EditorSkeleton } from "@/lib/editor/rich-text-editor";
 import type { SprintListItem } from "@/lib/sprints/query";
 import { formatSprintDisplayName } from "@/lib/sprints/status";
 import {
@@ -29,8 +31,19 @@ import {
 } from "@/lib/tickets/status";
 import type { Database } from "@/types/database";
 
+import { ConfirmDiscardDialog } from "./confirm-discard-dialog";
+
 type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
 type TicketStatus = Database["public"]["Enums"]["ticket_status"];
+
+// El bundle de Tiptap + ProseMirror + lowlight pesa ~90KB gzipped. El editor
+// se carga tarde (`ssr: false`) para no sumarlo al bundle de las páginas que
+// solo listan tickets — el detalle usa `<RichTextViewer>`, que es server y
+// no importa Tiptap. Ver §4.1 del plan.
+const RichTextEditor = dynamic(
+  () => import("@/lib/editor/rich-text-editor").then((mod) => mod.RichTextEditor),
+  { ssr: false, loading: () => <EditorSkeleton /> },
+);
 
 const UNASSIGNED = "__unassigned__";
 const BACKLOG = "__backlog__";
@@ -40,7 +53,9 @@ export type TicketFormInitial = {
   id?: string;
   projectId: string | null;
   title: string;
-  description: string;
+  // 019: la descripción viaja como doc de ProseMirror. `null` = sin
+  // descripción (equivalente al `""` del schema markdown viejo).
+  descriptionDoc: JSONContent | null;
   priority: TicketPriority;
   assigneeId: string | null;
   status?: TicketStatus;
@@ -101,6 +116,8 @@ export function TicketFormDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TicketFormInitial>(initial);
+  const [dirty, setDirty] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Cuando el dialog se abre (o `initial` cambia), reflejar el estado del
   // padre. Sin esto, abrir "Editar" dos veces sobre tickets distintos muestra
@@ -109,6 +126,7 @@ export function TicketFormDialog({
     if (open) {
       setForm(initial);
       setError(null);
+      setDirty(false);
     }
   }, [open, initial]);
 
@@ -153,7 +171,11 @@ export function TicketFormDialog({
     try {
       const body: Record<string, unknown> = {
         title: form.title.trim(),
-        description: form.description.trim(),
+        // 019: un doc "vacío" (solo un párrafo sin contenido) se manda como
+        // null. El plainText del editor cae a 0, así que la señal "sin
+        // descripción" no depende de mirar la estructura del doc — pero acá
+        // en el submit no tenemos plainText a mano, así que revisamos el doc.
+        description_doc: isEmptyDoc(form.descriptionDoc) ? null : form.descriptionDoc,
         priority: form.priority,
         assignee_id: form.assigneeId,
       };
@@ -372,16 +394,18 @@ export function TicketFormDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label>Descripción</Label>
-            <MarkdownEditor
-              value={form.description}
-              onChange={(value) => setForm({ ...form, description: value })}
-              placeholder="Describí el ticket. Podés usar markdown."
+            <RichTextEditor
+              value={form.descriptionDoc}
+              onChange={(doc) => setForm((current) => ({ ...current, descriptionDoc: doc }))}
+              onDirtyChange={setDirty}
+              placeholder="Describí el ticket. Podés usar formato."
+              disabled={!canEditFields}
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={handleCancel}>
             Cancelar
           </Button>
           <Button onClick={submit} disabled={!canSubmit}>
@@ -389,6 +413,35 @@ export function TicketFormDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDiscardDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        onConfirm={() => {
+          setDiscardOpen(false);
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
+
+  function handleCancel() {
+    if (dirty) {
+      setDiscardOpen(true);
+      return;
+    }
+    onOpenChange(false);
+  }
+}
+
+function isEmptyDoc(doc: JSONContent | null): boolean {
+  if (!doc) return true;
+  if (doc.type !== "doc") return false;
+  const content = doc.content ?? [];
+  if (content.length === 0) return true;
+  if (content.length !== 1) return false;
+  const only = content[0]!;
+  if (only.type !== "paragraph") return false;
+  const inner = only.content ?? [];
+  return inner.length === 0;
 }
