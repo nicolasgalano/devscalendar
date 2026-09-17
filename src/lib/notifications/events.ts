@@ -21,6 +21,10 @@ export const NOTIFICATION_TYPES = [
   "booking_displaced",
   "ticket_assigned",
   "ticket_status_changed",
+  // 016: alguien cargó tiempo por vos (created_by ≠ user_id).
+  "time_entry_created_by_other",
+  // 016: admin borró una entry tuya (delete por auth.uid distinto y admin).
+  "time_entry_deleted_by_admin",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -54,6 +58,13 @@ export type NotificationPayload = {
   changed_by?: string | null;
   from_status?: TicketStatus | string | null;
   to_status?: TicketStatus | string | null;
+  // 016: time entries
+  ticket_id?: string | null;
+  minutes?: number | null;
+  logged_at?: string | null;
+  created_by?: string | null;
+  deleted_by?: string | null;
+  description?: string | null;
 };
 
 export type NotificationRow = {
@@ -61,6 +72,8 @@ export type NotificationRow = {
   type: NotificationType;
   bookingId: string | null;
   ticketId: string | null;
+  /** 016: id de la time entry si el aviso viene de una carga de horas. */
+  timeEntryId: string | null;
   /**
    * `PROJ-N` resuelto en la query. `null` para avisos de bookings o cuando el
    * ticket referenciado no está más disponible (tickets se cancelan, no se
@@ -88,6 +101,8 @@ const TITLE: Record<
   booking_cancelled: "Cancelaron una reserva tuya",
   booking_needs_reapproval: "Cambió una reserva que habías aprobado",
   booking_displaced: "Te desplazaron una reserva",
+  time_entry_created_by_other: "Cargaron horas por vos",
+  time_entry_deleted_by_admin: "Un admin borró una carga tuya",
 };
 
 /**
@@ -184,6 +199,14 @@ export function notificationDetail(
     }
     if (from && to) return `${from} → ${to}`;
   }
+  if (type === "time_entry_created_by_other" && payload.minutes && payload.logged_at) {
+    const hours = (payload.minutes / 60).toFixed(2).replace(/\.?0+$/, "");
+    return `${hours} h en ${payload.project ?? "proyecto"} · ${payload.logged_at}`;
+  }
+  if (type === "time_entry_deleted_by_admin" && payload.minutes && payload.logged_at) {
+    const hours = (payload.minutes / 60).toFixed(2).replace(/\.?0+$/, "");
+    return `Borraron ${hours} h del ${payload.logged_at} sobre ${payload.project ?? "proyecto"}`;
+  }
   return null;
 }
 
@@ -196,9 +219,20 @@ export function notificationDetail(
  * firma para que el llamador no invente un tercer estado.
  */
 export function notificationHref(
-  row: Pick<NotificationRow, "bookingId" | "ticketKey">,
+  row: Pick<NotificationRow, "bookingId" | "ticketKey"> & {
+    // 016: campos opcionales — los callers de bookings/tickets viejos no los
+    // pasan y siguen funcionando; los avisos de time entries sí los pasan.
+    timeEntryId?: string | null;
+    type?: NotificationType;
+  },
 ): string {
   if (row.ticketKey) return `/tickets/${row.ticketKey}`;
+  if (
+    row.type === "time_entry_created_by_other" ||
+    row.type === "time_entry_deleted_by_admin"
+  ) {
+    return "/my-time";
+  }
   return row.bookingId ? `/calendar?booking=${row.bookingId}` : "/calendar";
 }
 

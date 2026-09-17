@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status";
+import { formatMinutesDecimal } from "@/lib/time-entries/format";
+import type { SprintActualHours } from "@/lib/time-entries/query";
 import {
   Table,
   TableBody,
@@ -60,9 +62,12 @@ type SprintReportShape = {
 export function SprintReport({
   sprint,
   projectKey,
+  actualHours,
 }: {
   sprint: SprintDetail;
   projectKey?: string;
+  /** 016 T7.1 — horas cargadas live-queried al momento de abrir la página. */
+  actualHours?: SprintActualHours;
 }) {
   const report = (sprint.report ?? {}) as SprintReportShape;
 
@@ -121,6 +126,59 @@ export function SprintReport({
           />
         </dl>
       </section>
+
+      {actualHours && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-section font-medium">Horas cargadas</h2>
+            <p className="text-caption text-muted-foreground">
+              Calculadas al momento de abrir esta página
+            </p>
+          </div>
+          <dl className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Metric
+              label="Cargadas totales"
+              value={formatMinutesDecimal(actualHours.totalMinutes)}
+            />
+            <Metric
+              label="Estimadas"
+              value={`${formatHours(totalHours)}`}
+            />
+            {totalHours > 0 && (
+              <Metric
+                label="Desvío"
+                value={(() => {
+                  const actualH = actualHours.totalMinutes / 60;
+                  const deltaPct = Math.round(
+                    ((actualH - totalHours) / totalHours) * 100,
+                  );
+                  return `${deltaPct > 0 ? "+" : ""}${deltaPct}%`;
+                })()}
+              />
+            )}
+          </dl>
+          {actualHours.byUser.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Persona</TableHead>
+                  <TableHead className="w-40 text-right">Horas cargadas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {actualHours.byUser.map((entry) => (
+                  <TableRow key={entry.userId}>
+                    <TableCell>{entry.userName}</TableCell>
+                    <TableCell className="font-data text-right">
+                      {formatMinutesDecimal(entry.minutes)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+      )}
 
       {byAssignee.length > 0 && (
         <section>

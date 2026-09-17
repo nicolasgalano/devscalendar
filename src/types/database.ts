@@ -8,6 +8,59 @@ export type Database = {
   };
   public: {
     Tables: {
+      active_timers: {
+        Row: {
+          activity_id: string | null;
+          project_id: string;
+          started_at: string;
+          ticket_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          activity_id?: string | null;
+          project_id: string;
+          started_at?: string;
+          ticket_id?: string | null;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string | null;
+          project_id?: string;
+          started_at?: string;
+          ticket_id?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "active_timers_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "project_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "tickets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           action: string;
@@ -153,6 +206,7 @@ export type Database = {
           read_at: string | null;
           recipient_id: string;
           ticket_id: string | null;
+          time_entry_id: string | null;
           type: string;
         };
         Insert: {
@@ -167,6 +221,7 @@ export type Database = {
           read_at?: string | null;
           recipient_id: string;
           ticket_id?: string | null;
+          time_entry_id?: string | null;
           type: string;
         };
         Update: {
@@ -181,6 +236,7 @@ export type Database = {
           read_at?: string | null;
           recipient_id?: string;
           ticket_id?: string | null;
+          time_entry_id?: string | null;
           type?: string;
         };
         Relationships: [
@@ -203,6 +259,13 @@ export type Database = {
             columns: ["ticket_id"];
             isOneToOne: false;
             referencedRelation: "tickets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_time_entry_id_fkey";
+            columns: ["time_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "time_entries";
             referencedColumns: ["id"];
           },
         ];
@@ -276,6 +339,38 @@ export type Database = {
             columns: ["primary_pm_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_activities: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          id: string;
+          name: string;
+          project_id: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          name: string;
+          project_id: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          project_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_activities_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
             referencedColumns: ["id"];
           },
         ];
@@ -518,6 +613,84 @@ export type Database = {
           },
         ];
       };
+      time_entries: {
+        Row: {
+          activity_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          logged_at: string;
+          minutes: number;
+          project_id: string;
+          ticket_id: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          logged_at: string;
+          minutes: number;
+          project_id: string;
+          ticket_id?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          logged_at?: string;
+          minutes?: number;
+          project_id?: string;
+          ticket_id?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "project_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "tickets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -565,6 +738,15 @@ export type Database = {
         };
         Returns: undefined;
       };
+      notify_user_for_time_entry: {
+        Args: {
+          notification_payload: Json;
+          notification_type: string;
+          target_recipient: string;
+          target_time_entry: string;
+        };
+        Returns: undefined;
+      };
       reallocate_booking: {
         Args: {
           booking_note?: string;
@@ -581,13 +763,23 @@ export type Database = {
         Args: { p_project_id: string; p_user_id?: string };
         Returns: Database["public"]["Enums"]["project_member_role"];
       };
+      stop_and_start_timer: {
+        Args: {
+          p_activity_id: string;
+          p_project_id: string;
+          p_ticket_id: string;
+          p_user_id: string;
+        };
+        Returns: Json;
+      };
+      stop_timer: { Args: { p_user_id: string }; Returns: string };
     };
     Enums: {
       project_member_role: "viewer" | "contributor" | "lead";
       sprint_status: "planned" | "active" | "completed";
       ticket_priority: "low" | "medium" | "high" | "critical";
       ticket_status: "todo" | "in_progress" | "in_review" | "blocked" | "done" | "cancelled";
-      user_role: "admin" | "pm" | "developer";
+      user_role: "admin" | "pm" | "developer" | "staff";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -713,7 +905,7 @@ export const Constants = {
       sprint_status: ["planned", "active", "completed"],
       ticket_priority: ["low", "medium", "high", "critical"],
       ticket_status: ["todo", "in_progress", "in_review", "blocked", "done", "cancelled"],
-      user_role: ["admin", "pm", "developer"],
+      user_role: ["admin", "pm", "developer", "staff"],
     },
   },
 } as const;

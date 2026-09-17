@@ -25,7 +25,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 013 | Saldar la deuda registrada que queda              | done   | 012                | §3, §12 (seguridad) |
 | 014 | PMs fuera del calendario por default              | done   | 003, 011, 012      | §4                  |
 | 015 | Project membership y tickets                      | en progreso | 001, 002, 010, 012 | fuera de spec original |
-| 016 | Time tracking                                     | draft  | 015                | fuera de spec original |
+| 016 | Time tracking (Mi Tiempo, Actividades, Reportes)  | done   | 015, 018           | fuera de spec original |
 | 017 | Home, workspace por proyecto y tablero kanban     | done   | 015                | fuera de spec original |
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 

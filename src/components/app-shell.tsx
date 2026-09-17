@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  BarChart3Icon,
   Building2Icon,
   CalendarDaysIcon,
   FolderKanbanIcon,
@@ -12,6 +13,7 @@ import {
   LogOutIcon,
   MenuIcon,
   PanelLeftIcon,
+  TimerIcon,
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -20,8 +22,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
 import { SyncIndicatorProvider } from "@/components/sync-indicator";
-import { isAdmin, isDeveloper, type UserRole } from "@/lib/auth/roles";
+import { TimerPill } from "@/components/timer-pill";
+import { hasPmScope, isAdmin, isDeveloper, type UserRole } from "@/lib/auth/roles";
 import type { NotificationRow } from "@/lib/notifications/events";
+import type { ActiveTimer } from "@/lib/time-entries/query";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "devscalendar:sidebar-collapsed";
@@ -60,9 +64,20 @@ const BASE_NAV: NavGroup[] = [
       // Visible para todo autenticado; quien no sea miembro de nada ve el
       // empty state, no un 403.
       { href: "/my-work", label: "Mi trabajo", Icon: ListChecksIcon },
+      // `016` T4.1 — grilla semanal de time tracking. Visible para todos
+      // autenticados; el staff-only también entra a cargar horas acá.
+      { href: "/my-time", label: "Mi tiempo", Icon: TimerIcon },
     ],
   },
 ];
+
+// `016` T6.1 — ítem "Reportes" visible solo a admin y PMs (rol global).
+// Se compone dinámicamente en `AppShell` para respetar los roles del viewer.
+const REPORTS_NAV_ITEM: NavItem = {
+  href: "/reports/consumo",
+  label: "Reportes",
+  Icon: BarChart3Icon,
+};
 
 const ADMIN_NAV: NavGroup = {
   label: "Administración",
@@ -149,6 +164,7 @@ export function AppShell({
   roles,
   userLabel,
   notifications,
+  activeTimer = null,
 }: {
   children: React.ReactNode;
   /** Pasa los roles enteros y no un `isAdmin`: con `005` ya son dos los que
@@ -159,6 +175,9 @@ export function AppShell({
   /** `010`: la campana vive en el shell porque un aviso puede llegar estés donde
    *  estés. Las filas las resuelve el layout, que ya es server component. */
   notifications: NotificationRow[];
+  /** `016`: cronómetro activo del user si hay. Renderiza el `<TimerPill>` en
+   *  el header. Cuando es null, no aparece nada. */
+  activeTimer?: ActiveTimer | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -167,9 +186,12 @@ export function AppShell({
   // admin el atajo a lo que está esperando respuesta. **Unión y no `else if`**
   // (`012`, AC-4.1): quien es dev y admin a la vez tiene las dos cosas, y con
   // el ternario de antes perdía una por el orden en que estaban escritas.
+  //
+  // 016 T6.1: PMs (rol global) y admins ven además "Reportes".
   const extras: NavItem[] = [
     ...(isDeveloper(roles) ? [DEVELOPER_NAV_ITEM] : []),
     ...(isAdmin(roles) ? [TEAM_PENDING_ITEM] : []),
+    ...(hasPmScope(roles) ? [REPORTS_NAV_ITEM] : []),
   ];
 
   const nav: NavGroup[] = [
@@ -311,6 +333,8 @@ export function AppShell({
               {currentLabel ?? "DevsCalendar"}
             </p>
           </nav>
+
+          <TimerPill activeTimer={activeTimer} />
 
           <span className="text-caption text-muted-foreground hidden truncate sm:block">
             {userLabel}
