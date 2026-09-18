@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Activa las clases `prose*` del rich text de tickets (019) y del
+   `<MarkdownViewer>` fallback. Sin este plugin Tailwind Preflight deja
+   headings, listas, links y code blocks sin estilos porque los resetea. */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /* ─────────────────────────────────────────────────────────────

@@ -302,7 +302,19 @@ export function TicketDetail({
             {ticket.createdBy}
             <span className="text-muted-foreground">
               {" · "}
-              <time title={formatAbsoluteFull(ticket.createdAt)} className="font-data">
+              {/* suppressHydrationWarning: el `title` viene de
+                  `Intl.DateTimeFormat("es-AR", { month: "long", ... })`, que
+                  emite distinto en el ICU chico de Node ("16 de septiembre
+                  de 2026 a las 10:24") vs el ICU full de Chrome ("16 de
+                  septiembre de 2026, 10:24"). El contenido tampoco es
+                  determinista porque `formatRelativeShort` usa `Date.now()`.
+                  Ambas divergencias son cosméticas, no afectan lo que ve el
+                  usuario después de la hidratación. */}
+              <time
+                title={formatAbsoluteFull(ticket.createdAt)}
+                className="font-data"
+                suppressHydrationWarning
+              >
                 {formatRelativeShort(ticket.createdAt)}
               </time>
             </span>

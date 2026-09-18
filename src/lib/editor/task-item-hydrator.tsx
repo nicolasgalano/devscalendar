@@ -65,7 +65,7 @@ export function TaskItemHydrator({ doc, ticketId, expectedUpdatedAt }: TaskItemH
     const stop = start("Actualizando checklist");
     try {
       const mutated = toggleCheckedAtPath(doc, item.path);
-      const response = await fetch(`/api/tickets/${ticketId}`, {
+      await fetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -76,13 +76,9 @@ export function TaskItemHydrator({ doc, ticketId, expectedUpdatedAt }: TaskItemH
       // En 200 el server ya escribió; el refresh reobtiene el doc.
       // En 409 el ticket cambió entre la lectura y esta escritura; el
       // refresh trae el nuevo estado y el usuario puede reintentar.
-      // Cualquier otro error: refresh para volver al estado del server
-      // (silencio deliberado — un toast acá sería ruido en el edge case).
-      if (response.ok || response.status === 409) {
-        router.refresh();
-      } else {
-        router.refresh();
-      }
+      // Otros errores caen a refresh también — silencio deliberado en el edge
+      // case, para no meter un toast en un click que ya se sintió instantáneo.
+      router.refresh();
     } finally {
       stop();
     }

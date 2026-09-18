@@ -14,7 +14,11 @@ type LinkPopoverProps = {
   editor: Editor;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
+  // Elemento React (no ReactNode) que va a ser el trigger. Base UI hace
+  // "compose": renderiza *este* elemento en vez de su `<button>` default y le
+  // inyecta handlers/refs/ARIA. Sin esto quedaría `<button>` (del trigger)
+  // envolviendo el `<button>` del caller — invalid HTML, error de hidratación.
+  children: React.ReactElement;
 };
 
 // Popover para agregar/editar un link en el editor. Se ancla al botón de la
@@ -80,7 +84,7 @@ export function LinkPopover({ editor, open, onOpenChange, children }: LinkPopove
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger>{children}</PopoverTrigger>
+      <PopoverTrigger render={children} />
       <PopoverContent
         align="start"
         className="w-80"

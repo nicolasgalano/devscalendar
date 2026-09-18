@@ -65,10 +65,13 @@ export function buildRichTextExtensions({ placeholder }: BuildOptions = {}) {
       autolink: true,
       linkOnPaste: true,
       protocols: [...LINK_PROTOCOLS],
-      HTMLAttributes: {
-        target: "_blank",
-        rel: "noopener noreferrer",
-      },
+      // Sin `HTMLAttributes`: la extensión usaría esos valores como default de
+      // los attrs `target`, `rel`, `class` del mark (los emitiría en el JSON
+      // como strings reales, no null), y el validador Zod los rebota porque
+      // no están declarados en `RICH_TEXT_SCHEMA`. El `target="_blank"
+      // rel="noopener noreferrer"` los mete `renderDocToHtml` hardcodeados en
+      // el viewer server-side, así que perder el default acá no cambia lo que
+      // ve el usuario, y sí evita ensuciar el doc guardado con "ghost data".
     }),
 
     TaskList,

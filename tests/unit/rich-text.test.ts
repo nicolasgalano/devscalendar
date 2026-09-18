@@ -5,6 +5,7 @@ import { renderDocToHtml } from "@/lib/editor/render";
 import { RICH_TEXT_SCHEMA } from "@/lib/editor/schema";
 import { validateProseMirrorDoc } from "@/lib/editor/validate";
 import { richTextDocSchema } from "@/lib/validation/rich-text";
+import { updateTicketSchema } from "@/lib/validation/tickets";
 
 // Smoke test de Phase 1 (019). Cubre lo mínimo indispensable — el catálogo
 // completo de casos de la T7 (aspiracional) queda para cuando se decida
@@ -102,7 +103,7 @@ describe("019 rich text — schema, validator, renderer", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("rechaza attr no declarada (whitelist positiva)", () => {
+  it("rechaza attr no declarada con valor real (whitelist positiva)", () => {
     const doc = {
       type: "doc",
       content: [
@@ -125,6 +126,75 @@ describe("019 rich text — schema, validator, renderer", () => {
     };
     const parsed = richTextDocSchema.safeParse(doc);
     expect(parsed.success).toBe(false);
+  });
+
+  it("acepta target/rel/class/title en link mark (attrs cosméticos de Tiptap)", () => {
+    // Tiptap Link declara target/rel/class/title como attrs default. Cuando el
+    // usuario los mete por HTMLAttributes o vienen de un doc viejo, salen como
+    // strings reales. El renderer los ignora y hardcodea target/rel; el schema
+    // los acepta para no rebotar docs guardados con formatos previos.
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "sitio",
+              marks: [
+                {
+                  type: "link",
+                  attrs: {
+                    href: "https://ejemplo.com",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    class: "some-class",
+                    title: "Hover title",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("acepta attrs no declaradas con valor null (Tiptap serializa así)", () => {
+    // Tiptap emite `target`, `rel`, `class` como `null` cuando el usuario no
+    // las tocó — es "ghost data" del serializer, no un intento de inyectar.
+    // Sin esta tolerancia, cualquier link guardado con la extensión estándar
+    // rebota (bug encontrado en verificación visual T8.4).
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "wedoweb",
+              marks: [
+                {
+                  type: "link",
+                  attrs: {
+                    href: "https://wedoweb.com",
+                    target: null,
+                    rel: null,
+                    class: null,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
   });
 
   it("rechaza plainText > 10.000 caracteres", () => {
@@ -308,5 +378,38 @@ describe("019 converter markdown → ProseMirror", () => {
     expect(parsed.success).toBe(true);
     expect(doc.content?.[0]?.type).toBe("codeBlock");
     expect(doc.content?.[0]?.attrs?.language).toBe("plaintext");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// updateTicketSchema — expected_updated_at (regresión del checklist)
+// ─────────────────────────────────────────────────────────────
+
+describe("updateTicketSchema — expected_updated_at", () => {
+  // El hidratador de checklists manda `expected_updated_at` con el formato
+  // que Postgres devuelve (offset explícito `+00:00`). Sin `{ offset: true }`
+  // el schema rebotaba todo y el PATCH del checkbox nunca escribía.
+  it("acepta ISO con offset explícito (formato Supabase)", () => {
+    const parsed = updateTicketSchema.safeParse({
+      description_doc: { type: "doc", content: [{ type: "paragraph" }] },
+      expected_updated_at: "2026-09-17T15:24:00.123456+00:00",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("acepta ISO con Z (UTC)", () => {
+    const parsed = updateTicketSchema.safeParse({
+      description_doc: { type: "doc", content: [{ type: "paragraph" }] },
+      expected_updated_at: "2026-09-17T15:24:00.123Z",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rebota strings que no son datetime", () => {
+    const parsed = updateTicketSchema.safeParse({
+      description_doc: { type: "doc", content: [{ type: "paragraph" }] },
+      expected_updated_at: "no-es-una-fecha",
+    });
+    expect(parsed.success).toBe(false);
   });
 });

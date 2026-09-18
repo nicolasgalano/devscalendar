@@ -117,6 +117,18 @@ export const RICH_TEXT_SCHEMA = {
     link: {
       attrs: {
         href: { type: "url", protocols: LINK_PROTOCOLS },
+        // Los cuatro attrs siguientes son "cosméticos" — la extensión Link de
+        // Tiptap los declara con default null. El renderer server-side los
+        // ignora y hardcodea `target="_blank" rel="noopener noreferrer"` en
+        // el HTML final, así que su valor en el JSON no cambia lo que ve el
+        // usuario. Se declaran acá como opcionales para no rebotar docs
+        // guardados que los traigan como strings (docs pre-fix o docs que
+        // venían con esos attrs seteados por autolink/paste antes de que se
+        // saque `HTMLAttributes` de la config).
+        target: { type: "primitive", kind: "string", optional: true },
+        rel: { type: "primitive", kind: "string", optional: true },
+        class: { type: "primitive", kind: "string", optional: true },
+        title: { type: "primitive", kind: "string", optional: true },
       },
     },
   },

@@ -180,11 +180,16 @@ function validateAttrs(
   const specKeys = spec ? Object.keys(spec) : [];
   const attrKeys = attrs ? Object.keys(attrs) : [];
 
-  // Attrs no declaradas → error (whitelist positiva)
+  // Attrs no declaradas → error (whitelist positiva), pero solo si tienen
+  // valor real. Tiptap serializa attrs default (`target`, `rel`, `class` en el
+  // link mark, por ejemplo) con `null` cuando el usuario no las tocó — eso es
+  // "ghost data", no un intento de inyectar algo. Si alguien manda un `target`
+  // con string cualquiera, cae acá y rebota como debe.
   for (const key of attrKeys) {
-    if (!specKeys.includes(key)) {
-      errors.push(`${label}: attr desconocida "${key}"`);
-    }
+    if (specKeys.includes(key)) continue;
+    const value = attrs?.[key];
+    if (value === null || value === undefined) continue;
+    errors.push(`${label}: attr desconocida "${key}"`);
   }
 
   if (!spec) return;

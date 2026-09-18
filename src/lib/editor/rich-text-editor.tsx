@@ -301,12 +301,9 @@ function Toolbar({ editor, linkOpen, onLinkOpenChange, disabled }: ToolbarProps)
       <Separator />
 
       <LinkPopover editor={editor} open={linkOpen} onOpenChange={onLinkOpenChange}>
-        <ToolbarButton
-          label="Link (Ctrl+K)"
-          active={isActive("link")}
-          disabled={disabled}
-          onClick={() => onLinkOpenChange(true)}
-        >
+        {/* Sin `onClick` propio: Base UI hace compose y su handler abre/cierra
+             el popover automáticamente. Un onClick extra pelearía con el toggle. */}
+        <ToolbarButton label="Link (Ctrl+K)" active={isActive("link")} disabled={disabled}>
           <LinkIcon className="size-4" />
         </ToolbarButton>
       </LinkPopover>

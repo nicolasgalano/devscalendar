@@ -88,7 +88,9 @@ export const updateTicketSchema = z
     // base => max 999.99. Opcional (Q-1: fricción cero al alta).
     estimated_hours: z.number().nonnegative().max(999.99).nullable().optional(),
     // 019: hint de carrera. No cuenta como campo actualizable — ver `.refine`.
-    expected_updated_at: z.string().datetime().optional(),
+    // `{ offset: true }` acepta el formato de Supabase (`...+00:00`); sin eso
+    // Zod exige la variante con `Z` y rebota todo lo que salga de Postgres.
+    expected_updated_at: z.string().datetime({ offset: true }).optional(),
   })
   .refine(
     (body) =>
