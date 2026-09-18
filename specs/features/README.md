@@ -28,9 +28,12 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 016 | Time tracking (Mi Tiempo, Actividades, Reportes)  | done   | 015, 018           | fuera de spec original |
 | 017 | Home, workspace por proyecto y tablero kanban     | done   | 015                | fuera de spec original |
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
-| 019 | Editor rich text para descripciones de tickets    | code done, ver nota | 015           | fuera de spec original |
+| 019 | Editor rich text para descripciones de tickets    | done (deployed 2026-09-18) | 015 | fuera de spec original |
+| 020 | Adjuntos (imágenes) en tickets                    | draft (spec)   | 015, 010     | fuera de spec original |
 
-**`019` — nota:** el código está listo y en verde (typecheck, lint, unit, build). Falta correr el script de migración de descripciones markdown → doc de ProseMirror (`pnpm exec tsx scripts/migrate-ticket-descriptions.ts`) y la verificación visual manual. La feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte, después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
+**`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
+
+**`020` — alcance:** solo imágenes en el MVP (`png/jpeg/webp/gif`). Panel de "Adjuntos" propio en el detalle del ticket, separado del rich text. **Fase 2 aparte** (spec futura): paste de imágenes al editor rich text de 019 — el nodo `image` del schema ya vive reservado, `020` sienta las bases (bucket + tabla + endpoints) y la fase 2 conecta el editor con esa misma infra.
 
 ## Orden sugerido de implementación
 
