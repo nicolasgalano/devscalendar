@@ -65,6 +65,8 @@ persona real". Ese día se acerca y las que importaban ya no están:
 | ~~D-07~~ | ~~El `PATCH` de reservas no chequea el `active` del desarrollador~~                                                        | 004     | **saldada 2026-09-08 con D-01** (`012`) |
 | ~~D-08~~ | ~~Nada impide reservar sobre un proyecto desactivado~~                                                                         | 004     | **saldada 2026-09-08** (`013`)  |
 | ~~D-09~~ | ~~Un rol por persona; nadie puede ser PM y admin a la vez~~ → resuelto con roles múltiples                                 | 001     | **saldada 2026-09-08** (`012`)          |
+| ~~D-10~~ | ~~Migration `time_entries_start_time` (versión 18) aplicada en prod sin archivo local~~                                       | 016     | **desactualizada 2026-09-18** — no era fantasma; el archivo real vivía en `feature/016-time-entry-dialog-redesign` (commit `be0c69a`), que se mergeó a develop mientras 019 estaba en desarrollo |
+| D-11     | Fase 2 de 019: drop de `tickets.description` + borrado de `src/lib/markdown/*` + remoción de deps `react-markdown` etc.       | 019     | ≥ 1 semana en prod con 100% `description_doc` no nulo |
 
 ---
 
@@ -569,3 +571,130 @@ plantan la cookie de sesión (`tests/e2e/session.ts`) en vez de pasar por el OAu
 de Google. Por eso hizo falta una persona una vez — y por eso, si algún día
 cambia el guard de `/admin/*`, conviene repetir el guion en vez de confiar solo
 en la suite.
+
+---
+
+## ~~D-10~~ — Migration fantasma `time_entries_start_time` (versión 18) — **no era fantasma**
+
+**Actualización 2026-09-18**, al mergear `feature/019-ticket-rich-editor` a
+develop: hubo conflicto de merge en el archivo, y la razón fue simple — la
+migration **no era fantasma**, sino un archivo que estaba en un branch
+paralelo (`feature/016-time-entry-dialog-redesign`, commit `be0c69a`) que se
+mergeó a develop mientras 019 estaba en desarrollo. La rama de 019 salió de
+un develop que no la tenía, así que al pushear terminó con la versión
+reconstruida por acá (el stub `if not exists`); el merge trajo la versión
+real y se pisó el stub — que es lo correcto.
+
+Lección para la próxima: antes de reconstruir una migration desde el schema
+en prod, chequear en TODAS las branches abiertas del repo, no solo en
+develop. Un `git log --all -- supabase/migrations/00000000000018_*` hubiera
+encontrado el commit real.
+
+Registro histórico:
+
+
+
+**Feature:** `016-time-tracking` (probablemente) · **Gate:** investigar el origen
+antes de saldarla.
+
+Descubierta el 2026-09-16 al arrancar `019-ticket-rich-editor`. La base de
+producción tenía la fila `(version=00000000000018, name=time_entries_start_time)`
+en `supabase_migrations.schema_migrations` y físicamente `time_entries.start_time`
+aplicada — pero **no había archivo local** en `supabase/migrations/` para esa
+versión. Cualquiera que levantara la base desde cero se hubiera perdido la columna
+sin darse cuenta.
+
+**Cómo se disparó:** al escribir la migration 19 de `019`, el `pnpm db:push`
+respondía "Remote database is up to date" (sin aplicar nada). El CLI compara por
+número de versión, no por hash — y la 18 ya figuraba en `schema_migrations`, así
+que la 19 ni siquiera se miraba. El síntoma: los types regenerados con
+`pnpm db:types` no incluían `description_doc`.
+
+**Mitigación aplicada** (el mismo día, sin OK — es el mínimo para desbloquear
+`019`, no la solución):
+
+- Se creó `supabase/migrations/00000000000018_time_entries_start_time.sql` con
+  `alter table public.time_entries add column if not exists start_time time without time zone;`.
+- Es idempotente contra prod (la columna ya existe, el `if not exists` la deja
+  igual) y funcional contra una base virgen.
+- Con el archivo local en su lugar, `pnpm db:push` reconoció la 19 como pendiente
+  y la aplicó correctamente.
+
+**Lo que sigue abierto y por qué:**
+
+- **Origen desconocido.** Nadie recuerda quién aplicó la migration original ni
+  cuándo. Lo más probable es que se coló durante `016-time-tracking` — un ajuste
+  manual desde el dashboard de Supabase o una versión temprana del archivo que
+  después se squasheó en la migration 17 sin recuperar el diff.
+- **El SQL reconstruido puede diverger del original.** El stub agrega la columna
+  con `null` como default. Si el ghost original tenía una cláusula distinta
+  (`default '09:00'`, un backfill, un check constraint), esa parte se perdió y
+  el estado local no matchea al de prod en ese detalle. Prod es la fuente de
+  verdad hasta que se investigue.
+- **No hay proceso que impida que vuelva a pasar.** Cualquiera con acceso al
+  dashboard puede correr `alter table` a mano; la CLI no chequea consistencia
+  local vs. remoto en cada push (el error `LegacyDbPushMissingLocalError` solo
+  aparece cuando local tiene un archivo con la misma versión que remoto pero
+  distinto nombre — el caso "remoto tiene versión que local no tiene" pasa
+  silencioso).
+
+**Por dónde se salda, cuando se dé el OK:**
+
+1. Buscar en el historial de commits de `016-time-tracking` (feature branch,
+   PRs, mensajes de Slack si aplicable) qué migration se pensó originalmente
+   para `start_time`.
+2. Si se encuentra: reemplazar el stub por el SQL histórico completo.
+3. Si no: dejar el stub, agregar un comentario definitivo diciendo que se
+   reconstruyó y aceptar que ese es el estado.
+4. Considerar un check en CI que corra `supabase migration list` y falle si
+   hay versiones remotas sin archivo local. Requiere credenciales en CI — puede
+   no ser trivial.
+
+---
+
+## D-11 — Fase 2 de 019: drop de `tickets.description` + limpieza markdown
+
+**Feature:** `019-ticket-rich-editor` · **Gate:** ≥ 1 semana en producción con
+`select count(*) from tickets where description_doc is null and description is not null` = 0
+y sin issues reportados por usuarios.
+
+Es **deuda intencional**, no un olvido: `019` salió a propósito con la columna
+vieja `description` viva como fallback de lectura para tickets no migrados y
+para tickets que el script skipeó (parseo roto). La regla de dos fases del
+`CLAUDE.md` — agregar, deployar, borrar — obliga a que el drop llegue en una
+migration posterior, en una feature aparte (`019.5`).
+
+Sin ese wait period, borrar la columna deja tres agujeros:
+
+1. **`<MarkdownViewer>` como fallback en `<TicketDescription>`** dejaría de
+   recibir datos y siempre mostraría el placeholder para tickets no migrados.
+2. **`ticket-detail.tsx` importa `markdownToProseMirrorDoc`** para convertir
+   al vuelo si un ticket llega al editor sin migrar. Sin `description`, esa
+   ruta no se dispara nunca pero el import queda muerto — es señal de que
+   algo se puede simplificar.
+3. **Los tickets que el script skipeó** por parseo roto perderían el texto
+   original: hoy sobreviven como markdown en `description` mientras un
+   operador los corrige a mano. Después del drop, ese contenido desaparece.
+
+**Alcance del `019.5`, cuando se dé el OK:**
+
+- Migration nueva: `alter table public.tickets drop column description;`.
+- Borrar `src/lib/markdown/viewer.tsx` y `src/lib/markdown/sanitize.ts`.
+- Borrar la rama de fallback en `<TicketDescription>` (helper en
+  `src/components/tickets/ticket-detail.tsx`) — queda `<RichTextViewer>` o
+  placeholder, y basta.
+- Borrar `markdownToProseMirrorDoc` de `src/lib/editor/convert.ts` **solo si
+  el script `scripts/migrate-ticket-descriptions.ts` también se retira** (o
+  se lo deja como archivo histórico si conviene documentar cómo se hizo la
+  conversión). El converter y el script son un par: uno sin el otro pierde
+  sentido.
+- Remover las deps del `package.json`: `react-markdown`, `remark-gfm`,
+  `rehype-sanitize`. **`unified` y `remark-parse` también** si se retira el
+  converter/script; si se dejan, quedan como deps sin caller — vale un
+  chequeo con `depcheck` antes.
+- Actualizar `CLAUDE.md`: sacar `markdown/` de la estructura del repo y la
+  sección "Editor rich text" — la frase "MarkdownViewer sigue vivo" deja de
+  ser cierta.
+
+**Riesgo si se salda antes del gate:** un ticket cuyo `description_doc` es
+null pierde su descripción. No hay recovery — la columna vieja se fue.

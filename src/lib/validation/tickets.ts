@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { richTextDocSchema } from "@/lib/validation/rich-text";
 import type { Database } from "@/types/database";
 
 // Los tres enums copiados desde el schema generado. Se re-exportan como
@@ -31,15 +32,6 @@ export const ticketStatus = z.enum(TICKET_STATUS_VALUES);
 export const ticketPriority = z.enum(TICKET_PRIORITY_VALUES);
 export const projectMemberRole = z.enum(PROJECT_MEMBER_ROLE_VALUES);
 
-// Un `description` vacío llega como "" desde el form y significa "sin
-// descripción", no "descripción vacía" — se normaliza a `null`.
-const optionalMarkdown = z
-  .string()
-  .max(10_000, "La descripción no puede pasar de 10.000 caracteres")
-  .nullable()
-  .optional()
-  .transform((value) => (value === "" || value == null ? null : value));
-
 /**
  * Alta de ticket. `status` no viaja: nace `todo` por el default de la tabla
  * (los estados iniciales distintos son ruido; si mañana un flujo necesita
@@ -50,11 +42,17 @@ const optionalMarkdown = z
  * `tickets: contributor+ insert` sabe qué es el proyecto, no quién es el
  * assignee. El chequeo `assignee is member` vive en el handler antes del
  * insert (AC-2.3 del spec).
+ *
+ * 019: `description` (string markdown) salió del schema. La descripción ahora
+ * es un doc de ProseMirror validado por `richTextDocSchema`; la columna vieja
+ * queda como fallback de lectura hasta la fase 2. Un cliente que mande
+ * `description` recibe un 400 por "campo desconocido" — es lo que
+ * corresponde: el sistema pasó a `description_doc`.
  */
 export const createTicketSchema = z.object({
   project_id: z.string().uuid(),
   title: z.string().trim().min(1, "El título es obligatorio").max(200, "Máximo 200 caracteres"),
-  description: optionalMarkdown,
+  description_doc: richTextDocSchema.nullable().optional(),
   priority: ticketPriority.default("medium"),
   assignee_id: z.string().uuid().nullable().optional(),
 });
@@ -68,11 +66,18 @@ export const createTicketSchema = z.object({
  * quién puede editar qué (contributor edita propios, transiciona ajenos, no
  * reasigna) la hace el trigger `enforce_ticket_contributor_scope` — el
  * schema no la conoce a propósito, para no duplicar la regla en dos lugares.
+ *
+ * 019: `expected_updated_at` opcional para el hidratador de checkboxes del
+ * `<RichTextViewer>`. Si viaja, el handler compara con `ticket.updated_at`
+ * antes del `.update()` y responde 409 si difieren — es la protección contra
+ * la carrera entre la edición completa y el toggle del checklist. No lo
+ * cuenta el `.refine("Nada para actualizar")` porque es metadata de la
+ * escritura, no un campo a actualizar.
  */
 export const updateTicketSchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
-    description: optionalMarkdown,
+    description_doc: richTextDocSchema.nullable().optional(),
     status: ticketStatus.optional(),
     priority: ticketPriority.optional(),
     assignee_id: z.string().uuid().nullable().optional(),
@@ -82,10 +87,20 @@ export const updateTicketSchema = z
     // 018: horas estimadas para el reporte de sprint. numeric(5,2) en la
     // base => max 999.99. Opcional (Q-1: fricción cero al alta).
     estimated_hours: z.number().nonnegative().max(999.99).nullable().optional(),
+    // 019: hint de carrera. No cuenta como campo actualizable — ver `.refine`.
+    // `{ offset: true }` acepta el formato de Supabase (`...+00:00`); sin eso
+    // Zod exige la variante con `Z` y rebota todo lo que salga de Postgres.
+    expected_updated_at: z.string().datetime({ offset: true }).optional(),
   })
-  .refine((body) => Object.values(body).some((value) => value !== undefined), {
-    message: "Nada para actualizar",
-  });
+  .refine(
+    (body) =>
+      Object.entries(body).some(
+        ([key, value]) => key !== "expected_updated_at" && value !== undefined,
+      ),
+    {
+      message: "Nada para actualizar",
+    },
+  );
 
 /**
  * Alta de miembro. El rol default es `contributor` — el UI y el trigger de

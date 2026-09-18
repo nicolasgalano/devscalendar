@@ -21,6 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { markdownToProseMirrorDoc } from "@/lib/editor/convert";
+import { RichTextViewer } from "@/lib/editor/rich-text-viewer";
+import type { ProseMirrorNode } from "@/lib/editor/validate";
 import { MarkdownViewer } from "@/lib/markdown/viewer";
 import type { UserRole } from "@/lib/auth/roles";
 import type { SprintListItem } from "@/lib/sprints/query";
@@ -151,7 +154,14 @@ export function TicketDetail({
     id: ticket.id,
     projectId: ticket.project.id,
     title: ticket.title,
-    description: ticket.description ?? "",
+    // 019: si el ticket ya fue migrado, `descriptionDoc` viaja tal cual. Si
+    // todavía tiene markdown viejo (el script de fase 6 no lo cubrió), se
+    // convierte al vuelo con el mismo converter que usa el script — así el
+    // usuario que edita un ticket no-migrado ve el mismo resultado que si
+    // hubiese esperado a la migración. Nunca se guarda hasta que confirme.
+    descriptionDoc:
+      optimistic.descriptionDoc ??
+      (optimistic.description ? markdownToProseMirrorDoc(optimistic.description) : null),
     priority: ticket.priority,
     assigneeId: ticket.assigneeId,
     status: ticket.status,
@@ -292,7 +302,19 @@ export function TicketDetail({
             {ticket.createdBy}
             <span className="text-muted-foreground">
               {" · "}
-              <time title={formatAbsoluteFull(ticket.createdAt)} className="font-data">
+              {/* suppressHydrationWarning: el `title` viene de
+                  `Intl.DateTimeFormat("es-AR", { month: "long", ... })`, que
+                  emite distinto en el ICU chico de Node ("16 de septiembre
+                  de 2026 a las 10:24") vs el ICU full de Chrome ("16 de
+                  septiembre de 2026, 10:24"). El contenido tampoco es
+                  determinista porque `formatRelativeShort` usa `Date.now()`.
+                  Ambas divergencias son cosméticas, no afectan lo que ve el
+                  usuario después de la hidratación. */}
+              <time
+                title={formatAbsoluteFull(ticket.createdAt)}
+                className="font-data"
+                suppressHydrationWarning
+              >
                 {formatRelativeShort(ticket.createdAt)}
               </time>
             </span>
@@ -416,7 +438,13 @@ export function TicketDetail({
 
       <section className="pt-4">
         <h2 className="text-section pb-2 font-medium">Descripción</h2>
-        <MarkdownViewer content={optimistic.description} />
+        <TicketDescription
+          descriptionDoc={optimistic.descriptionDoc}
+          description={optimistic.description}
+          ticketId={ticket.id}
+          canEditChecklist={mayEditFields}
+          expectedUpdatedAt={optimistic.updatedAt}
+        />
       </section>
 
       <TicketTimeEntries
@@ -471,6 +499,42 @@ export function TicketDetail({
       />
     </>
   );
+}
+
+// 019: elige la ruta de renderizado según el estado de migración del ticket.
+// - `descriptionDoc` no null → viewer rich text (con checkboxes interactivos
+//   si el usuario puede editar).
+// - `description` (markdown) no vacío → fallback al viewer viejo. Cubre
+//   tickets creados antes de 019 cuya migración fue skippeada o que quedaron
+//   editados con el path de fallback antes de que fase 2 borre la columna.
+// - Ninguno → placeholder.
+function TicketDescription({
+  descriptionDoc,
+  description,
+  ticketId,
+  canEditChecklist,
+  expectedUpdatedAt,
+}: {
+  descriptionDoc: ProseMirrorNode | null;
+  description: string | null;
+  ticketId: string;
+  canEditChecklist: boolean;
+  expectedUpdatedAt: string;
+}) {
+  if (descriptionDoc) {
+    return (
+      <RichTextViewer
+        doc={descriptionDoc}
+        ticketId={ticketId}
+        canEditChecklist={canEditChecklist}
+        expectedUpdatedAt={expectedUpdatedAt}
+      />
+    );
+  }
+  if (description && description.trim().length > 0) {
+    return <MarkdownViewer content={description} />;
+  }
+  return <RichTextViewer doc={null} />;
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {

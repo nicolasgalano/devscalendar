@@ -28,6 +28,9 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 016 | Time tracking (Mi Tiempo, Actividades, Reportes)  | done   | 015, 018           | fuera de spec original |
 | 017 | Home, workspace por proyecto y tablero kanban     | done   | 015                | fuera de spec original |
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
+| 019 | Editor rich text para descripciones de tickets    | code done, ver nota | 015           | fuera de spec original |
+
+**`019` — nota:** el código está listo y en verde (typecheck, lint, unit, build). Falta correr el script de migración de descripciones markdown → doc de ProseMirror (`pnpm exec tsx scripts/migrate-ticket-descriptions.ts`) y la verificación visual manual. La feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte, después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
 ## Orden sugerido de implementación
 
