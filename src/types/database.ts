@@ -542,6 +542,73 @@ export type Database = {
           },
         ]
       }
+      ticket_attachments: {
+        Row: {
+          created_at: string
+          height: number
+          id: string
+          mime_type: string
+          object_key: string
+          original_filename: string
+          project_id: string
+          size_bytes: number
+          thumb_object_key: string
+          ticket_id: string
+          uploaded_by: string | null
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          height: number
+          id?: string
+          mime_type: string
+          object_key: string
+          original_filename: string
+          project_id: string
+          size_bytes: number
+          thumb_object_key: string
+          ticket_id: string
+          uploaded_by?: string | null
+          width: number
+        }
+        Update: {
+          created_at?: string
+          height?: number
+          id?: string
+          mime_type?: string
+          object_key?: string
+          original_filename?: string
+          project_id?: string
+          size_bytes?: number
+          thumb_object_key?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assignee_id: string | null

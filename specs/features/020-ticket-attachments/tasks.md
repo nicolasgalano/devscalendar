@@ -19,7 +19,7 @@ Fases:
 
 ## Phase 1 — Base: migration + storage + types
 
-- [ ] **T1.1** — Migration `supabase/migrations/00000000000020_ticket_attachments.sql`:
+- [x] **T1.1** — Migration `supabase/migrations/00000000000020_ticket_attachments.sql`:
   - Tabla `ticket_attachments` con las columnas del §2.1 del plan.
   - Indexes en `ticket_id` y `project_id`.
   - RLS enable + 3 policies (read / insert / delete).
@@ -27,15 +27,15 @@ Fases:
   - Trigger `audit_ticket_attachment_events` + su función (§2.3 del plan).
   - _DoD:_ `pnpm db:push` limpio; `pnpm db:types` regenera `Database` con `ticket_attachments`.
 
-- [ ] **T1.2** — Crear bucket `ticket-attachments` privado en Supabase (dashboard o SQL). Documentar en el commit qué método se usó. Confirmar `public: false`.
+- [x] **T1.2** — Crear bucket `ticket-attachments` privado en Supabase (dashboard o SQL). Documentar en el commit qué método se usó. Confirmar `public: false`.
 
-- [ ] **T1.3** — Storage RLS: policy de select sobre `storage.objects` para `authenticated` con el join contra `ticket_attachments` (§2.4 del plan). Insert/delete al bucket NO se dan a `authenticated` — el server usa `service_role`.
+- [x] **T1.3** — Storage RLS: policy de select sobre `storage.objects` para `authenticated` con el join contra `ticket_attachments` (§2.4 del plan). Insert/delete al bucket NO se dan a `authenticated` — el server usa `service_role`.
 
-- [ ] **T1.4** — `pnpm db:push` + `pnpm db:types`. Verificar que `Database["public"]["Tables"]["ticket_attachments"]` esté en `src/types/database.ts`.
+- [x] **T1.4** — `pnpm db:push` + `pnpm db:types`. Verificar que `Database["public"]["Tables"]["ticket_attachments"]` esté en `src/types/database.ts`.
 
-- [ ] **T1.5** — `src/lib/attachments/types.ts`: whitelist de MIMEs (`ATTACHMENT_MIME_TYPES`), tamaños (`MAX_ATTACHMENT_SIZE_BYTES = 5 MB`, `SOFT_TOTAL_PER_TICKET_BYTES = 50 MB`, `MAX_THUMB_SIZE_BYTES = 100 KB`), helper `extensionForMime(mime)`. Cero dependencias externas.
+- [x] **T1.5** — `src/lib/attachments/types.ts`: whitelist de MIMEs (`ATTACHMENT_MIME_TYPES`), tamaños (`MAX_ATTACHMENT_SIZE_BYTES = 5 MB`, `SOFT_TOTAL_PER_TICKET_BYTES = 50 MB`, `MAX_THUMB_SIZE_BYTES = 100 KB`), helper `extensionForMime(mime)`. Cero dependencias externas.
 
-- [ ] **T1.6** — `src/lib/attachments/permissions.ts`: `canUploadAttachment(viewer, ticket, project, roleInProject)` (reuso de `canEditTicket`) y `canDeleteAttachment(attachment, viewer, project)` (autor + PM primario + admin).
+- [x] **T1.6** — `src/lib/attachments/permissions.ts`: `canUploadAttachment(viewer, ticket, project, roleInProject)` (reuso de `canEditTicket`) y `canDeleteAttachment(attachment, viewer, project)` (autor + PM primario + admin).
 
 ---
 
