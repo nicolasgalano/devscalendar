@@ -96,6 +96,14 @@ export function RichTextEditor({
           "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
           "prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
           "prose-pre:bg-muted prose-pre:text-foreground",
+          // TaskList styles del editor — Tiptap emite `<ul data-type="taskList">`
+          // con hijos `<li data-checked="...">` que ya traen su propio
+          // `<input type="checkbox">`. Sin `list-none` los `<li>` heredan el
+          // bullet de `.prose` y quedan con dos marcadores (bullet + checkbox).
+          "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-0",
+          "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-2 [&_ul[data-type='taskList']_li]:my-1",
+          "[&_ul[data-type='taskList']_li>label]:mt-1 [&_ul[data-type='taskList']_li>label]:flex-none",
+          "[&_ul[data-type='taskList']_li>div]:min-w-0 [&_ul[data-type='taskList']_li>div>p]:my-0",
         ].join(" "),
       },
     },
