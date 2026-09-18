@@ -49,6 +49,23 @@ export type TicketDetail = TicketListItem & {
     active: boolean;
     client: { id: string; name: string } | null;
   };
+  // 020: adjuntos del ticket. Vienen del embed en el select principal para
+  // no sumar un round-trip al abrir el detalle. Solo metadata — las URLs
+  // firmadas se piden al server al montar cada thumb/lightbox.
+  attachments: TicketAttachmentSummary[];
+};
+
+/** Fila mínima para el panel de adjuntos (feature 020). */
+export type TicketAttachmentSummary = {
+  id: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  uploadedById: string | null;
+  uploadedByName: string | null;
+  createdAt: string;
 };
 
 const TICKET_DETAIL_SELECT = `
@@ -67,7 +84,18 @@ const TICKET_DETAIL_SELECT = `
   sprint_id,
   assignee:profiles!tickets_assignee_id_fkey ( full_name ),
   creator:profiles!tickets_created_by_fkey ( full_name ),
-  sprint:sprints ( name, numero, status )
+  sprint:sprints ( name, numero, status ),
+  attachments:ticket_attachments (
+    id,
+    original_filename,
+    mime_type,
+    size_bytes,
+    width,
+    height,
+    uploaded_by,
+    created_at,
+    uploader:profiles!ticket_attachments_uploaded_by_fkey ( full_name )
+  )
 ` as const;
 
 /**
@@ -251,5 +279,18 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
     sprintNumero: ticket.sprint?.numero ?? null,
     sprintStatus: ticket.sprint?.status ?? null,
     estimatedHours: ticket.estimated_hours,
+    attachments: (ticket.attachments ?? [])
+      .map((row) => ({
+        id: row.id,
+        originalFilename: row.original_filename,
+        mimeType: row.mime_type,
+        sizeBytes: row.size_bytes,
+        width: row.width,
+        height: row.height,
+        uploadedById: row.uploaded_by,
+        uploadedByName: row.uploader?.full_name ?? null,
+        createdAt: row.created_at,
+      }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   };
 });

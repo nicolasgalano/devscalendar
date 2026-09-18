@@ -7,6 +7,7 @@ import { PencilIcon } from "lucide-react";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status";
+import { TicketAttachmentsPanel } from "@/components/tickets/ticket-attachments-panel";
 import { TicketTimeEntries } from "@/components/time-entries/ticket-time-entries";
 import type {
   TimeEntryActivity,
@@ -446,6 +447,15 @@ export function TicketDetail({
           expectedUpdatedAt={optimistic.updatedAt}
         />
       </section>
+
+      <TicketAttachmentsPanel
+        ticketId={ticket.id}
+        ticketKey={ticket.key}
+        attachments={ticket.attachments}
+        viewer={viewer}
+        project={{ pm_id: ticket.project.pmId }}
+        canUpload={mayEditFields}
+      />
 
       <TicketTimeEntries
         ticketId={ticket.id}

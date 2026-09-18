@@ -97,19 +97,19 @@ Fases:
 
 ## Phase 4 — UI
 
-- [ ] **T4.1** — `src/lib/attachments/format.ts`: `formatBytes(n)` (`"1.4 MB"`, `"250 KB"`).
+- [x] **T4.1** — `src/lib/attachments/format.ts`: `formatBytes(n)` (`"1.4 MB"`, `"250 KB"`).
 
-- [ ] **T4.2** — `src/lib/tickets/query.ts`: extender `TicketDetail` con `attachments: AttachmentSummary[]`. Un embed en el select principal del ticket para no hacer round-trip aparte al abrir el detalle.
+- [x] **T4.2** — `src/lib/tickets/query.ts`: extender `TicketDetail` con `attachments: AttachmentSummary[]`. Un embed en el select principal del ticket para no hacer round-trip aparte al abrir el detalle.
 
-- [ ] **T4.3** — `src/components/tickets/thumbnail-card.tsx`: card con `aspect-ratio` calculado desde `width`/`height`, `<img src={signedThumbUrl}>` con `useEffect` que pide la signed URL on mount, hover con nombre/tamaño/tiempo, botón borrar si `canDeleteAttachment`.
+- [x] **T4.3** — `src/components/tickets/thumbnail-card.tsx`: card con `aspect-ratio` calculado desde `width`/`height`, `<img src={signedThumbUrl}>` con `useEffect` que pide la signed URL on mount, hover con nombre/tamaño/tiempo, botón borrar si `canDeleteAttachment`.
 
-- [ ] **T4.4** — `src/components/tickets/lightbox.tsx`: overlay full-screen con imagen a resolución completa (pide URL firmada `variant=original`), navegación con flechas/keyboard, cierre con `Esc`.
+- [x] **T4.4** — `src/components/tickets/lightbox.tsx`: overlay full-screen con imagen a resolución completa (pide URL firmada `variant=original`), navegación con flechas/keyboard, cierre con `Esc`.
 
-- [ ] **T4.5** — `src/components/tickets/ticket-attachments-panel.tsx`: grid responsive de `<ThumbnailCard>`, botón "Subir imagen" (input file múltiple con `accept`), contador visible `"X de 50 MB usados"`, upload en paralelo con placeholders por archivo, integra `<Lightbox>` con estado local.
+- [x] **T4.5** — `src/components/tickets/ticket-attachments-panel.tsx`: grid responsive de `<ThumbnailCard>`, botón "Subir imagen" (input file múltiple con `accept`), contador visible `"X de 50 MB usados"`, upload en paralelo con placeholders por archivo, integra `<Lightbox>` con estado local.
 
-- [ ] **T4.6** — `src/components/tickets/ticket-detail.tsx`: importar y montar `<TicketAttachmentsPanel>` debajo de la descripción y encima de `<TicketTimeEntries>`.
+- [x] **T4.6** — `src/components/tickets/ticket-detail.tsx`: importar y montar `<TicketAttachmentsPanel>` debajo de la descripción y encima de `<TicketTimeEntries>`.
 
-- [ ] **T4.7** — Ajustes DESIGN.md: grid responsive (2/3/4/6 columnas según breakpoint), hover states del thumb, transitions en lightbox (200ms fade). Reutilizar tokens existentes (`--surface`, `--border`, radios).
+- [x] **T4.7** — Ajustes DESIGN.md: grid responsive (2/3/4/6 columnas según breakpoint), hover states del thumb, transitions en lightbox (200ms fade). Reutilizar tokens existentes (`--surface`, `--border`, radios).
 
 ---
 
