@@ -4,6 +4,9 @@ import { readJsonBody } from "@/lib/api/read-json";
 import { requireTicketAccess } from "@/lib/api/require-ticket-access";
 import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { updateTicketSchema } from "@/lib/validation/tickets";
+import type { Database } from "@/types/database";
+
+type TicketUpdate = Database["public"]["Tables"]["tickets"]["Update"];
 
 /**
  * PATCH de ticket. La granularidad fina (contributor edita propios, transiciona
@@ -51,6 +54,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  // 019: si el cliente mandó `expected_updated_at`, es una escritura optimista
+  // (el hidratador de checkboxes del `<RichTextViewer>` es el único caller
+  // hoy). Si el ticket cambió entre la lectura y este PATCH, rebotamos con
+  // 409 y el cliente refetchea antes de reintentar. Sin este chequeo, un
+  // click al checklist justo después de que otro usuario edite la descripción
+  // pisaría el cambio ajeno.
+  if (parsed.data.expected_updated_at !== undefined) {
+    if (parsed.data.expected_updated_at !== ticket.updated_at) {
+      return NextResponse.json(
+        {
+          error: "El ticket cambió mientras editabas",
+          reason: "conflict",
+          currentUpdatedAt: ticket.updated_at,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   // 018: si se cambia sprint_id (no a null), el sprint tiene que pertenecer al
   // mismo proyecto y no estar completado (AC-3.4). Un ticket con sprint
   // completado congela historia — no se puede reasignar.
@@ -88,7 +110,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from("tickets")
     .update({
       ...(parsed.data.title !== undefined && { title: parsed.data.title }),
-      ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+      ...(parsed.data.description_doc !== undefined && {
+        // Cast: `description_doc` es `Json` en la DB (unknown-ish); el tipo
+        // derivado del validador de rich-text es `ProseMirrorNode` con
+        // `attrs: Record<string, unknown>`. Ambas descripciones son de la
+        // misma forma runtime; el cast lo declara.
+        description_doc: parsed.data.description_doc as TicketUpdate["description_doc"],
+      }),
       ...(parsed.data.status !== undefined && { status: parsed.data.status }),
       ...(parsed.data.priority !== undefined && { priority: parsed.data.priority }),
       ...(parsed.data.assignee_id !== undefined && { assignee_id: parsed.data.assignee_id }),

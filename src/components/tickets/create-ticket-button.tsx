@@ -56,7 +56,7 @@ export function CreateTicketButton({
   const initial: TicketFormInitial = {
     projectId: preselectedProject,
     title: "",
-    description: "",
+    descriptionDoc: null,
     priority: "medium",
     assigneeId: null,
   };
