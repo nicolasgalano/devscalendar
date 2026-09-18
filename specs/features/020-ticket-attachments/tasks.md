@@ -115,12 +115,12 @@ Fases:
 
 ## Phase 5 — Cierre
 
-- [ ] **T5.1** — `specs/features/README.md`: marcar 020 como done.
-- [ ] **T5.2** — `CLAUDE.md`:
+- [x] **T5.1** — `specs/features/README.md`: marcar 020 como done.
+- [x] **T5.2** — `CLAUDE.md`:
   - Estructura del repo: sumar `src/lib/attachments/` con sus archivos.
   - Sección "Convenciones de código > Adjuntos": pipeline cliente genera thumb + server valida + RLS del bucket espeja `can_view_project`.
   - Estado de features: línea para 020.
-- [ ] **T5.3** — Verificación visual del usuario en el navegador (checklist del §Phase 5.3 del plan).
+- [ ] **T5.3** (pendiente — verificación visual del usuario) — Verificación visual del usuario en el navegador (checklist del §Phase 5.3 del plan).
 
 ---
 
