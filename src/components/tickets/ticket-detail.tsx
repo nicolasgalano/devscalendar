@@ -172,6 +172,12 @@ export function TicketDetail({
 
   return (
     <>
+      <p className="text-caption text-muted-foreground pb-3">
+        <Link href={`/projects/${ticket.project.key}/sprint`} className="hover:underline">
+          ← Volver al proyecto
+        </Link>
+      </p>
+
       <div className="flex items-start justify-between gap-4 pb-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -482,12 +488,6 @@ export function TicketDetail({
           moviendo, pero no se pueden crear nuevos.
         </p>
       )}
-
-      <p className="mt-6 text-caption text-muted-foreground">
-        <Link href={`/projects/${ticket.project.key}/sprint`} className="hover:underline">
-          ← Volver al proyecto
-        </Link>
-      </p>
 
       <TicketFormDialog
         mode="edit"
