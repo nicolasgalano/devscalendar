@@ -216,14 +216,28 @@ export function TicketFormDialog({
     }
   }
 
+  // El bloque de campos "meta" (Prioridad / Asignado / Sprint / Est.hs)
+  // colapsa a 4 columnas en desktop cuando el viewer puede planificar sprint,
+  // o a 2 columnas cuando no puede. En modo edit el proyecto no aparece —
+  // cambiarlo no está soportado (los tickets quedan atados al proyecto que
+  // los numeró, `enforce_project_key_immutable`). En modo create sí, en su
+  // propia fila para no confundir con los campos que dependen del proyecto.
+  const showProjectSelect = mode === "create";
+  const metaCols = canSprintPlan
+    ? "md:grid-cols-2 lg:grid-cols-4"
+    : "md:grid-cols-2";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
+      {/* max-h + grid-rows: header y footer natural, body ocupa el resto y
+          scrollea internamente cuando la descripción es larga. Sin esto el
+          botón "Guardar cambios" se salía de la pantalla con contenido largo. */}
+      <DialogContent className="sm:max-w-5xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[calc(100vh-4rem)]">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Nuevo ticket" : "Editar ticket"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
+        <div className="-mr-2 flex flex-col gap-3 overflow-y-auto pr-2">
           {error && (
             <p role="alert" className="text-ui text-destructive">
               {error}
@@ -242,13 +256,13 @@ export function TicketFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {showProjectSelect && (
             <div className="flex flex-col gap-1.5">
               <Label>Proyecto</Label>
               <Select
                 value={form.projectId ?? ""}
                 onValueChange={(value) => setForm({ ...form, projectId: value as string })}
-                disabled={mode === "edit" || projects.length === 0}
+                disabled={projects.length === 0}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Elegí un proyecto">
@@ -265,7 +279,9 @@ export function TicketFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          )}
 
+          <div className={`grid grid-cols-1 gap-3 ${metaCols}`}>
             <div className="flex flex-col gap-1.5">
               <Label>Prioridad</Label>
               <Select
@@ -287,110 +303,114 @@ export function TicketFormDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Asignado</Label>
-            <Select
-              value={form.assigneeId ?? UNASSIGNED}
-              onValueChange={(value) =>
-                setForm({
-                  ...form,
-                  assigneeId: value === UNASSIGNED ? null : (value as string),
-                })
-              }
-              disabled={!canReassign || (mode === "create" && !form.projectId)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {form.assigneeId
-                    ? availableMembers.find((person) => person.id === form.assigneeId)?.name ??
-                      "—"
-                    : "Sin asignar"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED}>Sin asignar</SelectItem>
-                {availableMembers.map((person) => (
-                  <SelectItem key={person.id} value={person.id}>
-                    {person.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {mode === "create" && form.projectId && availableMembers.length === 0 && (
-              <p className="text-caption text-muted-foreground">
-                Este proyecto todavía no tiene miembros activos.
-              </p>
+            <div className="flex flex-col gap-1.5">
+              <Label>Asignado</Label>
+              <Select
+                value={form.assigneeId ?? UNASSIGNED}
+                onValueChange={(value) =>
+                  setForm({
+                    ...form,
+                    assigneeId: value === UNASSIGNED ? null : (value as string),
+                  })
+                }
+                disabled={!canReassign || (mode === "create" && !form.projectId)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {form.assigneeId
+                      ? availableMembers.find((person) => person.id === form.assigneeId)?.name ??
+                        "—"
+                      : "Sin asignar"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Sin asignar</SelectItem>
+                  {availableMembers.map((person) => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {mode === "create" && form.projectId && availableMembers.length === 0 && (
+                <p className="text-caption text-muted-foreground">
+                  Este proyecto todavía no tiene miembros activos.
+                </p>
+              )}
+            </div>
+
+            {canSprintPlan && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Sprint</Label>
+                  <Select
+                    value={form.sprintId ?? BACKLOG}
+                    onValueChange={(value) =>
+                      setForm({
+                        ...form,
+                        sprintId: value === BACKLOG ? null : (value as string),
+                      })
+                    }
+                    disabled={mode === "create" && !form.projectId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {form.sprintId
+                          ? (() => {
+                              const sprint = availableSprints.find(
+                                (s) => s.id === form.sprintId,
+                              );
+                              return sprint ? formatSprintDisplayName(sprint) : "—";
+                            })()
+                          : "Backlog"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BACKLOG}>Backlog</SelectItem>
+                      {availableSprints.map((sprint) => (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                          {formatSprintDisplayName(sprint)}
+                          {sprint.status === "active" && (
+                            <span className="text-caption text-muted-foreground ml-1">
+                              (activo)
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="ticket-hours">Horas estimadas</Label>
+                  <Input
+                    id="ticket-hours"
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={
+                      form.estimatedHours === null || form.estimatedHours === undefined
+                        ? ""
+                        : String(form.estimatedHours)
+                    }
+                    placeholder="—"
+                    onChange={(event) => {
+                      const raw = event.target.value.trim();
+                      const next = raw === "" ? null : Number(raw);
+                      setForm({
+                        ...form,
+                        estimatedHours:
+                          next === null || (Number.isFinite(next) && next >= 0)
+                            ? next
+                            : form.estimatedHours ?? null,
+                      });
+                    }}
+                  />
+                </div>
+              </>
             )}
           </div>
-
-          {canSprintPlan && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label>Sprint</Label>
-                <Select
-                  value={form.sprintId ?? BACKLOG}
-                  onValueChange={(value) =>
-                    setForm({
-                      ...form,
-                      sprintId: value === BACKLOG ? null : (value as string),
-                    })
-                  }
-                  disabled={mode === "create" && !form.projectId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {form.sprintId
-                        ? (() => {
-                            const sprint = availableSprints.find(
-                              (s) => s.id === form.sprintId,
-                            );
-                            return sprint ? formatSprintDisplayName(sprint) : "—";
-                          })()
-                        : "Backlog"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={BACKLOG}>Backlog</SelectItem>
-                    {availableSprints.map((sprint) => (
-                      <SelectItem key={sprint.id} value={sprint.id}>
-                        {formatSprintDisplayName(sprint)}
-                        {sprint.status === "active" && (
-                          <span className="text-caption text-muted-foreground ml-1">
-                            (activo)
-                          </span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ticket-hours">Horas estimadas</Label>
-                <Input
-                  id="ticket-hours"
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={form.estimatedHours === null || form.estimatedHours === undefined ? "" : String(form.estimatedHours)}
-                  placeholder="—"
-                  onChange={(event) => {
-                    const raw = event.target.value.trim();
-                    const next = raw === "" ? null : Number(raw);
-                    setForm({
-                      ...form,
-                      estimatedHours:
-                        next === null || (Number.isFinite(next) && next >= 0)
-                          ? next
-                          : form.estimatedHours ?? null,
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>Descripción</Label>
