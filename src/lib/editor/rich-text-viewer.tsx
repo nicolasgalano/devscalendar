@@ -59,14 +59,17 @@ export function RichTextViewer({
           "prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
           "prose-pre:bg-muted prose-pre:text-foreground",
           // taskList styles — el renderer emite `<ul data-task-list>` con
-          // `<li data-task-index>`; el `[data-task-item-marker]` es donde el
-          // hidratador monta el input. Sin hidratador, mostramos el estado
-          // via el `::before` sobre `[data-checked]`.
+          // `<li data-task-index>` y un `[data-task-item-marker]` vacío que
+          // puede quedar tal cual (modo lectura) o recibir un
+          // `<input type="checkbox">` real vía portal desde `<TaskItemHydrator>`.
+          // El estilo custom del marker (borde + fondo cuando checked) se
+          // aplica SOLO si el span está vacío (`:not(:has(*))`), así en modo
+          // interactivo no queda duplicado con el input del hidratador.
           "[&_[data-task-list]]:list-none [&_[data-task-list]]:pl-0",
           "[&_[data-task-list]_li]:flex [&_[data-task-list]_li]:items-start [&_[data-task-list]_li]:gap-2",
           "[&_[data-task-list]_li]:my-1",
-          "[&_[data-task-item-marker]]:mt-0.5 [&_[data-task-item-marker]]:inline-block [&_[data-task-item-marker]]:size-3.5 [&_[data-task-item-marker]]:shrink-0 [&_[data-task-item-marker]]:rounded [&_[data-task-item-marker]]:border [&_[data-task-item-marker]]:border-border",
-          "[&_[data-checked='true']_[data-task-item-marker]]:bg-primary [&_[data-checked='true']_[data-task-item-marker]]:border-primary",
+          "[&_[data-task-item-marker]:not(:has(*))]:mt-0.5 [&_[data-task-item-marker]:not(:has(*))]:inline-block [&_[data-task-item-marker]:not(:has(*))]:size-3.5 [&_[data-task-item-marker]:not(:has(*))]:shrink-0 [&_[data-task-item-marker]:not(:has(*))]:rounded [&_[data-task-item-marker]:not(:has(*))]:border [&_[data-task-item-marker]:not(:has(*))]:border-border",
+          "[&_[data-checked='true']_[data-task-item-marker]:not(:has(*))]:bg-primary [&_[data-checked='true']_[data-task-item-marker]:not(:has(*))]:border-primary",
           "[&_[data-checked='true']_[data-task-item-content]]:text-muted-foreground [&_[data-checked='true']_[data-task-item-content]]:line-through",
           "[&_[data-task-item-content]]:min-w-0 [&_[data-task-item-content]_p]:my-0",
           className,
