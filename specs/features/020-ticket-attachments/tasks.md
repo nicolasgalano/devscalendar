@@ -41,9 +41,9 @@ Fases:
 
 ## Phase 2 — API
 
-- [ ] **T2.1** — `src/lib/validation/attachments.ts`: schemas Zod para el body del POST (validar `width`, `height`, tamaños). Nota: como es `multipart`, el schema valida el objeto derivado del `FormData`, no un JSON — se implementa un `parseAttachmentUploadForm(request)` helper.
+- [x] **T2.1** — `src/lib/validation/attachments.ts`: schemas Zod para el body del POST (validar `width`, `height`, tamaños). Nota: como es `multipart`, el schema valida el objeto derivado del `FormData`, no un JSON — se implementa un `parseAttachmentUploadForm(request)` helper.
 
-- [ ] **T2.2** — `src/app/api/tickets/[key]/attachments/route.ts` (POST):
+- [x] **T2.2** — `src/app/api/tickets/[key]/attachments/route.ts` (POST):
   - Guard: `requireTicketAccess(key)` + permission check con `canUploadAttachment`.
   - Valida MIME/tamaño de `original` (whitelist).
   - Valida MIME del `thumb` = `image/webp`, tamaño ≤ 100 KB.
@@ -55,14 +55,14 @@ Fases:
   - Si falla el insert: borra los dos objetos, responde 500.
   - Response 201 con la fila (sin URLs firmadas).
 
-- [ ] **T2.3** — `src/app/api/tickets/[key]/attachments/[id]/signed-url/route.ts` (GET):
+- [x] **T2.3** — `src/app/api/tickets/[key]/attachments/[id]/signed-url/route.ts` (GET):
   - Guard: `requireTicketAccess(key)` (read).
   - Valida que `attachment.ticket_id` matchee el ticket del path.
   - `variant=thumb|original` de query. Default `thumb`.
   - Llama `supabase.storage.from('ticket-attachments').createSignedUrl(path, 900)`.
   - Response `{ url, expires_at }`.
 
-- [ ] **T2.4** — `src/app/api/tickets/[key]/attachments/[id]/route.ts` (DELETE):
+- [x] **T2.4** — `src/app/api/tickets/[key]/attachments/[id]/route.ts` (DELETE):
   - Guard: `requireTicketAccess(key)`.
   - Fetch de la fila → validar permiso con `canDeleteAttachment`.
   - `supabase.storage.from(...).remove([object_key, thumb_object_key])`.
