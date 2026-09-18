@@ -79,9 +79,9 @@ Fases:
 
 ## Phase 3 — Lib cliente
 
-- [ ] **T3.1** — `src/lib/attachments/generate-thumb.ts`: `generateThumb(file: File): Promise<GeneratedThumb>` con `createImageBitmap` + `OffscreenCanvas` + `convertToBlob({type:"image/webp",quality:0.8})`. Max side = 300 px. Devuelve `{ blob, width, height }`. Si el browser no soporta `OffscreenCanvas`, lanza error claro.
+- [x] **T3.1** — `src/lib/attachments/generate-thumb.ts`: `generateThumb(file: File): Promise<GeneratedThumb>` con `createImageBitmap` + `OffscreenCanvas` + `convertToBlob({type:"image/webp",quality:0.8})`. Max side = 300 px. Devuelve `{ blob, width, height }`. Si el browser no soporta `OffscreenCanvas`, lanza error claro.
 
-- [ ] **T3.2** — `src/lib/attachments/upload.ts`: `uploadTicketAttachment(ticketKey, file, opts)`:
+- [x] **T3.2** — `src/lib/attachments/upload.ts`: `uploadTicketAttachment(ticketKey, file, opts)`:
   - Valida MIME + tamaño client-side.
   - Llama `generateThumb`.
   - Arma `FormData` con `original`, `thumb`, `width`, `height`.
