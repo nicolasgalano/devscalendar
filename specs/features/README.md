@@ -30,12 +30,15 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | done (deployed 2026-09-21) | 015 | fuera de spec original |
 | 021 | Tareas (rename) + reporte planilla con export XLSX | draft (spec + plan) | 016, 018     | fuera de spec original |
+| 024 | Planning: hoy en la última semana visible         | done (deployed 2026-09-21) | 011          | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
 **`020` — alcance:** solo imágenes en el MVP (`png/jpeg/webp/gif`). Panel de "Adjuntos" propio en el detalle del ticket, separado del rich text. Thumbnails generados en cliente con Canvas → WebP ~300px (cero deps server, ~25 KB vs ~3 MB del original). Storage en Supabase Storage con bucket privado + RLS espejo de `can_view_project`. Límite total por ticket es soft (contador visible, no bloquea). Sin notificaciones en el MVP. **Fase 2 aparte** (spec futura): paste de imágenes al editor rich text de 019 — el nodo `image` del schema ya vive reservado desde 019, `020` sienta las bases (bucket + tabla + endpoints) y la fase 2 conecta el editor con esa misma infra.
 
 **`021` — alcance:** dos ejes. (1) **Rename UI Actividades → Tareas** (sin migration de schema — la tabla sigue siendo `project_activities`, solo cambian labels visibles). (2) **Reporte planilla + export XLSX** — extiende `GET /api/time-entries/export.csv` con las columnas del Excel de referencia (menos USD/facturable) y suma un endpoint `.xlsx` en paralelo. Fuera de scope: concepto de "Servicio" global, facturación. Spec + plan commiteados en su branch, esperando tasks + implementación.
+
+**`024` — alcance:** cuando la fecha activa de la vista **Planning** es hoy (botón "Hoy" o entrada sin `?date`), la grilla renderiza `[mondayOf(hoy) - 21, mondayOf(hoy) + 7)` — 3 semanas pasadas + la semana en curso, con hoy como la **cuarta fila** en lugar de la primera. Cambio de cómputo puro en `viewBounds` y `resolveRange` (`src/lib/calendar/range.ts`) con parámetro opcional `today` que solo el case "planning" consume. Cero migration, cero UI directa, cero cambios en Day/Month/Year, cero cambios en el paso de navegación.
 
 ## Orden sugerido de implementación
 

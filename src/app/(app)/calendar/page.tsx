@@ -100,7 +100,7 @@ export default async function CalendarPage({
   const params = parseCalendarParams(raw, { today });
 
   const supabase = await createClient();
-  const range = resolveRange(params.view, params.date, TIMEZONE);
+  const range = resolveRange(params.view, params.date, TIMEZONE, { today });
 
   // Ya resuelto y memorizado por el layout del route group: acá no cuesta otro
   // round trip al servidor de auth (ver `lib/supabase/session.ts`).
@@ -208,7 +208,7 @@ export default async function CalendarPage({
       return emptyOrNoResults();
     }
 
-    const [from, to] = viewBounds("planning", params.date);
+    const [from, to] = viewBounds("planning", params.date, { today });
     const days = eachDay(from, to);
     const rows = buildPlanningMatrix(bookings, days, TIMEZONE);
     const overload = computeDevDayLoad(devDayLoad, days, TIMEZONE);
@@ -236,7 +236,7 @@ export default async function CalendarPage({
 
   async function renderAggregated(view: "month" | "year"): Promise<ViewContent> {
     const { spans, devCount } = await getDayLoad(supabase, { range, filters: params.filters });
-    const [from, to] = viewBounds(view, params.date);
+    const [from, to] = viewBounds(view, params.date, { today });
     const days = aggregateDayLoad({
       spans,
       days: eachDay(from, to),
