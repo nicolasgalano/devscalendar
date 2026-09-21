@@ -30,12 +30,15 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | done (deployed 2026-09-21) | 015 | fuera de spec original |
 | 021 | Tareas (rename) + reporte planilla con export XLSX | draft (spec + plan) | 016, 018     | fuera de spec original |
+| 023 | Notif de status change al PM primario             | draft (spec) | 015, 010     | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
 **`020` — alcance:** solo imágenes en el MVP (`png/jpeg/webp/gif`). Panel de "Adjuntos" propio en el detalle del ticket, separado del rich text. Thumbnails generados en cliente con Canvas → WebP ~300px (cero deps server, ~25 KB vs ~3 MB del original). Storage en Supabase Storage con bucket privado + RLS espejo de `can_view_project`. Límite total por ticket es soft (contador visible, no bloquea). Sin notificaciones en el MVP. **Fase 2 aparte** (spec futura): paste de imágenes al editor rich text de 019 — el nodo `image` del schema ya vive reservado desde 019, `020` sienta las bases (bucket + tabla + endpoints) y la fase 2 conecta el editor con esa misma infra.
 
 **`021` — alcance:** dos ejes. (1) **Rename UI Actividades → Tareas** (sin migration de schema — la tabla sigue siendo `project_activities`, solo cambian labels visibles). (2) **Reporte planilla + export XLSX** — extiende `GET /api/time-entries/export.csv` con las columnas del Excel de referencia (menos USD/facturable) y suma un endpoint `.xlsx` en paralelo. Fuera de scope: concepto de "Servicio" global, facturación. Spec + plan commiteados en su branch, esperando tasks + implementación.
+
+**`023` — alcance:** cambio quirúrgico al trigger `notify_ticket_events` (migration 14) para sumar al **PM primario del proyecto** como destinatario de `ticket_status_changed`, sin sacar a assignee ni creador. La dedupe estándar del `notify_user()` evita el doble aviso cuando el PM coincide con alguno. Cero UI, cero API, cero enums nuevos — se reusa el tipo y el copy que ya existen. Solo `status`; `ticket_assigned` no se toca (ya avisa al dev).
 
 ## Orden sugerido de implementación
 
