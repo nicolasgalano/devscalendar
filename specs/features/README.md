@@ -30,7 +30,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | done (deployed 2026-09-21) | 015 | fuera de spec original |
 | 021 | Tareas (rename) + reporte planilla con export XLSX | draft (spec + plan) | 016, 018     | fuera de spec original |
-| 022 | Comentarios de tickets con @menciones             | draft (spec + plan) | 015, 019, 010 | fuera de spec original |
+| 022 | Comentarios de tickets con @menciones             | draft (spec + plan + tasks) | 015, 019, 010 | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
@@ -38,7 +38,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 
 **`021` — alcance:** dos ejes. (1) **Rename UI Actividades → Tareas** (sin migration de schema — la tabla sigue siendo `project_activities`, solo cambian labels visibles). (2) **Reporte planilla + export XLSX** — extiende `GET /api/time-entries/export.csv` con las columnas del Excel de referencia (menos USD/facturable) y suma un endpoint `.xlsx` en paralelo. Fuera de scope: concepto de "Servicio" global, facturación. Spec + plan commiteados en su branch, esperando tasks + implementación.
 
-**`022` — alcance:** hilo de comentarios por ticket con **@menciones**. Cada comentario es un doc rich text (reusa `RICH_TEXT_SCHEMA` y el editor Tiptap de 019 — se suma el nodo `mention`, habilitado también en la descripción). Dos tipos de notificación nuevos: `ticket_mentioned` (a las personas con @, tanto en comentarios como en la descripción) y `ticket_commented` (a assignee + creador + PM primario, con dedupe estándar del `notify_user()`). Nueva tabla `ticket_comments` con RLS por `can_view_project`, endpoints POST/PATCH/DELETE, y contador de comentarios en las cards del backlog y del kanban. Spec + plan commiteados en su branch, esperando tasks + implementación. Fuera del MVP: threading, reacciones, follow explícito, menciones a grupos/roles, notif agrupadas.
+**`022` — alcance:** hilo de comentarios por ticket con **@menciones**. Cada comentario es un doc rich text (reusa `RICH_TEXT_SCHEMA` y el editor Tiptap de 019 — se suma el nodo `mention`, habilitado también en la descripción). Dos tipos de notificación nuevos: `ticket_mentioned` (a las personas con @, tanto en comentarios como en la descripción) y `ticket_commented` (a assignee + creador + PM primario, con dedupe estándar del `notify_user()`). Nueva tabla `ticket_comments` con RLS por `can_view_project`, endpoints POST/PATCH/DELETE, y contador de comentarios en las cards del backlog y del kanban. Spec + plan + tasks commiteados en su branch, esperando implementación. Fuera del MVP: threading, reacciones, follow explícito, menciones a grupos/roles, notif agrupadas.
 
 ## Orden sugerido de implementación
 
