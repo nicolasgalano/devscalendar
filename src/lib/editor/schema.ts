@@ -109,6 +109,16 @@ export const RICH_TEXT_SCHEMA = {
         title: { type: "primitive", kind: "string", optional: true },
       },
     },
+    // 022. Habilitado tanto en comentarios como en descripciones. El validador
+    // chequea que `user_id` matchee formato uuid (kind: "string" solo garantiza
+    // shape, no formato) y que sea un miembro activo del proyecto (chequeo
+    // aplicativo en el handler que crea/edita — la RLS no lo puede expresar).
+    mention: {
+      attrs: {
+        user_id: { type: "primitive", kind: "string" },
+        label: { type: "primitive", kind: "string" },
+      },
+    },
   },
   marks: {
     bold: {},

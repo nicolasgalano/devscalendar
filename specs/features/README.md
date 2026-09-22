@@ -30,7 +30,9 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | done (deployed 2026-09-21) | 015 | fuera de spec original |
 | 021 | Tareas (rename) + reporte planilla con export XLSX | draft (spec + plan) | 016, 018     | fuera de spec original |
+| 022 | Comentarios de tickets con @menciones             | code done (deployed 2026-09-22) | 015, 019, 010 | fuera de spec original |
 | 023 | Notif de status change al PM primario             | draft (spec) | 015, 010     | fuera de spec original |
+| 024 | Planning: hoy en la última semana visible         | done (deployed 2026-09-21) | 011          | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
@@ -38,7 +40,11 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 
 **`021` — alcance:** dos ejes. (1) **Rename UI Actividades → Tareas** (sin migration de schema — la tabla sigue siendo `project_activities`, solo cambian labels visibles). (2) **Reporte planilla + export XLSX** — extiende `GET /api/time-entries/export.csv` con las columnas del Excel de referencia (menos USD/facturable) y suma un endpoint `.xlsx` en paralelo. Fuera de scope: concepto de "Servicio" global, facturación. Spec + plan commiteados en su branch, esperando tasks + implementación.
 
-**`023` — alcance:** cambio quirúrgico al trigger `notify_ticket_events` (migration 14) para sumar al **PM primario del proyecto** como destinatario de `ticket_status_changed`, sin sacar a assignee ni creador. La dedupe estándar del `notify_user()` evita el doble aviso cuando el PM coincide con alguno. Cero UI, cero API, cero enums nuevos — se reusa el tipo y el copy que ya existen. Solo `status`; `ticket_assigned` no se toca (ya avisa al dev).
+**`022` — alcance:** hilo de comentarios por ticket con **@menciones**. Cada comentario es un doc rich text (reusa `RICH_TEXT_SCHEMA` y el editor Tiptap de 019 — se suma el nodo `mention`, habilitado también en la descripción). Dos tipos de notificación nuevos: `ticket_mentioned` (a las personas con @, tanto en comentarios como en la descripción) y `ticket_commented` (a assignee + creador + PM primario, con dedupe estándar del `notify_user()`). Nueva tabla `ticket_comments` con RLS por `can_view_project`, endpoints POST/PATCH/DELETE, y contador de comentarios en las cards del backlog y del kanban. Fuera del MVP: threading, reacciones, follow explícito, menciones a grupos/roles, notif agrupadas, preview del body_doc en el email. Deployed 2026-09-22 con migration 21 aditiva pura; verificación visual pendiente por parte del usuario.
+
+**`023` — alcance:** cambio quirúrgico al trigger `notify_ticket_events` para sumar al **PM primario del proyecto** como destinatario de `ticket_status_changed`, sin sacar a assignee ni creador. La dedupe del `notify_user_for_ticket()` evita el doble aviso cuando el PM coincide con alguno. Cero UI, cero API, cero enums nuevos — se reusa el tipo y el copy que ya existen. Solo `status`; `ticket_assigned` no se toca (ya avisa al dev). Se construye sobre la versión de la función que dejó `022` (que sumó menciones en `description_doc`), preservando todo lo anterior.
+
+**`024` — alcance:** cuando la fecha activa de la vista **Planning** es hoy (botón "Hoy" o entrada sin `?date`), la grilla renderiza `[mondayOf(hoy) - 21, mondayOf(hoy) + 7)` — 3 semanas pasadas + la semana en curso, con hoy como la **cuarta fila** en lugar de la primera. Cambio de cómputo puro en `viewBounds` y `resolveRange` (`src/lib/calendar/range.ts`) con parámetro opcional `today` que solo el case "planning" consume. Cero migration, cero UI directa, cero cambios en Day/Month/Year, cero cambios en el paso de navegación.
 
 ## Orden sugerido de implementación
 
