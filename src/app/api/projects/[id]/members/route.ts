@@ -44,15 +44,17 @@ export async function GET(
   const url = new URL(request.url);
   const query = (url.searchParams.get("q") ?? "").trim();
 
+  // Sin alias en el embed: PostgREST se confunde entre el nombre de tabla y
+  // el alias JS al aplicar filtros sobre columnas del embed. Con alias
+  // `profile:profiles!inner(...)`, el `.eq("profiles.active", true)` +
+  // `.order("full_name", { referencedTable: "profiles" })` termina rebotando
+  // con 400 ("'profiles' is not an embedded resource"). Sin alias, las tres
+  // referencias son coherentes: select, filter y order usan `profiles`.
   let membersQuery = supabase
     .from("project_members")
-    .select("profile:profiles!inner(id, full_name, email, avatar_url, active)")
+    .select("profiles!inner(id, full_name, email, avatar_url, active)")
     .eq("project_id", projectId)
     .eq("active", true)
-    // Filtro sobre columna del embed: PostgREST espera el NOMBRE de la tabla
-    // (`profiles`), no el alias JS (`profile`). El alias solo afecta el shape
-    // de la respuesta; con el alias equivocado el filtro se ignora en silencio
-    // y `!inner` + orden por embed no devuelve nada (bug de deploy inicial).
     .eq("profiles.active", true);
 
   if (query) {
@@ -76,7 +78,7 @@ export async function GET(
   }
 
   const rows = (data ?? [])
-    .map((row) => row.profile)
+    .map((row) => row.profiles)
     .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile))
     .map((profile) => ({
       id: profile.id,
