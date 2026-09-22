@@ -299,6 +299,7 @@ Las variables de entorno viven en Vercel → Settings → Environment Variables.
 - **`on delete cascade` en las dos FK de `notifications`, y es un desvío deliberado de la convención de "Migrations".** Una notificación no es historia, es un mensaje: sin destinatario no significa nada y sin reserva no lleva a ningún lado. La historia la guarda `audit_log`, que por eso sí conserva `set null`.
 - **El `payload` se congela al escribir; el texto no.** El trigger guarda los hechos —proyecto, franja, motivo— y las oraciones las arma `src/lib/notifications/events.ts`, así que cambiar el copy no necesita migration ni deja los avisos viejos hablando distinto que los nuevos.
 - **A nadie se le avisa de su propia acción**, y el chequeo vive en un solo lugar (`notify_user()`). Con roles múltiples eso dejó de ser un caso raro.
+- **`ticket_status_changed` avisa a tres destinatarios**: assignee (015), creador (015) y **PM primario del proyecto** (023). La dedupe entre ellos es explícita con `distinct from` en tres direcciones — cuando el PM coincide con assignee o creador, no se duplica la fila. Solo `status`; `ticket_assigned` sigue avisando solo al asignado nuevo.
 - **Sin `RESEND_API_KEY` no se rompe nada**: las filas quedan `pending` y la bandeja in-app anda igual. Es lo que permite que CI corra sin credenciales de terceros.
 
 ### Estado en la URL
