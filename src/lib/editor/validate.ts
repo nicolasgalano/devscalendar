@@ -38,7 +38,14 @@ export type ValidationResult =
 
 // Nodos que no tienen `content` — cualquier `content` presente en uno de
 // éstos es motivo de error.
-const LEAF_NODES = new Set(["text", "hardBreak", "horizontalRule", "image"]);
+const LEAF_NODES = new Set(["text", "hardBreak", "horizontalRule", "image", "mention"]);
+
+// UUID v4 format, case-insensitive. Se aplica al attr `user_id` del nodo
+// `mention` — el spec del schema es solo `primitive.string`, así que el
+// validador tiene que cerrar la forma acá (analogía con `link.href` +
+// protocolos: el spec dice "url" y el validador remata contra la lista).
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Nodos que separan párrafos en el `plainText`: al terminar de visitar su
 // contenido, se agrega un `\n` si el buffer no termina ya en `\n`.
@@ -122,6 +129,16 @@ function visitNode(
 
   // Attrs
   validateAttrs(node.attrs, nodeSpec.attrs, `${label}.attrs`, errors);
+
+  // 022: chequeo extra de formato uuid en `mention.attrs.user_id`.
+  // Se hace acá y no en el schema porque el schema no expresa "string con
+  // formato uuid" — es lo mismo que hace el link con protocolos.
+  if (node.type === "mention" && node.attrs) {
+    const userId = node.attrs.user_id;
+    if (typeof userId === "string" && !UUID_REGEX.test(userId)) {
+      errors.push(`${label}.attrs.user_id: "${userId}" no es un uuid válido`);
+    }
+  }
 
   // Text
   if (node.type === "text") {

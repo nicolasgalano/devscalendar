@@ -25,6 +25,13 @@ export const NOTIFICATION_TYPES = [
   "time_entry_created_by_other",
   // 016: admin borró una entry tuya (delete por auth.uid distinto y admin).
   "time_entry_deleted_by_admin",
+  // 022: hay comentario nuevo en un ticket donde sos assignee, creador o PM
+  // primario (dedupe: si además te mencionan, recibís SOLO ticket_mentioned).
+  "ticket_commented",
+  // 022: te mencionaron con @ en un comentario o en la descripción de un
+  // ticket. `payload.source` distingue ('description' vs 'comment' — default
+  // implícito para comentarios).
+  "ticket_mentioned",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -65,6 +72,15 @@ export type NotificationPayload = {
   created_by?: string | null;
   deleted_by?: string | null;
   description?: string | null;
+  // 022: comentarios y menciones.
+  // `comment_id` presente si el aviso viene de una fila de `ticket_comments`.
+  // Para menciones en `description_doc` del ticket, viene null y `source`
+  // vale 'description'.
+  comment_id?: string | null;
+  author_id?: string | null;
+  // 'comment' (default implícito) | 'description'. Solo poblado en avisos
+  // de tipo ticket_mentioned que vienen de la descripción del ticket.
+  source?: "comment" | "description" | null;
 };
 
 export type NotificationRow = {
@@ -92,7 +108,10 @@ export type NotificationRow = {
  * tickets viven en `notificationTitle()` porque su título incluye la clave.
  */
 const TITLE: Record<
-  Exclude<NotificationType, "ticket_assigned" | "ticket_status_changed">,
+  Exclude<
+    NotificationType,
+    "ticket_assigned" | "ticket_status_changed" | "ticket_commented" | "ticket_mentioned"
+  >,
   string
 > = {
   booking_created: "Te reservaron tiempo",
@@ -113,12 +132,22 @@ const TITLE: Record<
 export function notificationTitle(
   type: NotificationType,
   ticketKey?: string | null,
+  payload?: NotificationPayload,
 ): string {
   if (type === "ticket_assigned") {
     return ticketKey ? `Te asignaron ${ticketKey}` : "Te asignaron un ticket";
   }
   if (type === "ticket_status_changed") {
     return ticketKey ? `${ticketKey}: cambió el estado` : "Cambió el estado de un ticket";
+  }
+  if (type === "ticket_commented") {
+    return ticketKey ? `Nuevo comentario en ${ticketKey}` : "Nuevo comentario en un ticket";
+  }
+  if (type === "ticket_mentioned") {
+    const where = payload?.source === "description" ? "la descripción" : "un comentario";
+    return ticketKey
+      ? `Te mencionaron en ${where} de ${ticketKey}`
+      : `Te mencionaron en ${where} de un ticket`;
   }
   return TITLE[type];
 }
@@ -207,6 +236,9 @@ export function notificationDetail(
     const hours = (payload.minutes / 60).toFixed(2).replace(/\.?0+$/, "");
     return `Borraron ${hours} h del ${payload.logged_at} sobre ${payload.project ?? "proyecto"}`;
   }
+  if ((type === "ticket_commented" || type === "ticket_mentioned") && payload.title) {
+    return `"${payload.title}"`;
+  }
   return null;
 }
 
@@ -224,9 +256,26 @@ export function notificationHref(
     // pasan y siguen funcionando; los avisos de time entries sí los pasan.
     timeEntryId?: string | null;
     type?: NotificationType;
+    // 022: los avisos ticket_commented / ticket_mentioned con `comment_id`
+    // en el payload agregan anchor #comment-<id> al href para que el detalle
+    // scrollee al comentario.
+    payload?: NotificationPayload;
   },
 ): string {
-  if (row.ticketKey) return `/tickets/${row.ticketKey}`;
+  if (row.ticketKey) {
+    const commentId = row.payload?.comment_id;
+    const source = row.payload?.source;
+    // Solo hacemos anchor si venimos de un comentario (source !== 'description'
+    // y tenemos comment_id). Menciones en la descripción caen al ticket base.
+    if (
+      commentId &&
+      source !== "description" &&
+      (row.type === "ticket_commented" || row.type === "ticket_mentioned")
+    ) {
+      return `/tickets/${row.ticketKey}#comment-${commentId}`;
+    }
+    return `/tickets/${row.ticketKey}`;
+  }
   if (
     row.type === "time_entry_created_by_other" ||
     row.type === "time_entry_deleted_by_admin"

@@ -112,7 +112,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
                   )}
                 >
                   <span className="text-emphasis text-ui font-medium">
-                    {notificationTitle(notification.type, notification.ticketKey)}
+                    {notificationTitle(notification.type, notification.ticketKey, notification.payload)}
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {describeSlot(notification.payload)}

@@ -121,6 +121,8 @@ export async function POST(request: Request) {
     const href = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${notificationHref({
       bookingId: row.booking_id,
       ticketKey,
+      type,
+      payload,
     })}`;
 
     const result = await sendEmail({

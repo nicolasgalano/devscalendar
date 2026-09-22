@@ -97,7 +97,7 @@ describe("019 rich text — schema, validator, renderer", () => {
   it("rechaza nodo desconocido", () => {
     const doc = {
       type: "doc",
-      content: [{ type: "mention", attrs: { userId: "abc" } }],
+      content: [{ type: "somethingWeird", attrs: { foo: "bar" } }],
     };
     const parsed = richTextDocSchema.safeParse(doc);
     expect(parsed.success).toBe(false);

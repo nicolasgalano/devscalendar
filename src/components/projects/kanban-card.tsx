@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { MessageSquareIcon } from "lucide-react";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import type { TicketListItem } from "@/lib/tickets/query";
@@ -78,9 +79,18 @@ export function KanbanCard({
         <TicketPriorityBadge priority={ticket.priority} />
       </div>
       <p className="text-ui text-foreground line-clamp-2">{ticket.title}</p>
-      <p className="text-caption text-muted-foreground truncate">
-        {ticket.assigneeName ?? "Sin asignar"}
-      </p>
+      <div className="text-caption text-muted-foreground flex items-center justify-between gap-2">
+        <span className="truncate">{ticket.assigneeName ?? "Sin asignar"}</span>
+        {ticket.commentCount > 0 && (
+          <span
+            className="inline-flex items-center gap-0.5"
+            aria-label={`${ticket.commentCount} ${ticket.commentCount === 1 ? "comentario" : "comentarios"}`}
+          >
+            <MessageSquareIcon aria-hidden="true" className="size-3" />
+            {ticket.commentCount}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

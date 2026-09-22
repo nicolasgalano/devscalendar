@@ -609,6 +609,48 @@ export type Database = {
           },
         ]
       }
+      ticket_comments: {
+        Row: {
+          author_id: string
+          body_doc: Json
+          created_at: string
+          id: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body_doc: Json
+          created_at?: string
+          id?: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body_doc?: Json
+          created_at?: string
+          id?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assignee_id: string | null
@@ -784,6 +826,7 @@ export type Database = {
         Args: { p_next_sprint_id: string; p_sprint_id: string }
         Returns: Json
       }
+      extract_mention_user_ids: { Args: { doc: Json }; Returns: string[] }
       has_any_role: { Args: never; Returns: boolean }
       has_role: {
         Args: { target: Database["public"]["Enums"]["user_role"] }
