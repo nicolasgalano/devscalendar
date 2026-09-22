@@ -49,7 +49,11 @@ export async function GET(
     .select("profile:profiles!inner(id, full_name, email, avatar_url, active)")
     .eq("project_id", projectId)
     .eq("active", true)
-    .eq("profile.active", true);
+    // Filtro sobre columna del embed: PostgREST espera el NOMBRE de la tabla
+    // (`profiles`), no el alias JS (`profile`). El alias solo afecta el shape
+    // de la respuesta; con el alias equivocado el filtro se ignora en silencio
+    // y `!inner` + orden por embed no devuelve nada (bug de deploy inicial).
+    .eq("profiles.active", true);
 
   if (query) {
     // Escape del `%` y `,` que PostgREST usa para separar filtros en `or`.
