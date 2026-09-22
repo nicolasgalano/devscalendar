@@ -46,6 +46,10 @@ export function mountMentionPopover(
 
   container.appendChild(renderer.element as Node);
 
+  // Hasta el primer paint, container.offsetHeight es 0 y el fallback (200 px)
+  // suele quedar mal. Ocultamos el popover hasta que se pueda medir.
+  container.style.visibility = "hidden";
+
   const position = () => {
     const rect = props.clientRect?.();
     if (!rect) return;
@@ -56,8 +60,11 @@ export function mountMentionPopover(
       spaceBelow >= popoverHeight + 8 ? rect.bottom + 4 : Math.max(8, rect.top - popoverHeight - 4);
     container.style.top = `${top}px`;
     container.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
+    container.style.visibility = "visible";
   };
-  position();
+  // Doble rAF: el primero espera a que React commitee el DOM del popover,
+  // el segundo a que el browser lo layouteé — así offsetHeight es real.
+  requestAnimationFrame(() => requestAnimationFrame(position));
 
   const onResize = () => position();
   window.addEventListener("resize", onResize);
