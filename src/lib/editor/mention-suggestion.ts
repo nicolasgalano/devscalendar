@@ -20,8 +20,6 @@ export type MentionSuggestionItem = {
   avatar_url: string | null;
 };
 
-const ABORT_ON_UNMOUNT = new WeakMap<object, AbortController>();
-
 export function createMentionSuggestion(
   projectId: string,
 ): Omit<SuggestionOptions<MentionSuggestionItem>, "editor"> {
@@ -33,24 +31,22 @@ export function createMentionSuggestion(
     // es lo que Slack/Linear hacen (el espacio confirma que terminó el @).
     allowSpaces: false,
 
-    async items({ query }): Promise<MentionSuggestionItem[]> {
-      // Abort in-flight: si el user tipea rápido, cancelo el fetch previo.
-      // Sin esto el request más lento puede volver después y pisar el
-      // resultado bueno.
-      const prev = ABORT_ON_UNMOUNT.get(this as unknown as object);
-      if (prev) prev.abort();
-      const ctrl = new AbortController();
-      ABORT_ON_UNMOUNT.set(this as unknown as object, ctrl);
-
+    items: async ({ query }): Promise<MentionSuggestionItem[]> => {
+      // Sin AbortController — el uso previo con WeakMap<this, ...> era
+      // frágil (el `this` context de tiptap-suggestion no es estable) y
+      // el request se completa en ~50 ms. Last-write-wins es suficiente.
       try {
         const res = await fetch(
           `/api/projects/${encodeURIComponent(projectId)}/members?q=${encodeURIComponent(query)}`,
-          { credentials: "same-origin", signal: ctrl.signal },
+          { credentials: "same-origin" },
         );
-        if (!res.ok) return [];
+        if (!res.ok) {
+          console.error("mention members endpoint failed", res.status);
+          return [];
+        }
         return (await res.json()) as MentionSuggestionItem[];
       } catch (err) {
-        if ((err as Error).name === "AbortError") return [];
+        console.error("mention members fetch error", err);
         return [];
       }
     },
