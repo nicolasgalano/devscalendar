@@ -102,7 +102,7 @@ export function buildRichTextExtensions({ placeholder, mentionSuggestion }: Buil
     // ver los mentions viejos pero no ofrece autocompletado nuevo.
     Mention.configure({
       HTMLAttributes: {
-        class: "inline-flex items-baseline rounded bg-brand-50 px-1 text-brand-800",
+        class: "rounded bg-primary/10 px-1 py-0.5 font-medium text-primary",
       },
       renderText: ({ node }) => `@${(node.attrs.label as string | undefined) ?? ""}`,
       ...(mentionSuggestion ? { suggestion: mentionSuggestion } : {}),

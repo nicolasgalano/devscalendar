@@ -119,7 +119,7 @@ function renderNode(node: ProseMirrorNode, ctx: RenderContext): string {
     case "mention": {
       const userId = typeof node.attrs?.user_id === "string" ? node.attrs.user_id : "";
       const label = typeof node.attrs?.label === "string" ? node.attrs.label : "";
-      return `<span class="inline-flex items-baseline rounded bg-brand-50 px-1 text-brand-800" data-mention-user-id="${escapeAttr(userId)}">@${escapeText(label)}</span>`;
+      return `<span class="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary" data-mention-user-id="${escapeAttr(userId)}">@${escapeText(label)}</span>`;
     }
 
     default:
