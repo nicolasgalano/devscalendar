@@ -113,6 +113,15 @@ function renderNode(node: ProseMirrorNode, ctx: RenderContext): string {
     case "image":
       return "";
 
+    // 022: chip inline "@Nombre" sin link clickeable en el MVP.
+    // data-mention-user-id queda por si una fase futura lo consume (tooltip
+    // con card del usuario, click a /admin/users/[id]).
+    case "mention": {
+      const userId = typeof node.attrs?.user_id === "string" ? node.attrs.user_id : "";
+      const label = typeof node.attrs?.label === "string" ? node.attrs.label : "";
+      return `<span class="inline-flex items-baseline rounded bg-brand-50 px-1 text-brand-800" data-mention-user-id="${escapeAttr(userId)}">@${escapeText(label)}</span>`;
+    }
+
     default:
       return "";
   }

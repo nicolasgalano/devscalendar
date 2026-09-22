@@ -1,10 +1,12 @@
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { Image } from "@tiptap/extension-image";
 import { Link } from "@tiptap/extension-link";
+import { Mention } from "@tiptap/extension-mention";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { TaskList } from "@tiptap/extension-task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import type { SuggestionOptions } from "@tiptap/suggestion";
 import { common, createLowlight } from "lowlight";
 
 import { CODE_BLOCK_LANGUAGES, LINK_PROTOCOLS } from "./schema";
@@ -24,9 +26,14 @@ const lowlight = createLowlight(common);
 
 type BuildOptions = {
   placeholder?: string;
+  // 022. Config del popover de @ mention. Opcional — si no se pasa, la
+  // extensión Mention queda montada pero sin sugerencias (útil para tests
+  // o para docs cargados en modo lectura donde el mention viejo tiene que
+  // renderizar aunque nadie edite).
+  mentionSuggestion?: Omit<SuggestionOptions, "editor">;
 };
 
-export function buildRichTextExtensions({ placeholder }: BuildOptions = {}) {
+export function buildRichTextExtensions({ placeholder, mentionSuggestion }: BuildOptions = {}) {
   return [
     StarterKit.configure({
       // heading queda restringido a los tres niveles del schema; H4+ no
@@ -87,6 +94,37 @@ export function buildRichTextExtensions({ placeholder }: BuildOptions = {}) {
     // lista para que `Tiptap.generateHTML(doc, extensions)` en tests futuros
     // no rompa si aparece un nodo `image` en algún fixture.
     Image,
+
+    // 022. HTMLAttributes espeja el renderer server-side (`render.ts` case
+    // mention). renderHTML define el JSON emitido a Prosemirror → base para
+    // el JSON de storage → matchea con el schema (attrs: user_id + label).
+    // La suggestion es opcional: sin `mentionSuggestion`, el editor deja
+    // ver los mentions viejos pero no ofrece autocompletado nuevo.
+    Mention.configure({
+      HTMLAttributes: {
+        class: "inline-flex items-baseline rounded bg-brand-50 px-1 text-brand-800",
+      },
+      renderText: ({ node }) => `@${(node.attrs.label as string | undefined) ?? ""}`,
+      ...(mentionSuggestion ? { suggestion: mentionSuggestion } : {}),
+    }).extend({
+      // Override de attrs para usar `user_id` en lugar del `id` default. El
+      // storage del doc rich text mantiene la key `user_id` que es la que
+      // el schema Zod, el validador y el trigger SQL esperan.
+      addAttributes() {
+        return {
+          user_id: {
+            default: null,
+            parseHTML: (el) => el.getAttribute("data-mention-user-id"),
+            renderHTML: (attrs) => ({ "data-mention-user-id": attrs.user_id }),
+          },
+          label: {
+            default: null,
+            parseHTML: (el) => el.getAttribute("data-mention-label") ?? el.textContent?.replace(/^@/, "") ?? null,
+            renderHTML: (attrs) => ({ "data-mention-label": attrs.label }),
+          },
+        };
+      },
+    }),
 
     Placeholder.configure({
       placeholder: placeholder ?? "Escribí una descripción para el ticket…",

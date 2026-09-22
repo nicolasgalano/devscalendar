@@ -420,6 +420,7 @@ export function TicketFormDialog({
               onDirtyChange={setDirty}
               placeholder="Describí el ticket. Podés usar formato."
               disabled={!canEditFields}
+              projectId={form.projectId ?? undefined}
             />
           </div>
         </div>
