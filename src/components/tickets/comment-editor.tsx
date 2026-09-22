@@ -41,6 +41,10 @@ export function CommentEditor({
   disabled = false,
 }: CommentEditorProps) {
   const [submitting, setSubmitting] = useState(false);
+  // Tiptap no dispara re-render del parent cuando el user tipea; sin este
+  // state el contador y el disabled del botón "Comentar" se quedan pegados
+  // al valor inicial (0 = disabled). Update lo empuja desde el onUpdate.
+  const [plainTextLength, setPlainTextLength] = useState(0);
 
   const extensions = useMemo(
     () =>
@@ -64,6 +68,9 @@ export function CommentEditor({
     editable: !disabled,
     immediatelyRender: false,
     autofocus: autoFocus ? "end" : false,
+    onUpdate: ({ editor: e }) => {
+      setPlainTextLength(e.getText().length);
+    },
     editorProps: {
       attributes: {
         // Estilos alineados con `<RichTextEditor>` de 019 (prose sm), pero
@@ -87,6 +94,12 @@ export function CommentEditor({
     },
   });
 
+  // Al montar con initialDoc, sincronizar longitud desde el editor.
+  useEffect(() => {
+    if (editor) setPlainTextLength(editor.getText().length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
   async function triggerSubmit() {
     if (!editor || submitting || disabled) return;
     const doc = editor.getJSON();
@@ -99,13 +112,15 @@ export function CommentEditor({
       await onSubmitRef.current(doc);
       // Solo limpiar cuando es un comentario nuevo — en modo edición, el
       // parent va a desmontar el editor con el nuevo body_doc ya en su lugar.
-      if (!initialDoc) editor.commands.setContent(EMPTY_DOC);
+      if (!initialDoc) {
+        editor.commands.setContent(EMPTY_DOC);
+        setPlainTextLength(0);
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
-  const plainTextLength = editor?.getText().length ?? 0;
   const overCap = plainTextLength > RICH_TEXT_MAX_PLAIN_LENGTH;
 
   return (
