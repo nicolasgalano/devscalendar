@@ -91,7 +91,7 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
 
   const label = activeTimer.ticketKey
     ? `${activeTimer.ticketKey} · ${activeTimer.activityName ?? activeTimer.projectName}`
-    : `${activeTimer.projectName} · ${activeTimer.activityName ?? "Sin actividad"}`;
+    : `${activeTimer.projectName} · ${activeTimer.activityName ?? "Sin tarea"}`;
 
   return (
     <>

@@ -9,7 +9,9 @@ import { getCurrentProfile } from "@/lib/supabase/session";
 export const dynamic = "force-dynamic";
 
 /**
- * Tab "Actividades" del workspace de proyecto (016 T5.2).
+ * Tab "Tareas" del workspace de proyecto (UI label — 021); en el schema la
+ * tabla sigue siendo `project_activities` y el segmento URL `/activities`
+ * se preserva para no romper bookmarks viejos (016 T5.2).
  *
  * Guard doble — el layout esconde el tab del nav (T5.4), pero un URL directo
  * llega igual. Acá redirige a `/sprint` cuando el viewer no es admin ni PM.

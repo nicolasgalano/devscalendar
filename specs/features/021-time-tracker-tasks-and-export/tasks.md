@@ -20,17 +20,17 @@ Fases:
 
 Pass de reemplazos de strings sobre 8 archivos del frontend. Cero base, cero API, cero types. Identificadores de código (`activityId`, `activity_id`, `project_activities`, `ActivitiesPanel`), segmento URL `/activities` y el campo `activity` en JSON de la API **se conservan** — es solo UI visible (plan §3.2).
 
-- [ ] **T1.1** — `src/components/projects/project-activities-panel.tsx` (10 ocurrencias): título "Actividades" → "Tareas", CTA "+ Nueva actividad" → "+ Nueva tarea", header del form, empty state, mensajes de validación / confirmación de delete, texto del toggle active/inactive. Preservar los comentarios del código que mencionen `project_activities` como tabla; sumar al primero una nota "(en la UI se llama Tarea)" como puente para el próximo lector.
-- [ ] **T1.2** — Componentes de time tracking:
-  - `src/components/time-entries/time-entry-dialog.tsx` (4 occ): label del `<Select>` "Actividad" → "Tarea", placeholders "Elegí una actividad" / "Sin actividad" → "Elegí una tarea" / "Sin tarea", mensaje "El proyecto no tiene actividades activas" → "…tareas activas".
-  - `src/components/timer-pill.tsx` (1 occ): tooltip/label del cronómetro que muestra la tarea activa.
-- [ ] **T1.3** — Workspace del proyecto:
-  - `src/app/(app)/projects/[projectKey]/activities/page.tsx` (1 occ): heading de la página → "Tareas". El segmento URL `/activities` **se conserva** — no romper bookmarks.
-  - `src/components/projects/project-workspace-header.tsx` (1 occ): label de la tab de "Actividades" → "Tareas".
-- [ ] **T1.4** — Vistas transversales:
-  - `src/app/(app)/my-time/page.tsx` (2 occ): headings o filtros que aludan a actividad.
-  - `src/components/tickets/ticket-detail.tsx` (1 occ): chip/label de la columna "Tarea" en el listado de horas cargadas.
-- [ ] **T1.5** — Test guardrail `tests/unit/rename-tareas.test.ts` (plan §3.4 + §6.1). Lee recursivo `src/components/**/*.{ts,tsx}` + `src/app/**/*.{ts,tsx}`, remueve comentarios de línea (`//…`) y de bloque (`/*…*/`), busca `\bactividad(es)?\b` case-insensitive. Falla ruidoso con lista de `{file, line, text}` si hay match. `EXCLUSION_LIST` empieza vacía — se llena solo si aparece un caso legítimo, con comentario del PR que lo explique. _DoD: T1.1 – T1.4 completos; `pnpm test:unit` verde._
+- [x] **T1.1** — `src/components/projects/project-activities-panel.tsx` (8 strings UI, no 10 — el conteo del plan incluía algunos en comentarios): CTA, count sentence, empty state, dialog titles ("Nueva/Renombrar tarea"), confirm de desactivar, sync label del pill. Comentario del header reescrito con la nota "en la UI se llama Tarea; en el schema la tabla sigue siendo `project_activities`" como puente.
+- [x] **T1.2** — Componentes de time tracking:
+  - `src/components/time-entries/time-entry-dialog.tsx`: 4 strings (placeholders del select "Elegí una tarea" / "Sin tarea" en el ternario + el `<SelectItem>` + el mensaje "no tiene tareas definidas"). Comentario del JSDoc actualizado para alinear con "Tarea y ticket".
+  - `src/components/timer-pill.tsx`: 1 string ("Sin tarea" en el fallback del label).
+- [x] **T1.3** — Workspace del proyecto:
+  - `src/app/(app)/projects/[projectKey]/activities/page.tsx`: cero strings UI (el único "Actividades" estaba en el JSDoc, que fue actualizado para reflejar la UI nueva). El segmento URL `/activities` se preserva.
+  - `src/components/projects/project-workspace-header.tsx`: 1 string (`label="Tareas"` en la tab).
+- [x] **T1.4** — Vistas transversales:
+  - `src/app/(app)/my-time/page.tsx`: cero strings UI (ambas ocurrencias estaban en comentarios, actualizados para alinear con "tareas").
+  - `src/components/tickets/ticket-detail.tsx`: cero strings UI (la única ocurrencia estaba en el JSDoc del prop `projectActivities`, actualizado).
+- [x] **T1.5** — Test guardrail `tests/unit/rename-tareas.test.ts`. **Solo escanea `.tsx`** (no `.ts` como decía esta nota originalmente) — alineado con plan §3.4, excluye `src/app/api/*/route.ts`. Walker recursivo sobre `src/components` y `src/app`, strip de comentarios de línea y bloque, regex `\bactividad(es)?\b` case-insensitive. `EXCLUSION_LIST: string[] = []`. `pnpm test:unit` verde (240/240 tests).
 
 ---
 

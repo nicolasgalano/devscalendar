@@ -92,7 +92,7 @@ export function TicketDetail({
   openSprints: SprintListItem[];
   /** 016: entries cargadas sobre este ticket. */
   timeEntries: TimeEntryListItem[];
-  /** 016: actividades activas del proyecto (para el dialog de cargar tiempo). */
+  /** 016: tareas activas del proyecto (para el dialog de cargar tiempo). */
   projectActivities: TimeEntryActivity[];
   /** 016: si el viewer puede cargar tiempo sobre este proyecto (contributor+). */
   canLogTime: boolean;
