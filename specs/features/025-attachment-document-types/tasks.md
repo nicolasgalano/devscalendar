@@ -22,7 +22,7 @@ Fases:
 
 Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y bump del check de `size_bytes` 5→10 MB. No toca RLS, triggers ni grants.
 
-- [ ] **T1.1** — Crear `supabase/migrations/00000000000023_attachment_doc_types.sql` con:
+- [x] **T1.1** — Crear `supabase/migrations/00000000000023_attachment_doc_types.sql` con:
   - `alter table ticket_attachments alter column thumb_object_key drop not null, alter column width drop not null, alter column height drop not null;`
   - `alter table ticket_attachments drop constraint ticket_attachments_size_bytes_check;`
   - `alter table ticket_attachments add constraint ticket_attachments_size_bytes_check check (size_bytes > 0 and size_bytes <= 10485760);` (10 MB).
