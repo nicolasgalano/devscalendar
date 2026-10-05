@@ -5,31 +5,40 @@ import {
   MAX_ATTACHMENT_SIZE_BYTES,
   MAX_THUMB_SIZE_BYTES,
   THUMB_MIME_TYPE,
+  isImageMime,
 } from "@/lib/attachments/types";
 
 /**
- * Parseo y validación del multipart del POST de attachments (§3.1 del plan
- * de 020).
+ * Parseo y validación del multipart del POST de attachments.
  *
- * Como el body es `multipart/form-data` y no JSON, Zod se aplica a un objeto
- * derivado del `FormData`. Este helper hace el `request.formData()`, extrae
- * los cuatro campos esperados y los valida:
+ * El body es `multipart/form-data` — Zod se aplica a un objeto derivado del
+ * `FormData`. Este helper hace el `request.formData()`, extrae los campos
+ * esperados y los valida contra la whitelist y los límites.
  *
- *   - `original` (File requerido, MIME en la whitelist, size ≤ 5 MB)
- *   - `thumb`    (File requerido, MIME image/webp, size ≤ 100 KB)
- *   - `width`    (número entero positivo ≤ 20000)
- *   - `height`   (número entero positivo ≤ 20000)
+ * Campos:
+ *   - `original` (File requerido, MIME en la whitelist, size ≤ 10 MB).
+ *   - `thumb`    (File opcional — requerido solo si `original` es imagen,
+ *                MIME image/webp, size ≤ 100 KB).
+ *   - `width`    (opcional — requerido solo si `original` es imagen, int positivo ≤ 20000).
+ *   - `height`   (opcional — requerido solo si `original` es imagen, int positivo ≤ 20000).
  *
- * Todo lo demás en el form se ignora en silencio. Si algún campo falta o
- * no valida, la función devuelve `{ ok: false, issues }` con el detalle en
- * formato similar a `parsed.error.flatten()` — el handler traduce a 400.
+ * **Thumb/width/height solo para imágenes.** Las imágenes se renderizan como
+ * thumbnail en el panel y necesitan dimensiones para calcular aspect-ratio
+ * sin descargar el binario. Los documentos (025) no tienen esos tres — el
+ * cliente no los envía y este validador no los exige. Si vienen igual con un
+ * `original` no-imagen, se ignoran en silencio para no romper clientes que
+ * los manden de más.
+ *
+ * Todo lo demás en el form se ignora en silencio. Si algún campo falta o no
+ * valida, la función devuelve `{ ok: false, issues }` con el detalle — el
+ * handler traduce a 400.
  */
 
 export type ParsedAttachmentUpload = {
   original: File;
-  thumb: File;
-  width: number;
-  height: number;
+  thumb?: File;
+  width?: number;
+  height?: number;
 };
 
 export type ParseAttachmentUploadResult =
@@ -41,6 +50,8 @@ const dimensionSchema = z.coerce
   .int()
   .positive()
   .max(20000);
+
+const MAX_SIZE_MB = MAX_ATTACHMENT_SIZE_BYTES / 1024 / 1024;
 
 export async function parseAttachmentUploadForm(
   request: Request,
@@ -55,56 +66,73 @@ export async function parseAttachmentUploadForm(
   const issues: Record<string, string[]> = {};
 
   const original = form.get("original");
+  let originalIsImage = false;
+
   if (!(original instanceof File)) {
     issues.original = ["Falta el archivo original o no es un File"];
   } else {
     if (original.size <= 0) {
       issues.original = ["El archivo está vacío"];
     } else if (original.size > MAX_ATTACHMENT_SIZE_BYTES) {
-      issues.original = [`El archivo pasa el límite (5 MB)`];
+      issues.original = [`El archivo pasa el límite (${MAX_SIZE_MB} MB)`];
     } else if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(original.type)) {
       issues.original = [
         `Tipo de archivo no permitido: ${original.type}. Aceptados: ${ATTACHMENT_MIME_TYPES.join(", ")}`,
       ];
+    } else {
+      originalIsImage = isImageMime(original.type);
     }
   }
 
-  const thumb = form.get("thumb");
-  if (!(thumb instanceof File)) {
-    issues.thumb = ["Falta el thumbnail o no es un File"];
-  } else {
-    if (thumb.size <= 0) {
-      issues.thumb = ["El thumbnail está vacío"];
-    } else if (thumb.size > MAX_THUMB_SIZE_BYTES) {
-      issues.thumb = [`El thumbnail pasa el límite (${MAX_THUMB_SIZE_BYTES / 1024} KB)`];
-    } else if (thumb.type !== THUMB_MIME_TYPE) {
-      issues.thumb = [`El thumbnail debe ser ${THUMB_MIME_TYPE}, recibido ${thumb.type}`];
+  // Thumb/width/height son requeridos solo si `original` es una imagen válida.
+  // Para no-imagen se ignoran — pueden venir o no, no se agregan a `issues`.
+  const thumbField = form.get("thumb");
+  let parsedThumb: File | undefined;
+  if (originalIsImage) {
+    if (!(thumbField instanceof File)) {
+      issues.thumb = ["Falta el thumbnail o no es un File"];
+    } else {
+      if (thumbField.size <= 0) {
+        issues.thumb = ["El thumbnail está vacío"];
+      } else if (thumbField.size > MAX_THUMB_SIZE_BYTES) {
+        issues.thumb = [`El thumbnail pasa el límite (${MAX_THUMB_SIZE_BYTES / 1024} KB)`];
+      } else if (thumbField.type !== THUMB_MIME_TYPE) {
+        issues.thumb = [`El thumbnail debe ser ${THUMB_MIME_TYPE}, recibido ${thumbField.type}`];
+      } else {
+        parsedThumb = thumbField;
+      }
     }
   }
 
-  const widthResult = dimensionSchema.safeParse(form.get("width"));
-  if (!widthResult.success) {
-    issues.width = widthResult.error.issues.map((i) => i.message);
-  }
+  let parsedWidth: number | undefined;
+  let parsedHeight: number | undefined;
+  if (originalIsImage) {
+    const widthResult = dimensionSchema.safeParse(form.get("width"));
+    if (!widthResult.success) {
+      issues.width = widthResult.error.issues.map((i) => i.message);
+    } else {
+      parsedWidth = widthResult.data;
+    }
 
-  const heightResult = dimensionSchema.safeParse(form.get("height"));
-  if (!heightResult.success) {
-    issues.height = heightResult.error.issues.map((i) => i.message);
+    const heightResult = dimensionSchema.safeParse(form.get("height"));
+    if (!heightResult.success) {
+      issues.height = heightResult.error.issues.map((i) => i.message);
+    } else {
+      parsedHeight = heightResult.data;
+    }
   }
 
   if (Object.keys(issues).length > 0) {
     return { ok: false, issues };
   }
 
-  // Todos los campos están validados; los casts son seguros por los checks
-  // arriba.
   return {
     ok: true,
     data: {
       original: original as File,
-      thumb: thumb as File,
-      width: widthResult.data as number,
-      height: heightResult.data as number,
+      ...(parsedThumb ? { thumb: parsedThumb } : {}),
+      ...(parsedWidth !== undefined ? { width: parsedWidth } : {}),
+      ...(parsedHeight !== undefined ? { height: parsedHeight } : {}),
     },
   };
 }

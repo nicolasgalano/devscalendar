@@ -34,16 +34,16 @@ Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y 
 
 ## Phase 2 — Shared layer: types + validador
 
-- [ ] **T2.1** — Expansión de `src/lib/attachments/types.ts`:
+- [x] **T2.1** — Expansión de `src/lib/attachments/types.ts`:
   - `ATTACHMENT_MIME_TYPES`: sumar 5 entradas (`application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`).
   - `extensionForMime`: sumar 5 cases (`pdf`, `doc`, `docx`, `xls`, `xlsx`).
   - `MAX_ATTACHMENT_SIZE_BYTES`: `5 * 1024 * 1024` → `10 * 1024 * 1024`.
   - Actualizar el comentario del archivo para mencionar que ahora acepta imágenes **y** documentos; el `object_key` y el bucket no cambian.
-- [ ] **T2.2** — Nuevos exports en `types.ts`:
+- [x] **T2.2** — Nuevos exports en `types.ts`:
   - `isImageMime(mime: string): mime is AttachmentMimeType` — true para los 4 image/*, false para el resto. Narrow de type para TypeScript.
   - `iconForMime(mime: AttachmentMimeType): { kind: 'image'|'pdf'|'word'|'excel'|'file'; tone: string }` — devuelve el kind lógico + el className de color (text-\*). Mapeo del plan §4.1: PDF → destructive, Word → primary, Excel → emerald, image/fallback → muted.
   - `buildObjectKey`: cambiar el tipo de retorno de `{ objectKey: string; thumbObjectKey: string }` a `{ objectKey: string; thumbObjectKey: string | null }`. Solo las imágenes generan `thumbObjectKey`; para doc/PDF devuelve `null`.
-- [ ] **T2.3** — Ajuste de `src/lib/validation/attachments.ts` (parser multipart):
+- [x] **T2.3** — Ajuste de `src/lib/validation/attachments.ts` (parser multipart):
   - Si `original.type` es imagen (via `isImageMime`): `thumb`/`width`/`height` siguen requeridos como en 020.
   - Si no es imagen: los tres se ignoran si vienen; no se agregan a `issues` por ausencia.
   - Parametrizar el string "El archivo pasa el límite (5 MB)" a `` `El archivo pasa el límite (${MAX_ATTACHMENT_SIZE_BYTES / 1024 / 1024} MB)` `` para no mentir después del bump.
@@ -54,16 +54,16 @@ Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y 
 
 ## Phase 3 — Server: handler POST + signed-url
 
-- [ ] **T3.1** — `src/app/api/tickets/[id]/attachments/route.ts`: bifurcación por `isImageMime(originalMime)`:
+- [x] **T3.1** — `src/app/api/tickets/[id]/attachments/route.ts`: bifurcación por `isImageMime(originalMime)`:
   - Si es imagen: validar que `parsed.data.thumb` esté presente (si no, 400); flujo igual a 020 (subir original + thumb; insertar fila con `thumb_object_key`, `width`, `height`).
   - Si no es imagen: subir solo `original`; insertar fila con `thumb_object_key: null`, `width: null`, `height: null`.
   - Cleanup: si el insert falla, `admin.storage.remove([objectKey])` para no-imagen, `remove([objectKey, thumbObjectKey])` para imagen (como está hoy).
   - El guard `canUploadAttachment` y la lectura de `project.pm_id` no cambian.
-- [ ] **T3.2** — `src/app/api/tickets/[id]/attachments/[attachmentId]/signed-url/route.ts`:
+- [x] **T3.2** — `src/app/api/tickets/[id]/attachments/[attachmentId]/signed-url/route.ts`:
   - Agregar `original_filename` al `.select()` del `attachment`.
   - Si `variant === "thumb"` y `attachment.thumb_object_key` es null → responder 404 "Este adjunto no tiene thumbnail".
   - Aceptar query param `?download=1`: cuando está presente, pasar `{ download: attachment.original_filename }` como tercer argumento de `createSignedUrl`. Supabase Storage genera una URL que al abrirse devuelve `Content-Disposition: attachment; filename="..."`.
-- [ ] **T3.3** — Verificación programática: `pnpm typecheck` + `pnpm lint` verdes. Smoke manual queda para T6.4.
+- [x] **T3.3** — DELETE handler (`[attachmentId]/route.ts`) ajustado para filtrar `thumb_object_key` null antes del `storage.remove`. `pnpm typecheck` verde al finalizar Phase 3.
 
 ---
 

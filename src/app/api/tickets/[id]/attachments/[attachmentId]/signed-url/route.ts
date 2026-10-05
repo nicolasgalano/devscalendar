@@ -4,16 +4,22 @@ import { z } from "zod";
 import { requireTicketAccess } from "@/lib/api/require-ticket-access";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments/types";
 
-const SIGN_EXPIRES_SECONDS = 15 * 60; // 15 min (§3.2 del plan)
+const SIGN_EXPIRES_SECONDS = 15 * 60; // 15 min (020 §3.2 del plan)
 
 const variantSchema = z.enum(["thumb", "original"]).default("thumb");
 
 /**
- * GET /api/tickets/[id]/attachments/[attachmentId]/signed-url?variant=thumb|original
+ * GET /api/tickets/[id]/attachments/[attachmentId]/signed-url
  *
- * Devuelve una URL firmada del objeto pedido, con expiración corta. El
- * cliente la usa para renderizar el thumb en el panel o el original en el
- * lightbox — nunca accede al bucket directo.
+ * Query params:
+ *   - `variant=thumb|original` (default `thumb`). Thumb solo tiene sentido
+ *     para imágenes; para no-imagen (PDF, docs — 025) devuelve 404.
+ *   - `download=1` (opcional). Si está, pide a Supabase Storage que la URL
+ *     firmada responda con `Content-Disposition: attachment; filename="..."`,
+ *     usando el `original_filename` guardado. Esto fuerza al browser a
+ *     descargar y no renderizar inline — crítico para PDFs y docs (025) y
+ *     opcional para imágenes (cuando el user clickea "Descargar" en el
+ *     lightbox).
  *
  * Guard: el `requireTicketAccess` valida que el user puede ver el ticket. Y
  * verificamos que `attachment.ticket_id` matchee el ticket del path, para
@@ -39,6 +45,7 @@ export async function GET(
     );
   }
   const variant = parsedVariant.data;
+  const forceDownload = url.searchParams.get("download") === "1";
 
   // Guard del ticket (RLS + membresía).
   const guard = await requireTicketAccess(ticketId);
@@ -49,7 +56,7 @@ export async function GET(
   // fila no existe o RLS la esconde, devolvemos 404.
   const { data: attachment } = await supabase
     .from("ticket_attachments")
-    .select("id, ticket_id, object_key, thumb_object_key")
+    .select("id, ticket_id, object_key, thumb_object_key, original_filename")
     .eq("id", attachmentId)
     .maybeSingle();
 
@@ -62,12 +69,25 @@ export async function GET(
     return NextResponse.json({ error: "Adjunto no encontrado" }, { status: 404 });
   }
 
+  // Thumb solo para imágenes. Los no-imagen (025) tienen `thumb_object_key`
+  // null — devolver 404 explícito es más legible que un signed URL vacío.
+  if (variant === "thumb" && !attachment.thumb_object_key) {
+    return NextResponse.json(
+      { error: "Este adjunto no tiene thumbnail" },
+      { status: 404 },
+    );
+  }
+
   const targetPath =
-    variant === "original" ? attachment.object_key : attachment.thumb_object_key;
+    variant === "original" ? attachment.object_key : attachment.thumb_object_key!;
+
+  const signOptions = forceDownload
+    ? { download: attachment.original_filename }
+    : undefined;
 
   const { data: signed, error: signError } = await supabase.storage
     .from(ATTACHMENT_BUCKET)
-    .createSignedUrl(targetPath, SIGN_EXPIRES_SECONDS);
+    .createSignedUrl(targetPath, SIGN_EXPIRES_SECONDS, signOptions);
 
   if (signError || !signed) {
     return NextResponse.json(
