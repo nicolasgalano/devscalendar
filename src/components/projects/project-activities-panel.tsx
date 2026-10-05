@@ -27,9 +27,12 @@ import type { ProjectActivity } from "@/lib/project-activities/query";
 import { cn } from "@/lib/utils";
 
 /**
- * Panel de actividades del proyecto (016 T5.3). Admin y PM del proyecto
+ * Panel de tareas del proyecto — en la UI se llama "Tarea" (feature 021);
+ * en el schema la tabla sigue siendo `project_activities` (016 T5.3), por eso
+ * los identificadores de código, el endpoint `/api/project-activities` y los
+ * campos `activity_id` del JSON de la API no cambian. Admin y PM del proyecto
  * pueden crear, renombrar y desactivar/reactivar. Los `time_entries` viejos
- * mantienen su referencia a la actividad — desactivarla no borra historia.
+ * mantienen su referencia a la tarea — desactivarla no borra historia.
  */
 export function ProjectActivitiesPanel({
   activities,
@@ -88,7 +91,7 @@ export function ProjectActivitiesPanel({
       "/api/project-activities",
       "POST",
       { project_id: projectId, name: trimmed },
-      "Agregando actividad",
+      "Agregando tarea",
     );
     if (ok) {
       setAddOpen(false);
@@ -141,11 +144,11 @@ export function ProjectActivitiesPanel({
       <div className="mb-3 flex items-center justify-between">
         <p className="text-ui text-muted-foreground">
           {activities.length}{" "}
-          {activities.length === 1 ? "actividad definida" : "actividades definidas"}.
-          Las actividades categorizan el tipo de trabajo cargado.
+          {activities.length === 1 ? "tarea definida" : "tareas definidas"}.
+          Las tareas categorizan el tipo de trabajo cargado.
         </p>
         <Button size="sm" onClick={() => setAddOpen(true)}>
-          Agregar actividad
+          Agregar tarea
         </Button>
       </div>
 
@@ -157,7 +160,7 @@ export function ProjectActivitiesPanel({
 
       {activities.length === 0 ? (
         <p className="text-ui text-muted-foreground italic">
-          Todavía no hay actividades. Agregá al menos una (QA, Desarrollo, PM, etc.)
+          Todavía no hay tareas. Agregá al menos una (QA, Desarrollo, PM, etc.)
           para poder categorizar las horas cargadas en este proyecto.
         </p>
       ) : (
@@ -211,7 +214,7 @@ export function ProjectActivitiesPanel({
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nueva actividad</DialogTitle>
+            <DialogTitle>Nueva tarea</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="activity-name">Nombre</Label>
@@ -243,7 +246,7 @@ export function ProjectActivitiesPanel({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Renombrar actividad</DialogTitle>
+            <DialogTitle>Renombrar tarea</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="activity-rename">Nombre</Label>
@@ -277,7 +280,7 @@ export function ProjectActivitiesPanel({
             <DialogTitle>Desactivar {confirmDeactivate?.name}</DialogTitle>
           </DialogHeader>
           <p className="text-ui text-muted-foreground">
-            La actividad deja de aparecer al cargar horas nuevas. Las cargas viejas
+            La tarea deja de aparecer al cargar horas nuevas. Las cargas viejas
             que la usan siguen visibles y no se modifican.
           </p>
           <DialogFooter>

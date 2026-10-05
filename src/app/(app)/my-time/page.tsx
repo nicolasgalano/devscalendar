@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
  *     hasPmScope(viewer)).
  *   - Entries del user seleccionado en el rango de la semana.
  *   - Proyectos donde el user puede cargar (para el dialog).
- *   - Actividades activas por proyecto (para el dialog).
+ *   - Tareas activas por proyecto (schema: `project_activities` — ver 021).
  *   - Tickets abiertos por proyecto (para el autocomplete opcional del dialog).
  *   - Lista de asignables (si aplica) para el selector de user.
  */
@@ -73,9 +73,9 @@ export default async function MyTimePage({
   const viewingUserName =
     viewingUserProfile?.full_name ?? viewingUserProfile?.email ?? viewingUserId;
 
-  // Actividades y tickets por proyecto: dos queries agregadas sobre los
-  // proyectos del user. Al volumen esperado (< 20 proyectos, < 200 activities
-  // en total), es aceptable.
+  // Tareas y tickets por proyecto: dos queries agregadas sobre los proyectos
+  // del user. Al volumen esperado (< 20 proyectos, < 200 tareas en total), es
+  // aceptable. (La tabla sigue siendo `project_activities` — ver 021.)
   const projectIds = projects.map((p) => p.id);
   const activitiesByProject: Record<string, TimeEntryActivity[]> = {};
   const ticketsByProject: Record<string, TimeEntryTicket[]> = {};

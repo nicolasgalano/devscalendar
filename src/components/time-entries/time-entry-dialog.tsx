@@ -65,7 +65,8 @@ export type TimeEntryDialogInitial = {
  *   - "Horas trabajadas": tres inputs — start (HH:MM), end (HH:MM), duración
  *     calculada (readonly). Cualquiera se puede editar; el blur sincroniza.
  *   - "Proyecto y tarea": selectores stacked single-column con "+" leader que
- *     invita a completarlos. Actividad y ticket aparecen solo cuando aplica.
+ *     invita a completarlos. Tarea y ticket aparecen solo cuando aplica. (En
+ *     el schema la "tarea" es `project_activities` — ver 021.)
  *   - "Detalles": textarea corto.
  *   - Botones al pie (Cancelar / Cargar).
  *
@@ -308,7 +309,7 @@ export function TimeEntryDialog({
             {form.projectId && availableActivities.length > 0 && (
               <SelectorRow
                 placeholder={
-                  activityRequired ? "Elegí una actividad" : "Sin actividad"
+                  activityRequired ? "Elegí una tarea" : "Sin tarea"
                 }
                 value={form.activityId ?? (activityRequired ? "" : NO_ACTIVITY)}
                 onChange={(value) =>
@@ -321,7 +322,7 @@ export function TimeEntryDialog({
                 iconTone={form.activityId ? "muted" : "primary"}
               >
                 {!activityRequired && (
-                  <SelectItem value={NO_ACTIVITY}>Sin actividad</SelectItem>
+                  <SelectItem value={NO_ACTIVITY}>Sin tarea</SelectItem>
                 )}
                 {availableActivities.map((activity) => (
                   <SelectItem key={activity.id} value={activity.id}>
@@ -332,7 +333,7 @@ export function TimeEntryDialog({
             )}
             {form.projectId && availableActivities.length === 0 && (
               <p className="text-caption text-muted-foreground pl-1">
-                Este proyecto todavía no tiene actividades definidas.
+                Este proyecto todavía no tiene tareas definidas.
               </p>
             )}
 

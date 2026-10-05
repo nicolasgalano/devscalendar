@@ -1,28 +1,22 @@
 import { NextResponse } from "next/server";
 
 import { isAdmin, isPm } from "@/lib/auth/roles";
-import { serializeReportToCsv } from "@/lib/reports/serialize-csv";
 import { queryTimeEntriesForReport } from "@/lib/reports/time-entries-report";
 import { getCurrentProfile } from "@/lib/supabase/session";
 import { exportQuerySchema } from "@/lib/validation/time-entries";
 
 /**
- * Export CSV del reporte "planilla" (021 T2.5 — reemplaza al CSV de 016 T2.8).
- * Filtros por rango + cliente + proyecto + user. Alcance definido por la RLS
- * de `time_entries` (viewer solo lo suyo; PM lo de sus proyectos; admin todo).
+ * Export XLSX del reporte "planilla" (021 T2.6). Hermano del CSV con los
+ * mismos filtros, el mismo pipeline de query y el mismo mapeo — cambia
+ * solo el serializer. Columnas en orden alineado con la planilla comercial
+ * (ver `src/lib/reports/time-entries-report.ts`).
  *
- * **Permisos.** Solo admin o PM — el export es una herramienta de reporting,
- * no una vista para el dev individual (que usa `/my-time`).
+ * **Dynamic import de exceljs y del serializer.** `exceljs` pesa ~500 KB
+ * server-side; cargarlo estático metía ese costo en el cold start del resto
+ * de los handlers. Con el import diferido, solo se paga en el primer request
+ * a este endpoint — después queda cacheado en el runtime.
  *
- * **Breaking change vs 016:** headers en español alineados con la planilla
- * comercial de referencia (11 columnas: Cliente, Proyecto, Usuario, Tarea,
- * Fecha inicio, Fecha fin, Zona horaria, Duración, Horas, Notas, Ticket).
- * Nombre de archivo pasa de `time-entries-<from>-to-<to>.csv` a
- * `planilla-<from>-a-<to>.csv`. Sin consumidores externos conocidos (Q-3 del
- * plan).
- *
- * El pipeline de query + mapeo + serialización vive en `src/lib/reports/`,
- * compartido con el XLSX. Este handler es solo guard + parse + response.
+ * **Permisos.** Mismo criterio que el CSV: solo admin o PM.
  */
 export async function GET(request: Request) {
   const profile = await getCurrentProfile();
@@ -60,12 +54,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const csv = serializeReportToCsv(rows);
-  const filename = `planilla-${parsed.data.from}-a-${parsed.data.to}.csv`;
+  const { serializeReportToXlsx } = await import("@/lib/reports/serialize-xlsx");
+  const buffer = await serializeReportToXlsx(rows);
+  const filename = `planilla-${parsed.data.from}-a-${parsed.data.to}.xlsx`;
 
-  return new Response(csv, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
-      "content-type": "text/csv; charset=utf-8",
+      "content-type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "content-disposition": `attachment; filename="${filename}"`,
     },
   });
