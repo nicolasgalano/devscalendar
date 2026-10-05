@@ -69,12 +69,12 @@ Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y 
 
 ## Phase 4 — Cliente upload
 
-- [ ] **T4.1** — `src/lib/attachments/upload.ts`:
+- [x] **T4.1** — `src/lib/attachments/upload.ts`:
   - En `uploadTicketAttachment`: bifurcar por `isImageMime(file.type)`.
     - Si es imagen: flujo igual a 020 (llamar a `generateThumb` + append `thumb`, `width`, `height` al FormData).
     - Si no es imagen: skip `generateThumb`; el FormData solo lleva `original`.
   - El resto (validación de tamaño, POST, parseo de respuesta) no cambia.
-- [ ] **T4.2** — Agregar al `fetchAttachmentSignedUrl` un cuarto parámetro opcional `options?: { download?: boolean }`. Si `options.download === true`, agregar `download=1` al query string. Default: false (compatibilidad con los call sites existentes del lightbox y del thumb).
+- [x] **T4.2** — Agregar al `fetchAttachmentSignedUrl` un cuarto parámetro opcional `options?: { download?: boolean }`. Si `options.download === true`, agregar `download=1` al query string. Default: false (compatibilidad con los call sites existentes del lightbox y del thumb).
 
 ---
 
