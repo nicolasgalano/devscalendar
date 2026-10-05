@@ -102,15 +102,15 @@ Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y 
 
 ## Phase 6 — Tests + Cierre
 
-- [ ] **T6.1** — Nuevo archivo `tests/unit/attachments-doc-types.test.ts`:
+- [x] **T6.1** — Nuevo archivo `tests/unit/attachments-doc-types.test.ts`:
   - `isImageMime` para los 9 MIME types (4 true, 5 false) + un string random (false).
   - `iconForMime` para los 9 MIME types: cada uno devuelve el `kind` esperado.
   - `extensionForMime` para los 5 nuevos (pdf, doc, docx, xls, xlsx).
   - `buildObjectKey`:
     - Con `image/png`: `thumbObjectKey` **no null**, matchea el patrón `tickets/<id>/thumb/<attId>-<slug>.webp`.
     - Con `application/pdf`: `thumbObjectKey` **null**, `objectKey` matchea `tickets/<id>/original/<attId>-<slug>.pdf`.
-- [ ] **T6.2** — Actualizar `specs/features/README.md`: sumar fila para 025 con status `code done — pending deploy + verificación visual`. En el párrafo descriptivo de 020 (que dice "solo imágenes en el MVP"), sumar nota de que 025 extiende la whitelist a PDFs y Office.
-- [ ] **T6.3** — Actualizar `CLAUDE.md` (versión comprimida en main/develop):
+- [x] **T6.2** — Actualizar `specs/features/README.md`: sumar fila para 025 con status `code done — pending deploy + verificación visual`. En el párrafo descriptivo de 020 (que dice "solo imágenes en el MVP"), sumar nota de que 025 extiende la whitelist a PDFs y Office.
+- [x] **T6.3** — Actualizar `CLAUDE.md` (versión comprimida en main/develop):
   - Estructura del repo: en el bullet de `src/lib/`, el subdirectorio `attachments/` ya está mencionado — no cambia.
   - Estado de features: sumar línea de 025 debajo de 024 (orden cronológico) con el invariante clave ("extensión de 020: PDFs y Office en el panel con ícono por tipo, click → download via signed URL con download=1; mismo bucket + RLS, nueva migration 23 aditiva").
 - [ ] **T6.4** — Verificación visual del usuario (post deploy):
