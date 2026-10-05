@@ -7,11 +7,14 @@ import { PencilIcon } from "lucide-react";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status";
+import { TicketAttachmentsPanel } from "@/components/tickets/ticket-attachments-panel";
+import { TicketComments } from "@/components/tickets/ticket-comments";
 import { TicketTimeEntries } from "@/components/time-entries/ticket-time-entries";
 import type {
   TimeEntryActivity,
   TimeEntryProject,
 } from "@/components/time-entries/time-entry-dialog";
+import type { TicketComment } from "@/lib/tickets/comments";
 import type { TimeEntryListItem } from "@/lib/time-entries/query";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +86,7 @@ export function TicketDetail({
   timeEntries,
   projectActivities,
   canLogTime,
+  comments,
 }: {
   ticket: TicketDetailData;
   viewer: { id: string; roles: UserRole[] } | null;
@@ -96,6 +100,8 @@ export function TicketDetail({
   projectActivities: TimeEntryActivity[];
   /** 016: si el viewer puede cargar tiempo sobre este proyecto (contributor+). */
   canLogTime: boolean;
+  /** 022: feed de comentarios del ticket, cronológico ascendente. */
+  comments: TicketComment[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -171,6 +177,12 @@ export function TicketDetail({
 
   return (
     <>
+      <p className="text-caption text-muted-foreground pb-3">
+        <Link href={`/projects/${ticket.project.key}/sprint`} className="hover:underline">
+          ← Volver al proyecto
+        </Link>
+      </p>
+
       <div className="flex items-start justify-between gap-4 pb-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -447,6 +459,15 @@ export function TicketDetail({
         />
       </section>
 
+      <TicketAttachmentsPanel
+        ticketId={ticket.id}
+        ticketKey={ticket.key}
+        attachments={ticket.attachments}
+        viewer={viewer}
+        project={{ pm_id: ticket.project.pmId }}
+        canUpload={mayEditFields}
+      />
+
       <TicketTimeEntries
         ticketId={ticket.id}
         ticketKey={ticket.key}
@@ -466,18 +487,20 @@ export function TicketDetail({
         canLog={canLogTime}
       />
 
+      <TicketComments
+        ticketId={ticket.id}
+        projectId={ticket.project.id}
+        projectPmId={ticket.project.pmId}
+        comments={comments}
+        viewer={viewer ? { id: viewer.id, isAdmin: viewer.roles.includes("admin") } : null}
+      />
+
       {!ticket.project.active && (
         <p className="mt-6 text-caption text-muted-foreground">
           El proyecto está desactivado — los tickets existentes se pueden seguir
           moviendo, pero no se pueden crear nuevos.
         </p>
       )}
-
-      <p className="mt-6 text-caption text-muted-foreground">
-        <Link href={`/projects/${ticket.project.key}/sprint`} className="hover:underline">
-          ← Volver al proyecto
-        </Link>
-      </p>
 
       <TicketFormDialog
         mode="edit"

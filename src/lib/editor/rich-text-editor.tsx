@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { LinkPopover } from "./link-popover";
+import { createMentionSuggestion } from "./mention-suggestion";
 import { sanitizePastedHtml } from "./paste";
 import { buildRichTextExtensions } from "./tiptap-extensions";
 
@@ -52,6 +53,11 @@ type RichTextEditorProps = {
   placeholder?: string;
   maxPlainTextLength?: number;
   disabled?: boolean;
+  // 022. Si se pasa, el editor cablea el autocompletado de `@` mention contra
+  // `/api/projects/[projectId]/members`. Sin `projectId`, la extensión Mention
+  // queda montada pero sin sugerencias — sirve para mostrar mentions existentes
+  // en modo lectura o en un futuro editor descontextualizado.
+  projectId?: string;
 };
 
 export function RichTextEditor({
@@ -61,11 +67,19 @@ export function RichTextEditor({
   placeholder,
   maxPlainTextLength = DEFAULT_MAX_PLAIN_TEXT_LENGTH,
   disabled = false,
+  projectId,
 }: RichTextEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [plainTextLength, setPlainTextLength] = useState(0);
 
-  const extensions = useMemo(() => buildRichTextExtensions({ placeholder }), [placeholder]);
+  const extensions = useMemo(
+    () =>
+      buildRichTextExtensions({
+        placeholder,
+        mentionSuggestion: projectId ? createMentionSuggestion(projectId) : undefined,
+      }),
+    [placeholder, projectId],
+  );
 
   const initialDocRef = useRef<string>(JSON.stringify(value ?? EMPTY_DOC));
 

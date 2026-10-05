@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth/roles";
 import { getActivitiesForProject } from "@/lib/project-activities/query";
 import { getOpenSprints } from "@/lib/sprints/query";
 import { getTimeEntriesForTicket } from "@/lib/time-entries/query";
+import { getCommentsForTicket } from "@/lib/tickets/comments";
 import { getProjectMembers } from "@/lib/tickets/facets";
 import { getTicketByKey } from "@/lib/tickets/query";
 import { createClient } from "@/lib/supabase/server";
@@ -38,11 +39,12 @@ export default async function TicketPage({
     roleInProject = data ?? null;
   }
 
-  const [members, openSprints, timeEntries, projectActivities] = await Promise.all([
+  const [members, openSprints, timeEntries, projectActivities, comments] = await Promise.all([
     getProjectMembers(ticket.project.id),
     getOpenSprints(ticket.project.id),
     getTimeEntriesForTicket(ticket.id),
     getActivitiesForProject(ticket.project.id, { includeInactive: false }),
+    getCommentsForTicket(ticket.id),
   ]);
 
   // 016 US-1/US-2: contributor+ del proyecto puede cargar horas. Admin y PM
@@ -69,6 +71,7 @@ export default async function TicketPage({
         active: a.active,
       }))}
       canLogTime={canLogTime}
+      comments={comments}
     />
   );
 }

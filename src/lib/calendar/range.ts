@@ -167,8 +167,21 @@ export function monthsInYear(isoDate: string): string[] {
 
 // ── Ranges and navigation ────────────────────────────────────────────────────
 
-/** Local calendar bounds of a view, as `[fromDate, toDateExclusive)`. */
-export function viewBounds(view: CalendarView, isoDate: string): [string, string] {
+/**
+ * Local calendar bounds of a view, as `[fromDate, toDateExclusive)`.
+ *
+ * `opts.today` es la fecha "hoy" del viewer (`YYYY-MM-DD` en su TZ). Solo la
+ * consume el case "planning" (024): cuando el ancla es literalmente hoy, la
+ * grilla desplaza el rango para que la semana actual quede como la última de
+ * las 4 filas (3 semanas atrás + esta). Pasar `opts.today` a día/mes/año no
+ * cambia nada — se ignora — pero se acepta para que los call sites no tengan
+ * que ramificar por vista.
+ */
+export function viewBounds(
+  view: CalendarView,
+  isoDate: string,
+  opts?: { today?: string },
+): [string, string] {
   switch (view) {
     case "day":
       return [isoDate, addDays(isoDate, 1)];
@@ -184,7 +197,16 @@ export function viewBounds(view: CalendarView, isoDate: string): [string, string
       // 4 semanas ancladas al lunes de la semana de `isoDate`. La URL guarda la
       // fecha sin normalizar (`plan.md` §8.2), así que la normalización pasa
       // acá y en ningún otro lado.
-      const start = mondayOf(isoDate);
+      //
+      // Regla 024: cuando el ancla es "hoy" (botón "Hoy" del toolbar o URL sin
+      // `?date`), la semana en curso pasa a ser la ÚLTIMA de las 4 filas —
+      // el PM ve 3 semanas atrás + esta semana, que es el contexto natural
+      // para decidir dónde meter carga nueva. Se dispara solo cuando
+      // `isoDate === opts.today` (fecha literal). Cualquier otra fecha (link
+      // compartido, navegación con ▶/◀) mantiene el anclaje clásico
+      // "mondayOf(isoDate) es la primera fila".
+      const monday = mondayOf(isoDate);
+      const start = opts?.today === isoDate ? addDays(monday, -21) : monday;
       return [start, addDays(start, 28)];
     }
   }
@@ -199,8 +221,9 @@ export function resolveRange(
   view: CalendarView,
   isoDate: string,
   tz: string,
+  opts?: { today?: string },
 ): CalendarRange {
-  const [fromDate, toDate] = viewBounds(view, isoDate);
+  const [fromDate, toDate] = viewBounds(view, isoDate, opts);
   return {
     from: zonedToInstant(fromDate, tz).toISOString(),
     to: zonedToInstant(toDate, tz).toISOString(),

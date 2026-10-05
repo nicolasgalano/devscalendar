@@ -63,102 +63,19 @@ Ver `docs/adr/0002-language-conventions.md`.
 
 ## Estructura del repo
 
-```
-devscalendar/
-├── CLAUDE.md
-├── DESIGN.md                         # sistema de diseño — leer antes de tocar una vista
-├── devscalendar-specs.md             # spec funcional original (v0.1)
-├── package.json                      # pnpm + Next.js
-├── components.json                   # config de shadcn/ui
-├── next.config.mjs
-├── tsconfig.json
-├── postcss.config.mjs                # Tailwind v4 (sin tailwind.config.ts)
-├── playwright.config.ts
-├── vitest.config.ts
-├── .env.example                      # variables requeridas (desarrollo)
-├── .github/workflows/tests.yml       # CI: stack efímero de Supabase + toda la suite
-├── scripts/
-│   ├── cleanup-test-data.mjs         # limpieza por runId de pruebas manuales
-│   └── migrate-ticket-descriptions.ts # one-shot markdown → ProseMirror (019)
-├── src/
-│   ├── app/                          # rutas Next.js App Router
-│   │   ├── layout.tsx                # fuentes + ThemeProvider
-│   │   ├── globals.css               # tokens de diseño (@theme inline)
-│   │   ├── (app)/                    # route group: todo lo logueado, con shell
-│   │   │   ├── layout.tsx            # gate de sesión + AppShell
-│   │   │   ├── error.tsx             # error boundary de la app
-│   │   │   ├── page.tsx              # home landing — selector de producto (017)
-│   │   │   ├── calendar/             # pantalla principal (día/mes/año)
-│   │   │   ├── inbox/                # bandeja del dev: sus reservas pendientes
-│   │   │   ├── my-time/              # grilla semanal de time tracking (016)
-│   │   │   ├── reports/              # consumo, plan-vs-real, export CSV (016)
-│   │   │   ├── projects/             # raíz del sistema de tareas (017)
-│   │   │   │   ├── page.tsx          # lista de proyectos visibles
-│   │   │   │   └── [projectKey]/     # workspace del proyecto
-│   │   │   │       ├── layout.tsx    # header + tabs (Sprint/Backlog/Old/Actividades/Miembros)
-│   │   │   │       ├── page.tsx      # redirige a /sprint (018 default)
-│   │   │   │       ├── sprint/       # tab Sprint activo — kanban filtrado (018)
-│   │   │   │       ├── board/        # redirect a /sprint — legacy 017
-│   │   │   │       ├── backlog/      # tab backlog — TicketList con controles inline
-│   │   │   │       ├── sprints/      # tab "Old Sprints" — lista + [numero]/reporte (018)
-│   │   │   │       ├── activities/   # tab Actividades — CRUD por PM (016)
-│   │   │   │       └── members/      # tab Miembros (015 P8)
-│   │   │   ├── tickets/[key]/        # detalle flat de ticket (015)
-│   │   │   ├── my-work/              # vista personal cross-project (017)
-│   │   │   └── admin/                # ABM de maestros (solo admin)
-│   │   │       ├── layout.tsx        # guard de rol
-│   │   │       ├── clients/          # page + loading + tabla (client)
-│   │   │       ├── projects/
-│   │   │       └── users/
-│   │   ├── api/                      # route handlers (bookings/clients/projects/users)
-│   │   ├── login/                    # login page + button (client)
-│   │   ├── pending-access/           # usuarios autenticados sin rol
-│   │   └── auth/
-│   │       ├── callback/route.ts     # OAuth exchange
-│   │       └── signout/route.ts
-│   ├── middleware.ts                 # protege rutas + refresh de sesión
-│   ├── components/
-│   │   ├── ui/                       # shadcn/ui, comiteado y ajustado a DESIGN.md
-│   │   ├── calendar/                 # grilla, bloques, filtros, estados de reserva
-│   │   ├── tickets/                  # tabla, filtros, badges, form-dialog (015)
-│   │   ├── projects/                 # project-list, workspace-header, kanban (017)
-│   │   ├── home-dispatcher.tsx       # selector de producto de la home (017)
-│   │   ├── sync-indicator.tsx        # provider + hook + pill flotante (017)
-│   │   └── *.tsx                     # app-shell, theme-toggle, status, etc.
-│   ├── lib/
-│   │   ├── env.ts                    # validación de env con Zod
-│   │   ├── utils.ts                  # cn()
-│   │   ├── api/                      # guards de route handlers + lectura de body
-│   │   ├── bookings/                 # transiciones, conflictos, formulario, permisos
-│   │   ├── calendar/                 # rangos, layout, ocupación, paleta, query
-│   │   ├── tickets/                  # queries, permisos, keys, url, status, facets (015)
-│   │   ├── projects/                 # keys + workspace queries (017)
-│   │   ├── sprints/                  # status labels + queries de sprint (018)
-│   │   ├── editor/                   # rich text: schema, validator, renderer, editor client, viewer, hydrator, paste, convert (019)
-│   │   ├── markdown/                 # viewer + sanitize — fallback vivo hasta fase 2 (015, 019)
-│   │   ├── validation/               # schemas Zod por entidad
-│   │   └── supabase/                 # server/client/middleware/session helpers
-│   └── types/
-│       └── database.ts               # generado; regenerar con `pnpm db:types`
-├── supabase/
-│   ├── config.toml                   # solo para `supabase start`; ya no se usa
-│   ├── migrations/                   # SQL versionado
-│   └── seed.sql
-├── tests/
-│   ├── env.ts                        # guard: solo stack local; nunca un proyecto remoto
-│   ├── run-id.ts                     # identificador por corrida y convenciones de nombres
-│   ├── unit/                         # sin DB: funciones puras + Supabase mockeado
-│   │   └── helpers/supabase-mock.ts  # doble del cliente
-│   ├── smoke/                        # contrato con PostgREST y GoTrue (solo CI)
-│   ├── integration/                  # RLS, triggers y constraints (solo CI)
-│   ├── perf/                         # presupuestos de tiempo; corren aislados
-│   └── e2e/                          # Playwright (solo CI)
-├── specs/                            # SDD harness (spec/plan/tasks por feature)
-└── docs/
-    ├── deuda-tecnica.md              # deuda conocida — NO saldarla sin OK explícito
-    ├── testing.md                    # estrategia de testing — leer antes de tocar tests
-    └── adr/                          # architecture decision records
-```
+Top-level (para el detalle, `ls` o explorar el repo):
+
+- `src/app/` — rutas Next.js App Router. Todo lo logueado vive bajo el route group `(app)/` (gate de sesión + shell una sola vez; el paréntesis no aparece en URL). Las pantallas de auth (`login`, `pending-access`, `auth/*`) quedan afuera a propósito.
+- `src/app/api/` — route handlers (bookings, tickets, projects, clients, users, time-entries, project-members, attachments, comments).
+- `src/components/` — `ui/` (shadcn comiteado y ajustado a DESIGN.md); por dominio (`calendar/`, `tickets/`, `projects/`) y transversales (`app-shell`, `sync-indicator`, `theme-toggle`, `home-dispatcher`).
+- `src/lib/` — por dominio: `supabase/` (server/client/middleware/session), `api/` (guards + `readJsonBody`), `auth/`, `bookings/`, `calendar/`, `tickets/`, `projects/`, `sprints/`, `editor/` (rich text + mentions), `attachments/`, `markdown/` (fallback), `notifications/`, `reports/` (helper + serializers CSV/XLSX de 021), `validation/` (Zod).
+- `src/middleware.ts` — protege rutas + refresh de sesión.
+- `src/types/database.ts` — generado; regenerar con `pnpm db:types`.
+- `supabase/migrations/` — SQL versionado. `config.toml` existe pero ya no se usa (local Docker abandonado).
+- `tests/` — `unit/` (único que corre local, Supabase mockeado); `smoke/` + `integration/` + `e2e/` + `perf/` (solo CI). `env.ts` rechaza URLs no-locales; `run-id.ts` para datos de prueba manual.
+- `specs/features/NNN-<slug>/` — SDD harness (spec + plan + tasks por feature). `specs/features/README.md` es el índice vivo.
+- `docs/` — `deuda-tecnica.md` (no saldar sin OK), `testing.md`, `adr/` (decisiones de arquitectura).
+- `scripts/` — `cleanup-test-data.mjs` (limpieza por runId), `migrate-ticket-descriptions.ts` (one-shot markdown→ProseMirror).
 
 ---
 
@@ -298,6 +215,7 @@ Las variables de entorno viven en Vercel → Settings → Environment Variables.
 - **`on delete cascade` en las dos FK de `notifications`, y es un desvío deliberado de la convención de "Migrations".** Una notificación no es historia, es un mensaje: sin destinatario no significa nada y sin reserva no lleva a ningún lado. La historia la guarda `audit_log`, que por eso sí conserva `set null`.
 - **El `payload` se congela al escribir; el texto no.** El trigger guarda los hechos —proyecto, franja, motivo— y las oraciones las arma `src/lib/notifications/events.ts`, así que cambiar el copy no necesita migration ni deja los avisos viejos hablando distinto que los nuevos.
 - **A nadie se le avisa de su propia acción**, y el chequeo vive en un solo lugar (`notify_user()`). Con roles múltiples eso dejó de ser un caso raro.
+- **`ticket_status_changed` avisa a tres destinatarios**: assignee (015), creador (015) y **PM primario del proyecto** (023). La dedupe entre ellos es explícita con `distinct from` en tres direcciones — cuando el PM coincide con assignee o creador, no se duplica la fila. Solo `status`; `ticket_assigned` sigue avisando solo al asignado nuevo.
 - **Sin `RESEND_API_KEY` no se rompe nada**: las filas quedan `pending` y la bandeja in-app anda igual. Es lo que permite que CI corra sin credenciales de terceros.
 
 ### Estado en la URL
@@ -341,25 +259,52 @@ Desde `019` las descripciones de tickets son un doc de ProseMirror (`tickets.des
 - **`audit_ticket_events` reemplaza el JSON del doc por `__changed__` en el diff** (migration 19). Sin eso cada edit escribe kilobytes en `audit_log`, y el diff no es legible de todas formas.
 - **Cap de 10.000 caracteres es sobre el texto plano extraído del doc**, no sobre el JSON. Dos docs con el mismo texto pueden pesar KB muy distintos según el formato; el cap se centraliza en `RICH_TEXT_MAX_PLAIN_LENGTH` para que el contador del editor y el validador Zod usen el mismo número.
 
+### Adjuntos (attachments)
+
+Desde `020` los tickets pueden tener adjuntos (imágenes) en un panel propio, separado del rich text de `019`. Toda la lógica de upload, thumbs y permisos vive en `src/lib/attachments/`.
+
+- **El thumbnail se genera en el cliente**, no en el server. `generateThumb(file)` en `src/lib/attachments/generate-thumb.ts` usa `createImageBitmap` + `OffscreenCanvas` + `convertToBlob({type:"image/webp",quality:0.8})` — max 300 px del lado mayor, sin upscale. Cero deps server, ~25 KB vs. ~3 MB del original. El upload es un solo POST multipart con `original` + `thumb` + `width` + `height`; sin ida y vuelta separado para el thumb.
+- **La whitelist de tipos vive en `src/lib/attachments/types.ts`** (`ATTACHMENT_MIME_TYPES`). La consumen tres consumidores: el `<input accept=>` del panel, la validación cliente en `upload.ts`, y la validación server en el handler POST. Sumar tipos = agregar entries (ninguna migration, ningún cambio de storage) — pero decidir cómo se renderizan en el panel (imagen → thumbnail; otro → icono por tipo).
+- **El bucket es privado y todo pasa por handler.** `ticket-attachments` con `public = false`. El cliente **nunca** sube ni descarga directo al bucket — el server autoriza y firma URLs de 15 min. La RLS de `storage.objects` es un espejo de `can_view_project` (via join contra `ticket_attachments`) como red final, pero el camino normal es el endpoint.
+- **RLS de `ticket_attachments`:** read por `can_view_project`, insert por contributor+ del proyecto (la granularidad "puede editar este ticket puntual" vive en el handler con `canUploadAttachment`), delete por autor + PM primario + admin (`canDeleteAttachment`). Sin update — las filas son inmutables.
+- **`audit_ticket_attachment_events` guarda snapshot completo en delete**, no solo el diff. Motivo: cuando un PM/admin borra un adjunto de un contributor, la fila ya no existe y el binario tampoco — el audit_log es la única evidencia. Mismo patrón que `time_entries` en 016.
+- **Límite total por ticket es soft.** El contador visible al pie del panel avisa cuando pasa 50 MB pero no bloquea. El límite duro sigue siendo por archivo (5 MB, replicado en el `check` de la tabla como red final).
+
+### Comentarios con @menciones (022)
+
+Desde `022` los tickets tienen un feed de comentarios rich text al pie del detalle, y el editor rich text (comentarios **y** descripción) acepta el nodo `mention` con `@` autocompletado.
+
+- **Un solo motor de rich text.** `RICH_TEXT_SCHEMA` es la fuente única de verdad — el nodo `mention` se agrega ahí y se propaga a los tres consumidores (Tiptap, validador Zod, renderer server) tal como manda 019. **No hay editor "chico" separado**: `<CommentEditor>` reusa `buildRichTextExtensions()` con placeholder distinto y sin toolbar.
+- **Dos motores de `extract_mentions`, y tienen que coincidir.** La función SQL `extract_mention_user_ids(jsonb)` (migration 21, recursive CTE que camina content + marks con `coalesce + concat`) y el helper TS `src/lib/editor/extract-mentions.ts` implementan la misma semántica: caminar el árbol, recolectar `attrs.user_id` de todos los nodos `mention`, dedupe. La SQL corre en los triggers de notificación; la TS en el handler POST/PATCH para validar contra `project_members` antes de escribir. **Si aparece divergencia, arreglar las dos.** El regex UUID del cast en SQL es defensivo — el validador Zod ya lo cubre en el path normal.
+- **RLS y grants de `ticket_comments`.** Read/insert por `can_view_project` (**viewer** basta — no requiere contributor, mismo criterio que Linear). Update solo autor. Delete autor + PM primario + admin. Grant `DELETE` a `authenticated` — **3ª vez en el proyecto** tras `016` y `020`; documentado. La policy de update no restringe columnas (RLS no las distingue — ADR 0009); el handler solo manda `body_doc`, así que el vector es aplicativo. Si aparece necesidad de defense-in-depth, sumar guard en trigger análogo al de `tickets` (F9 de `022/tasks.md`).
+- **Dedupe estricta de destinatarios.** El trigger `notify_ticket_comment_events` inserta `ticket_mentioned` para cada mencionado y **después** `ticket_commented` para assignee/creador/PM primario **menos los ya mencionados** (spec AC-2.5). En UPDATE del `body_doc`, solo menciones **nuevas** disparan `ticket_mentioned` (comparación old vs new); sacar una mención no rescinde el aviso previo (AC-2.7).
+- **Menciones en la descripción avisan también.** `notify_ticket_events` (migration 21 lo reemplaza con `create or replace`) suma dos ramas: al INSERT de un ticket con `description_doc` con menciones, y al UPDATE de `description_doc` para menciones nuevas — con `payload.source = 'description'` para que el copy del email diga "en la descripción" y no "en un comentario". El trigger escucha `description_doc` en la lista de columnas del `create trigger` (drop+create idempotente).
+- **`<CommentEditor>` cargado con dynamic import.** Mismo patrón que `<RichTextEditor>` en `<TicketFormDialog>`: ~90 KB de Tiptap no viajan a la ruta del detalle hasta que el usuario abre la sección de comentarios. `Cmd/Ctrl+Enter` publica (patrón Slack/Linear); `Enter` = nuevo párrafo.
+- **Sin preview del comentario en el email.** El trigger guarda `ticket_id + comment_id` en el payload; el copy del email es "Nuevo comentario en PROJ-42: '{ticket title}'" + link al `#comment-<id>`. Preview extraído del `body_doc` en dispatch quedó como F para más adelante (Postgres no garantiza orden de walker jsonb, y computarlo en TS al dispatchar suma un query por notificación).
+- **Contador de comentarios en cards.** `TicketListItem.commentCount` se puebla con `comment_count:ticket_comments(count)` — embed agregado en la misma query de tickets. Cero N+1. Se muestra solo si > 0.
+
 ---
 
 ## Estado de features
 
-Ver `specs/features/README.md` para el índice completo y estado.
+Ver `specs/features/README.md` para el índice vivo con status, pendientes y gates por feature. Las entradas de abajo son solo el titular — para el "por qué" entrá a `specs/features/NNN/`.
 
-- **001-auth-and-permissions** — done. Google OAuth, roles, RLS base. **D-01 y D-09 se saldaron el 2026-09-08** con `012-multiple-roles-and-active-enforcement`: los roles son un conjunto y `active` se aplica en la base. **D-02 se saldó el 2026-09-08** con `013`, junto con F7 de `003`: el desvío de AC-1.3 quedó registrado —la sesión sobrevive al login sin alta a propósito— y las policies de `select` de `clients` y `projects` dejaron de ser `using (true)`.
-- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email (ADR 0004), `audit_log` mínimo (ADR 0005), y el sistema de diseño de `DESIGN.md` aplicado (ADR 0006). Q-A y Q-B **quedaron respondidas el 2026-09-07 con el default que ya estaba aplicado** —un PM primario obligatorio; el dev es transversal— igual que el resto de las preguntas de `001` a `006`; ver `specs/features/README.md`. **D-03 a D-06 se saldaron el 2026-09-08**: el PM primario ordena el desplegable de devs (y salió de la tabla), los `<SelectValue>` dicen el texto y no el valor, y los seis handlers usan `readJsonBody()` — todo con `013`—; y D-06 se cerró con la verificación manual del usuario en el navegador, que pasó limpia.
-- **003-calendar-ui** — done. Vistas día / mes / año en `/calendar`, agrupación por dev o proyecto, seis filtros combinables con estado en la URL, y la grilla propia sobre CSS grid (ADR 0007). Creó la tabla `bookings` de solo lectura.
-- **004-bookings** — done. `bookings` ya es escribible: `exclusion constraint` anti doble-booking, policies para el PM del proyecto y el admin, API de alta / edición / cancelación, y el diálogo que se abre desde el botón o desde un click en la grilla. El anti doble-booking quedó en dos capas (ADR 0008). Q-E aplicada: mover el horario o el desarrollador de una reserva aprobada la devuelve a `pending`.
-- **005-approval-flow** — done. El desarrollador ya escribe: policy propia sobre sus reservas, acotada a `status` y `response_note` **por un guard en el trigger, no por la policy** (ADR 0009). Bandeja en `/inbox` con guard de rol, respuesta también desde el popover del calendario, comentario obligatorio al rechazar, y las tres traducciones de error de la API — `23P01` a 409 con la reserva que bloquea, `check_violation` a 403, y `expectedUpdatedAt` desajustado a 409. Cada cambio de estado deja su fila en `audit_log`. Salió **sin notificaciones** por decisión del 2026-08-12: el dev se entera entrando a la app, y AC-1.2 / AC-3.1 se difieren a `010`.
-- **006-priority-reallocation** — done. Un proyecto prioritario le toma la franja a uno común: la reserva vieja pasa a `displaced` y la nueva nace `pending`. Todo adentro de `reallocate_booking()`, una función `security definer` atómica (ADR 0010), porque la reserva que se desplaza es de otro PM y la RLS la filtraría **en silencio**. `POST /api/bookings/reallocate` con `confirmedDisplacing`, que obliga al PM a nombrar lo que acepta pisar. El empate entre prioritarios no se resuelve solo (AC-1.3) y se distingue de la prioridad insuficiente por `reason`, no por el texto. Salió **sin avisar al PM desplazado**: se entera mirando el calendario, donde `displaced` es visible por default. AC-2.1 se difiere a `010`.
-  - **R-2, la deuda que dejó:** la prioridad juega al crear y no al aprobar. La bandeja del dev ordena por prioridad y advierte el choque (`outrankedByPending()`), pero eso lo hace visible, no lo impide. Ver F4 de `006/tasks.md`.
-- **010-notifications-and-audit** — done. Cerró lo que `005` y `006` habían diferido: bandeja in-app con campana en el shell, email transaccional, y `audit_log` completo con `create` y `update`, que hasta acá no se registraban. Las filas las escribe un trigger en la misma transacción que el evento y el envío es un paso aparte, reintentable (ADR 0012). **Salió con `010` el gate que faltaba antes del primer usuario real.** Q-9 se respondió con **in-app + email** y no con el default de solo in-app, porque una bandeja sola no arregla "se entera si mira el calendario".
-- **011-planning-view** — done. Cuarta vista del calendario (`/calendar?view=planning`): grilla de 4 semanas con **cliente > proyecto > dev** en filas y días en columnas, con la suma de horas por celda. Reusa `getBookingsInRange` y suma una segunda query **sin filtros de entidad** (`getDevDayLoad`) para la sobrecarga por dev-día — sin eso, un PM que filtra por su cliente ve a "sus" devs siempre libres cuando en realidad no lo están (R-1). Cero migrations, cero policies, cero API routes: es JS puro sobre la RLS existente. Solo lectura por diseño; la creación se queda en la vista Día. **Q-P1** cerrada con **`>8h` estricto** (jornada completa no es sobrecarga); **Q-P2** con partición por día calendario en zona local. La empty state de las cuatro vistas cambió en el mismo commit: sin filtros y sin reservas, la grilla se renderiza vacía en vez del cartel — el cartel queda para el caso filtrado, que es el único donde nombrar el filtro sí importa.
-- **014-hide-pms-in-calendar** — done. El calendario esconde por default a los PM puros (`roles={pm}` sin `developer`), y un toggle "Incluir PMs" en el panel de filtros los trae de vuelta con `?includePms=1`. Sin migrations ni RLS: es un `.not("dev_id","in",…)` en `bookingsQuery` y en `getDevDayLoad`, alimentado por `getPmOnlyDevIds()` (query cacheada por request). La regla "PM puro" vive en `isPmOnly()` de `@/lib/auth/roles` para que query y dropdown decidan igual (R-1). **Selección explícita gana:** una URL con `devId=<PM>` muestra a ese PM aunque el toggle esté off, y el select lo marca con un badge para que sea obvio por qué solo se ven sus reservas.
-- **015-project-membership-and-tickets** — Phases 1–7 en producción; **Phases 8 (panel de miembros en `/admin/projects/:id`), 9 (tests) y 10 (cierre) quedan abiertas.** Lo que salió: tabla `project_members` y tabla `tickets`, con enums `project_member_role` (`viewer|contributor|lead`) y `ticket_status` / `ticket_priority`. Cinco helpers `security definer` y cinco triggers (numeración correlativa `PROJ-N`, auto-add del PM como lead, inmutabilidad de `key` con tickets ya numerados, notificaciones de assign / status change, audit). API `POST/PATCH /api/tickets` y `POST/PATCH /api/project-members`. Vista global `/tickets` (movida a `/my-work` en 017), detalle flat `/tickets/[key]`, dialog de alta/edición, viewer + editor de markdown propios (`react-markdown` + `rehype-sanitize` con schema local). **La regla "el trigger es la verdad" se hereda de bookings (ADR 0009):** el guard de contributor-scope compara `to_jsonb(new) - {whitelist} = to_jsonb(old) - {...}` — cualquier columna nueva nace protegida. **Migration 15 arregla un bug del `audit_ticket_events`** que rompía todo UPDATE (`jsonb - jsonb` no existe en Postgres); anotado como F6 y como brecha de cobertura para Phase 9.
-- **017-workspaces-and-boards** — done. Restructure de rutas al estilo Jira. **`/` deja de redirigir al calendario** y pasa a ser un dispatcher con dos–cuatro cards según rol (DevCalendar, Proyectos, Bandeja si dev, Administración si admin). El logo del top-left del sidebar es el único acceso a la home — no aparece como ítem del nav. El sidebar renombra "Tickets" a **"Proyectos"** (`/projects`) y suma **"Mi trabajo"** (`/my-work` — donde vivía la tabla global de 015). `/projects` lista los proyectos donde el usuario participa (admin ve todos, no-admin ve donde es PM primario o miembro activo — más restrictivo que la RLS de `projects` que sigue siendo `has_any_role()` para no romper el calendario). Adentro de un proyecto viven dos tabs: **Tablero** (kanban con `@dnd-kit`, seis columnas fijas por status, drag & drop con keyboard sensor por accesibilidad) y **Backlog** (reuso de `<TicketList>` scoped al proyecto). Detalle de ticket sigue en `/tickets/[key]` flat — links viejos y emails de `010` no se rompen. **`useState` local + rollback puntual** en el kanban en vez de `useOptimistic`: la card se queda en la columna nueva desde el drop y solo revierte si el server rechaza, sin flash — `useOptimistic` requería mantener la transition pending durante el fetch, y no lo lograba con un callback sincrónico. **`<SyncIndicatorProvider>` transversal** al `AppShell`: `useSyncIndicator().start(label)` devuelve un `stop`, refcount adentro; el pill fijo bottom-right avisa cualquier trabajo asíncrono, primero en el kanban y de acá en adelante en cualquier feature que lo necesite.
-- **018-sprints-and-reporting** — done. Sprints por proyecto con ciclo `planned → active → completed`. Tabla `sprints` con **unique parcial `where status='active'`** por `project_id` — solo uno activo, garantía dura de la base. Extensiones a `tickets` (`sprint_id` FK set null, `estimated_hours numeric(5,2)`) y a `projects` (`next_sprint_number`). **Trigger de contributor-scope extendido en migration 16**: contributor no puede tocar `sprint_id` ni `estimated_hours` — es planning, no ejecución. **RPC `close_sprint_with_rollover(p_sprint_id, p_next_sprint_id)`** (`security definer`, transaccional) que compone el snapshot **antes** del update de tickets, rollea pendientes al próximo `planned`, cierra el sprint y setea `closed_at + report` — todo en una sola transacción. El check `sprints_completed_has_closed_at` garantiza que un `completed` sin snapshot no puede existir. El workspace del proyecto suma dos tabs (Sprint default, Old Sprints) y renombra el kanban existente a "Tablero completo"; el "Backlog" gana columnas Sprint (Select inline para admin/PM/lead) y Est.hs (input inline). **Solo el PM primario cierra sprints** — admin puede todo lo demás (crear, editar, activar, mover tickets) pero la firma del reporte es del owner del proyecto (AC-5.4). Rollover automático al `planned` con `starts_at` más cercano; **sin planificado siguiente, el cierre queda bloqueado** en el `<CloseSprintDialog>` que ofrece crear el próximo inline. El snapshot en `sprints.report jsonb` es inmutable — cambios post-cierre en tickets no lo modifican; la vista de reporte lo comunica al pie con "Congelado el DD/MM/YYYY".
-- **019-ticket-rich-editor** — code done. El editor de descripción de tickets pasa de textarea markdown a rich text sobre Tiptap + ProseMirror. Doble columna en `tickets` durante la transición: `description_doc jsonb` es la fuente de verdad post-019 y `description` sobrevive como fallback de lectura hasta fase 2 (feature `019.5`, F1 pendiente). Whitelist estricta de nodos y marks en `src/lib/editor/schema.ts` — compartida por Tiptap, el validador Zod y el renderer server-side. **El viewer del detalle es server** (`renderDocToHtml` construye HTML seguro desde el JSON validado) y **el editor client se carga con `dynamic({ ssr:false })`** para no meter Tiptap (~90 KB gzipped) en la ruta de lectura. El checklist es interactivo en el detalle via `<TaskItemHydrator>` con `createPortal` y `expected_updated_at` para atajar la carrera contra ediciones. **Contributor scope heredado**: el trigger `enforce_ticket_contributor_scope` no se toca, `description_doc` nace protegida (ADR 0009). **`audit_ticket_events` reemplaza el JSON del doc por `__changed__`** en el diff genérico. Falta la ejecución del script de migración de datos (`pnpm exec tsx scripts/migrate-ticket-descriptions.ts`, coordinada con el deploy) y la verificación visual manual. Deuda nueva D-10 descubierta durante la implementación: migration fantasma `time_entries_start_time` (versión 18) en prod sin archivo local — mitigada con un stub idempotente.
-- **016-time-tracking** — done. Reemplazo de TrackingTime, sin plata / sin cupos / sin ausencias. **Nuevo rol `staff`** en enum `user_role` para administración/comercial que carga horas sin ser dev (no aparece como recurso reservable en el calendario). **Tres tablas nuevas** (migration 17): `project_activities` (texto libre por proyecto, el PM define), `time_entries` (minutos múltiplos de 15 garantizado por check constraint, `ticket_id` opcional para cargar contra proyecto+actividad sin ticket específico), `active_timers` (una fila por user, PK, cronómetro persistido en DB que sobrevive al cierre del navegador). **RPCs** `stop_timer` y `stop_and_start_timer` (security definer, transaccionales) — cambio de timer con otro corriendo persiste el anterior primero. **Primera vez que la app expone `DELETE` a `authenticated`** — para `time_entries` y `active_timers`; audit_log conserva snapshot pre-borrado. **Ventana de edición de 7 días** para users (admin sin límite); enforce en handler, no en RLS. Nueva ruta **`/my-time`** con grilla semanal columnas por día (estilo TrackingTime), `<TimerPill>` en el header visible desde cualquier ruta cuando hay timer corriendo, tab **"Actividades"** en el workspace de proyecto (solo admin/PM), sección **"Horas cargadas"** en el detalle del ticket. Nueva ruta **`/reports`** (solo admin y PMs) con `/reports/consumo` (Cliente > Proyecto > Persona) y `/reports/plan-vs-real` (bookings approved vs entries cargadas). Endpoint `GET /api/time-entries/export.csv` con filtros. **Sprint report (018) enriquecido** con sección "Horas cargadas" **live-queried** al momento de abrir la página — motivo: es común cargar tarde (viernes olvidado, lunes se carga); si viviera en el snapshot inmutable, esas entries se perderían del reporte. Notificaciones (in-app + email, patrón 010): `time_entry_created_by_other` cuando alguien carga por vos, `time_entry_deleted_by_admin` cuando admin borra tu entry.
+- **001-auth-and-permissions** — done. Google OAuth, roles como conjunto (`profiles.roles`), RLS base con `has_role()` / `has_any_role()`.
+- **002-entities-admin** — done. ABM de clientes, proyectos y usuarios en `/admin/*`, invitación por email, `audit_log` mínimo (ADRs 0004-0006).
+- **003-calendar-ui** — done. Vistas día/mes/año en `/calendar`, grilla propia sobre CSS grid (ADR 0007), seis filtros con estado en URL.
+- **004-bookings** — done. Escritura de reservas con anti doble-booking en dos capas (ADR 0008). Mover horario o dev de una `approved` la vuelve a `pending`.
+- **005-approval-flow** — done. El dev responde desde `/inbox` o popover; alcance acotado por guard en trigger (ADR 0009), no por policy. `expectedUpdatedAt` ataja la carrera contra la edición del PM.
+- **006-priority-reallocation** — done. Prioridad desplaza vía `reallocate_booking()` security definer (ADR 0010), porque un `update` que la RLS filtra no falla. Deuda R-2 abierta: la prioridad juega al crear, no al aprobar — la bandeja lo advierte pero no lo impide (F4 de `006/tasks.md`).
+- **010-notifications-and-audit** — done. Cerró lo que `005` y `006` difirieron: bandeja in-app + email transaccional + audit_log completo. Trigger escribe en misma tx que el evento; envío es paso aparte reintentable (ADR 0012).
+- **011-planning-view** — done. Cuarta vista `/calendar?view=planning`: grilla de 4 semanas con cliente>proyecto>dev. Suma segunda query sin filtros (`getDevDayLoad`) para que la sobrecarga por dev-día sea global, no afectada por filtros del PM.
+- **014-hide-pms-in-calendar** — done. Calendario esconde PMs puros por default; toggle `?includePms=1`. Selección explícita gana: `devId=<PM>` lo muestra aunque el toggle esté off.
+- **015-project-membership-and-tickets** — Phases 1–8 en prod (panel de miembros incluido); **Phases 9 (tests) y 10 (cierre) abiertas**. Tablas `project_members` + `tickets`, numeración correlativa `PROJ-N` por trigger, contributor-scope heredado (ADR 0009). Deuda F6: cobertura de triggers.
+- **017-workspaces-and-boards** — done. Restructure estilo Jira: `/` dispatcher con cards por rol, `/projects/*` workspace por proyecto, `/my-work` cross-project. Kanban con `@dnd-kit` + rollback puntual. `<SyncIndicatorProvider>` transversal al `AppShell`.
+- **018-sprints-and-reporting** — done. Sprints por proyecto con ciclo `planned → active → completed`. Unique parcial garantiza un solo activo. RPC `close_sprint_with_rollover()` transaccional congela snapshot en `sprints.report jsonb` (inmutable); rollover automático al próximo `planned`.
+- **016-time-tracking** — done. `/my-time`, `/reports/consumo` y `/reports/plan-vs-real`, export CSV. Nuevo rol `staff`. `active_timers` persiste el cronómetro en DB. Primera vez que la app expone `DELETE` a `authenticated` (`time_entries` + `active_timers`); audit guarda snapshot pre-borrado.
+- **019-ticket-rich-editor** — code done. Descripciones a ProseMirror (`tickets.description_doc jsonb`); `description` markdown vive como fallback hasta fase 2 (feature `019.5`, F1 pendiente). Viewer server-side; editor cliente con `dynamic({ssr:false})`. Deuda D-10: migration fantasma 18 mitigada con stub idempotente.
+- **020-ticket-attachments** — code done. Adjuntos de imagen con thumb WebP generado en cliente, bucket privado `ticket-attachments` + signed URLs 15 min. Límite total soft; audit guarda snapshot en delete. Fase 2 (paste al editor) queda aparte.
+- **022-ticket-comments-and-mentions** — code done. Hilo de comentarios rich text + nodo `mention` compartido con descripción (misma whitelist). Dos motores de `extract_mentions` (SQL + TS) tienen que coincidir. Grant `DELETE` a `authenticated` por 3ª vez tras 016/020. Deuda F9: guard en trigger de `ticket_comments` para defense-in-depth.
+- **023-notify-pm-on-status-change** — done. `ticket_status_changed` ahora avisa también al PM primario con dedupe explícita (`distinct from` en tres direcciones) entre assignee / creador / PM.
+- **021-time-tracker-tasks-and-export** — code done. Rename cosmético UI "Actividad" → "Tarea" (el schema sigue en `project_activities`, segmento URL `/activities` e identificadores de código preservados — un test guardrail scaneando `.tsx` sin comentarios protege contra regresión). Reporte "planilla" con 11 columnas en español alineadas con la planilla comercial de referencia (sin USD/facturable); mismo pipeline sirve CSV y XLSX, con `exceljs` dynamic-imported para no pagar cold start del resto del server bundle.
 - **Próxima:** las tres integraciones (`007-google-calendar`, `008-jira`, `009-slack`), que ya no tienen nada delante. Ver `specs/features/README.md`.

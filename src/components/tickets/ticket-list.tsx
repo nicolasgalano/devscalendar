@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageSquareIcon } from "lucide-react";
 
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority";
 import { TicketRowSprintControls } from "@/components/tickets/ticket-row-sprint-controls";
@@ -93,6 +94,15 @@ function TicketRow({
         <Link href={href} className="hover:underline">
           {ticket.title}
         </Link>
+        {ticket.commentCount > 0 && (
+          <span
+            className="text-caption text-muted-foreground ml-2 inline-flex items-center gap-0.5 align-middle"
+            aria-label={`${ticket.commentCount} ${ticket.commentCount === 1 ? "comentario" : "comentarios"}`}
+          >
+            <MessageSquareIcon aria-hidden="true" className="size-3" />
+            {ticket.commentCount}
+          </span>
+        )}
       </TableCell>
       <TableCell>
         <TicketStatusBadge status={ticket.status} />

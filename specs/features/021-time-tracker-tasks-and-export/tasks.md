@@ -71,10 +71,7 @@ Refactor del pipeline de export para producir las 11 columnas alineadas con la p
 ## Phase 4 — Cierre
 
 - [x] **T4.1** — `specs/features/README.md` actualizado: 021 pasa a `code done — pending deploy + verificación visual`. El párrafo descriptivo ya existente debajo de la tabla se mantiene (describe el alcance de la feature, no su estado).
-- [ ] **T4.2** — Actualizar `CLAUDE.md`:
-  - Estructura del repo: sumar `src/lib/reports/` (helper + dos serializers).
-  - Estado de features: línea para 021 con el invariante clave ("rename cosmético UI; schema sigue en `project_activities`; export CSV + XLSX comparten pipeline").
-  - **Nota en Convenciones** (sección a elegir — podría ir dentro de "Rutas y permisos" o una nueva "Reportes y vocabulario"): **"Tarea" en UI = `project_activities` en schema**. El próximo lector que vea `activity_id` o `ActivitiesPanel` necesita el puente — este es exactamente el patrón que justifica el ADR 0002.
+- [x] **T4.2** — `CLAUDE.md` actualizado. Requirió cherry-pick del commit de compresión `99d6865` a `develop` primero, después merge a este branch para editar sobre la versión comprimida (el branch estaba basado en un `develop` anterior al trim). Cambios: (1) `src/lib/reports/` sumado al bullet de `src/lib/`. (2) Bullet nuevo de 021 en Estado de features con el invariante clave (rename cosmético, `project_activities` preservado, pipeline CSV+XLSX compartido). (3) Nota de vocabulario embebida en el mismo bullet en vez de abrir subsección en Convenciones — mantiene la compresión del archivo y el puente queda donde alguien va a buscar primero.
 - [x] **T4.3** — Revisado: ADR 0002 no lista ejemplos específicos de pares schema/UI; solo tipos generales ("tablas en inglés", "copy en español") que ya cubren el caso 021 por composición. Sin cambios por la decisión del propio task ("Si no lista ejemplos, no se agrega").
 - [ ] **T4.4** — Verificación visual del usuario:
   - Workspace del proyecto → tab dice "Tareas", heading de la página dice "Tareas", CTA dice "+ Nueva tarea".

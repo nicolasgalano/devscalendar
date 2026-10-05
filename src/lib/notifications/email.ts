@@ -29,7 +29,7 @@ export function emailSubject(
   payload: NotificationPayload,
   ticketKey?: string | null,
 ): string {
-  const title = notificationTitle(type, ticketKey);
+  const title = notificationTitle(type, ticketKey, payload);
   const slot = describeSlot(payload);
   return slot ? `${title} — ${slot}` : title;
 }
@@ -47,7 +47,7 @@ export function emailBody(
   href: string,
   ticketKey?: string | null,
 ): string {
-  const lines = [notificationTitle(type, ticketKey)];
+  const lines = [notificationTitle(type, ticketKey, payload)];
 
   const slot = describeSlot(payload);
   if (slot) lines.push(slot);

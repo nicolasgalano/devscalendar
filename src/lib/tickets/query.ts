@@ -32,6 +32,10 @@ export type TicketListItem = {
   sprintNumero: number | null;
   sprintStatus: Database["public"]["Enums"]["sprint_status"] | null;
   estimatedHours: number | null;
+  // 022: contador de comentarios del ticket. Se muestra en las cards del
+  // backlog/kanban como icono + número (solo si es > 0). Viene por embed
+  // agregado en la misma query — cero N+1.
+  commentCount: number;
 };
 
 /** Detalle de ticket para `/tickets/:key`. Suma `description` y datos del alta. */
@@ -49,6 +53,23 @@ export type TicketDetail = TicketListItem & {
     active: boolean;
     client: { id: string; name: string } | null;
   };
+  // 020: adjuntos del ticket. Vienen del embed en el select principal para
+  // no sumar un round-trip al abrir el detalle. Solo metadata — las URLs
+  // firmadas se piden al server al montar cada thumb/lightbox.
+  attachments: TicketAttachmentSummary[];
+};
+
+/** Fila mínima para el panel de adjuntos (feature 020). */
+export type TicketAttachmentSummary = {
+  id: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  uploadedById: string | null;
+  uploadedByName: string | null;
+  createdAt: string;
 };
 
 const TICKET_DETAIL_SELECT = `
@@ -67,7 +88,19 @@ const TICKET_DETAIL_SELECT = `
   sprint_id,
   assignee:profiles!tickets_assignee_id_fkey ( full_name ),
   creator:profiles!tickets_created_by_fkey ( full_name ),
-  sprint:sprints ( name, numero, status )
+  sprint:sprints ( name, numero, status ),
+  attachments:ticket_attachments (
+    id,
+    original_filename,
+    mime_type,
+    size_bytes,
+    width,
+    height,
+    uploaded_by,
+    created_at,
+    uploader:profiles!ticket_attachments_uploaded_by_fkey ( full_name )
+  ),
+  comment_count:ticket_comments ( count )
 ` as const;
 
 /**
@@ -120,7 +153,8 @@ export const getTicketsList = cache(
           sprint_id,
           project:projects!inner ( id, key, name ),
           assignee:profiles!tickets_assignee_id_fkey ( full_name ),
-          sprint:sprints ( name, numero, status )
+          sprint:sprints ( name, numero, status ),
+          comment_count:ticket_comments ( count )
         `,
       )
       .order("updated_at", { ascending: false });
@@ -161,6 +195,10 @@ export const getTicketsList = cache(
       const project = row.project;
       const assignee = row.assignee;
       const sprint = row.sprint;
+      // 022: PostgREST devuelve [{ count: N }] o [] para un aggregate embed.
+      const commentCount = Array.isArray(row.comment_count)
+        ? row.comment_count[0]?.count ?? 0
+        : 0;
       return {
         id: row.id,
         numero: row.numero,
@@ -181,6 +219,7 @@ export const getTicketsList = cache(
         sprintNumero: sprint?.numero ?? null,
         sprintStatus: sprint?.status ?? null,
         estimatedHours: row.estimated_hours,
+        commentCount,
       };
     });
   },
@@ -251,5 +290,21 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
     sprintNumero: ticket.sprint?.numero ?? null,
     sprintStatus: ticket.sprint?.status ?? null,
     estimatedHours: ticket.estimated_hours,
+    attachments: (ticket.attachments ?? [])
+      .map((row) => ({
+        id: row.id,
+        originalFilename: row.original_filename,
+        mimeType: row.mime_type,
+        sizeBytes: row.size_bytes,
+        width: row.width,
+        height: row.height,
+        uploadedById: row.uploaded_by,
+        uploadedByName: row.uploader?.full_name ?? null,
+        createdAt: row.created_at,
+      }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    commentCount: Array.isArray(ticket.comment_count)
+      ? ticket.comment_count[0]?.count ?? 0
+      : 0,
   };
 });

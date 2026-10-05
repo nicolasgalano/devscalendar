@@ -138,6 +138,49 @@ describe("viewBounds(planning)", () => {
   });
 });
 
+describe("viewBounds(planning) con today anchor — 024", () => {
+  it("mantiene el anclaje clásico cuando date !== today", () => {
+    // Con opts.today distinto → mondayOf(isoDate) es la primera fila.
+    const [from, to] = viewBounds("planning", "2026-05-13", { today: "2026-06-01" });
+    expect(from).toBe("2026-05-11");
+    expect(to).toBe("2026-06-08");
+  });
+
+  it("desplaza 3 semanas cuando date === today (miércoles)", () => {
+    // Miércoles 2026-05-13 = today → mondayOf(2026-05-13) = 2026-05-11 - 21 = 2026-04-20.
+    // Hoy queda en la 4ª fila (semana del 11-17 de mayo).
+    const [from, to] = viewBounds("planning", "2026-05-13", { today: "2026-05-13" });
+    expect(from).toBe("2026-04-20");
+    expect(to).toBe("2026-05-18");
+  });
+
+  it("caso borde: today == lunes → hoy es el primer día de la 4ª fila", () => {
+    // Lunes 2026-05-11 = today → mondayOf = 2026-05-11 - 21 = 2026-04-20.
+    const [from, to] = viewBounds("planning", "2026-05-11", { today: "2026-05-11" });
+    expect(from).toBe("2026-04-20");
+    expect(to).toBe("2026-05-18");
+  });
+
+  it("caso borde: today == domingo → hoy es el último día de la 4ª fila", () => {
+    // Domingo 2026-05-17 = today → mondayOf(2026-05-17) = 2026-05-11 - 21 = 2026-04-20.
+    const [from, to] = viewBounds("planning", "2026-05-17", { today: "2026-05-17" });
+    expect(from).toBe("2026-04-20");
+    expect(to).toBe("2026-05-18");
+  });
+
+  it("day/month/year ignoran opts.today (regla solo aplica a planning)", () => {
+    expect(viewBounds("day", "2026-05-13", { today: "2026-05-13" })).toEqual(
+      viewBounds("day", "2026-05-13"),
+    );
+    expect(viewBounds("month", "2026-05-13", { today: "2026-05-13" })).toEqual(
+      viewBounds("month", "2026-05-13"),
+    );
+    expect(viewBounds("year", "2026-05-13", { today: "2026-05-13" })).toEqual(
+      viewBounds("year", "2026-05-13"),
+    );
+  });
+});
+
 describe("visibleDayWindow", () => {
   const day = "2026-08-05";
   // 09:00–13:00 hora local de Buenos Aires.
