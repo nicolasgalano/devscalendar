@@ -2,8 +2,15 @@
 
 import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DownloadIcon } from "lucide-react";
+import { ChevronDownIcon, DownloadIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,9 +27,13 @@ const ALL = "__all__";
 
 /**
  * Barra de filtros compartida entre reportes (016 Phase 6). Cada control
- * navega vía `router.replace` con `buildReportHref`. El export CSV
- * (opcional, controlado por `showExport`) linkea al endpoint con los mismos
- * filtros aplicados.
+ * navega vía `router.replace` con `buildReportHref`.
+ *
+ * El export (opcional, controlado por `showExport`) muestra un dropdown
+ * "Exportar ▾" con dos opciones — CSV y XLSX (021 T3.2) — ambas apuntando a
+ * `/api/time-entries/export.<formato>` con los filtros actuales como query
+ * string. La descarga la dispara el browser directo (sin fetch, sin loading
+ * state) — mismo comportamiento del botón único que había antes.
  */
 export function ReportFiltersBar({
   basePath,
@@ -56,13 +67,13 @@ export function ReportFiltersBar({
     ? projects.filter((p) => p.clientId === optimistic.clientId)
     : projects;
 
-  const exportHref = `/api/time-entries/export.csv?${new URLSearchParams({
+  const exportQuery = new URLSearchParams({
     from: optimistic.from,
     to: optimistic.to,
     ...(optimistic.clientId ? { clientId: optimistic.clientId } : {}),
     ...(optimistic.projectId ? { projectId: optimistic.projectId } : {}),
     ...(optimistic.userId ? { userId: optimistic.userId } : {}),
-  }).toString()}`;
+  }).toString();
 
   return (
     <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -112,14 +123,41 @@ export function ReportFiltersBar({
       />
 
       {showExport && (
-        <a
-          href={exportHref}
-          className="ml-auto inline-flex items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1.5 text-ui hover:bg-surface-hover"
-          download
-        >
-          <DownloadIcon aria-hidden="true" className="size-3.5" />
-          Exportar CSV
-        </a>
+        <div className="ml-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" className="gap-2" />
+              }
+            >
+              <DownloadIcon aria-hidden="true" className="size-3.5" />
+              Exportar
+              <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                render={
+                  <a
+                    href={`/api/time-entries/export.csv?${exportQuery}`}
+                    download
+                  />
+                }
+              >
+                CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                render={
+                  <a
+                    href={`/api/time-entries/export.xlsx?${exportQuery}`}
+                    download
+                  />
+                }
+              >
+                XLSX (Excel)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
     </div>
   );

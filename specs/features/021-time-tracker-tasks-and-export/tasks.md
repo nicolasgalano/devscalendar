@@ -63,11 +63,8 @@ Refactor del pipeline de export para producir las 11 columnas alineadas con la p
 
 ## Phase 3 — UI del botón export
 
-- [ ] **T3.1** — Verificar que `<DropdownMenu>` de shadcn está instalado (`ls src/components/ui/dropdown-menu.tsx`). Si no, `pnpm dlx shadcn@latest add dropdown-menu` y ajustar a la escala de densidad del preset Nova (ADR 0006, mismo pattern que el resto de `src/components/ui/`).
-- [ ] **T3.2** — Modificar `src/components/reports/report-filters-bar.tsx`: reemplazar el link/botón único de export por un `<DropdownMenu>`:
-  - Trigger: `<Button variant="outline" size="sm">Exportar <ChevronDownIcon /></Button>`.
-  - Dos ítems `<DropdownMenuItem asChild>` con `<a href>` a `/api/time-entries/export.csv?<query>` y `/api/time-entries/export.xlsx?<query>` respectivamente. Mismo query string construido una sola vez.
-  - El browser dispara la descarga nativa — sin `fetch`, sin loading state (plan §5.1, consistente con el comportamiento actual del CSV).
+- [x] **T3.1** — `<DropdownMenu>` ya instalado desde 022 (lo usa `<TimerPill>`). Sin acción.
+- [x] **T3.2** — `src/components/reports/report-filters-bar.tsx`: el `<a href>` único reemplazado por `<DropdownMenu>` con trigger `Exportar ▾` (Button variant outline sm) y dos `<DropdownMenuItem render={<a download />}>` para CSV y XLSX. Query string construido una sola vez. Patrón `render={...}` para que el browser dispare descarga nativa — sin fetch, sin loading state.
 
 ---
 
