@@ -80,23 +80,23 @@ Una sola migration aditiva. Nullable para `thumb_object_key`/`width`/`height` y 
 
 ## Phase 5 — UI panel
 
-- [ ] **T5.1** — `src/components/tickets/ticket-attachments-panel.tsx`: cambios en el header de upload:
+- [x] **T5.1** — `src/components/tickets/ticket-attachments-panel.tsx`: cambios en el header de upload:
   - Reemplazar `ImagePlusIcon` por `PaperclipIcon` del `lucide-react`.
   - `"Subir imagen"` → `"Subir archivo"`.
   - Helper text: `"Hasta ${formatBytes(MAX_ATTACHMENT_SIZE_BYTES)} por archivo · imágenes, PDF, Word, Excel"`.
   - El `accept` attribute del `<input>` no se toca — ya consume `ATTACHMENT_ACCEPT_ATTR` que se actualiza automáticamente con los nuevos MIME types.
-- [ ] **T5.2** — Renderer condicional en el `.map(initialAttachments)`:
+- [x] **T5.2** — Renderer condicional en el `.map(initialAttachments)`:
   - Si `isImageMime(attachment.mimeType)`: `<ThumbnailCard ... />` como antes.
   - Si no: `<DocumentCard ... />` nueva.
   - `onDelete` se pasa a los dos siguiendo el mismo cálculo de `canDeleteAttachment`.
-- [ ] **T5.3** — Nueva subcomponente `DocumentCard` en el mismo archivo:
+- [x] **T5.3** — Nueva subcomponente `DocumentCard` en el mismo archivo:
   - Layout: `aspect-[3/2]`, flex centrado con el ícono grande (`size-12`), tono de color según `iconForMime`.
   - Mapeo ícono → componente de lucide: `pdf`/`word` → `FileTextIcon`; `excel` → `FileSpreadsheetIcon`; `image` → `ImageIcon`; `file` → `FileIcon`. Función helper `iconComponentForKind` local al componente.
   - Footer con `original_filename` (truncate) y `formatBytes(sizeBytes) · uploadedByName`.
   - Click → `fetchAttachmentSignedUrl(ticketId, id, "original", { download: true })` → `window.location.assign(url)` para disparar la descarga nativa.
   - Botón X de delete igual que `ThumbnailCard` (solo si `onDelete`).
   - Loading state mientras pide el signed URL (`disabled` + loader en el ícono).
-- [ ] **T5.4** — Lightbox: no se toca. Las docs no entran al lightbox porque `openLightbox` solo se llama desde `ThumbnailCard`. Anotar F3 (navegación con flechas puede tocar un doc) como follow-up — ver abajo.
+- [x] **T5.4** — Lightbox: no se toca. Las docs no entran al lightbox porque `openLightbox` solo se llama desde `ThumbnailCard`. Anotar F3 (navegación con flechas puede tocar un doc) como follow-up — ver abajo.
 
 ---
 
