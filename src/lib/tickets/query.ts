@@ -59,14 +59,19 @@ export type TicketDetail = TicketListItem & {
   attachments: TicketAttachmentSummary[];
 };
 
-/** Fila mínima para el panel de adjuntos (feature 020). */
+/**
+ * Fila mínima para el panel de adjuntos. `width`/`height` son nullable desde
+ * 025: los no-imagen (PDF, Office) no tienen dimensiones. El panel ramifica
+ * el render por `isImageMime(mimeType)` y usa dimensiones solo para el
+ * aspect-ratio del `<ThumbnailCard>`.
+ */
 export type TicketAttachmentSummary = {
   id: string;
   originalFilename: string;
   mimeType: string;
   sizeBytes: number;
-  width: number;
-  height: number;
+  width: number | null;
+  height: number | null;
   uploadedById: string | null;
   uploadedByName: string | null;
   createdAt: string;

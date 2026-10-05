@@ -7,6 +7,7 @@ import {
   ATTACHMENT_BUCKET,
   buildObjectKey,
   isAttachmentMimeType,
+  isImageMime,
   type AttachmentMimeType,
 } from "@/lib/attachments/types";
 import { requireTicketAccess } from "@/lib/api/require-ticket-access";
@@ -110,8 +111,19 @@ export async function POST(
     );
   }
   const originalMime: AttachmentMimeType = original.type;
+  const isImage = isImageMime(originalMime);
 
-  // 4. IDs y paths en el bucket.
+  // Para imágenes el validador ya exige thumb/width/height; defensivamente
+  // reconfirmamos acá (una invariante del contrato de 020 que 025 mantiene).
+  if (isImage && (!thumb || width === undefined || height === undefined)) {
+    return NextResponse.json(
+      { error: "Faltan campos obligatorios del thumbnail" },
+      { status: 400 },
+    );
+  }
+
+  // 4. IDs y paths en el bucket. `thumbObjectKey` es null para no-imagen —
+  //    los PDFs y docs no tienen thumb (025).
   const attachmentId = randomUUID();
   const { objectKey, thumbObjectKey } = buildObjectKey(
     ticket.id,
@@ -144,26 +156,33 @@ export async function POST(
     );
   }
 
-  const thumbUpload = await admin.storage
-    .from(ATTACHMENT_BUCKET)
-    .upload(thumbObjectKey, thumb, {
-      contentType: thumb.type,
-      upsert: false,
-    });
+  // Thumb solo para imágenes (020). Los no-imagen (PDFs, docs de 025) no
+  // envían thumb y el handler no sube nada en este paso.
+  if (isImage && thumbObjectKey && thumb) {
+    const thumbUpload = await admin.storage
+      .from(ATTACHMENT_BUCKET)
+      .upload(thumbObjectKey, thumb, {
+        contentType: thumb.type,
+        upsert: false,
+      });
 
-  if (thumbUpload.error) {
-    // Cleanup del original — best effort.
-    await admin.storage.from(ATTACHMENT_BUCKET).remove([objectKey]).catch(() => undefined);
-    return NextResponse.json(
-      { error: "No se pudo subir el thumbnail", detail: thumbUpload.error.message },
-      { status: 500 },
-    );
+    if (thumbUpload.error) {
+      // Cleanup del original — best effort.
+      await admin.storage.from(ATTACHMENT_BUCKET).remove([objectKey]).catch(() => undefined);
+      return NextResponse.json(
+        { error: "No se pudo subir el thumbnail", detail: thumbUpload.error.message },
+        { status: 500 },
+      );
+    }
   }
 
   // 6. Insert de la fila con el cliente authenticated. La RLS de insert de
   //    `ticket_attachments` corre como garantía final: aunque el handler ya
   //    validó, si algo cambió (la membresía se revocó entre el guard y el
   //    insert) la policy rechaza.
+  //
+  //    Las columnas `thumb_object_key`, `width`, `height` son nullable desde
+  //    la migration 23 (025). Para no-imagen van `null`.
   const insertPayload: TicketAttachmentInsert = {
     id: attachmentId,
     ticket_id: ticket.id,
@@ -173,8 +192,8 @@ export async function POST(
     original_filename: original.name,
     mime_type: originalMime,
     size_bytes: original.size,
-    width,
-    height,
+    width: isImage ? width ?? null : null,
+    height: isImage ? height ?? null : null,
     uploaded_by: viewer.id,
   };
 
@@ -185,10 +204,12 @@ export async function POST(
     .single();
 
   if (insertError || !inserted) {
-    // Cleanup de los dos objetos si el insert falló (Q-5 del plan).
+    // Cleanup de los objetos si el insert falló (Q-5 del plan de 020). Para
+    // no-imagen solo hay `objectKey`; para imagen están los dos.
+    const toRemove = thumbObjectKey ? [objectKey, thumbObjectKey] : [objectKey];
     await admin.storage
       .from(ATTACHMENT_BUCKET)
-      .remove([objectKey, thumbObjectKey])
+      .remove(toRemove)
       .catch(() => undefined);
     return NextResponse.json(
       {

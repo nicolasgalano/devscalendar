@@ -545,45 +545,45 @@ export type Database = {
       ticket_attachments: {
         Row: {
           created_at: string
-          height: number
+          height: number | null
           id: string
           mime_type: string
           object_key: string
           original_filename: string
           project_id: string
           size_bytes: number
-          thumb_object_key: string
+          thumb_object_key: string | null
           ticket_id: string
           uploaded_by: string | null
-          width: number
+          width: number | null
         }
         Insert: {
           created_at?: string
-          height: number
+          height?: number | null
           id?: string
           mime_type: string
           object_key: string
           original_filename: string
           project_id: string
           size_bytes: number
-          thumb_object_key: string
+          thumb_object_key?: string | null
           ticket_id: string
           uploaded_by?: string | null
-          width: number
+          width?: number | null
         }
         Update: {
           created_at?: string
-          height?: number
+          height?: number | null
           id?: string
           mime_type?: string
           object_key?: string
           original_filename?: string
           project_id?: string
           size_bytes?: number
-          thumb_object_key?: string
+          thumb_object_key?: string | null
           ticket_id?: string
           uploaded_by?: string | null
-          width?: number
+          width?: number | null
         }
         Relationships: [
           {
