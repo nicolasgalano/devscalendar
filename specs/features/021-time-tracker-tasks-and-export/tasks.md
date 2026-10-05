@@ -70,12 +70,12 @@ Refactor del pipeline de export para producir las 11 columnas alineadas con la p
 
 ## Phase 4 — Cierre
 
-- [ ] **T4.1** — Actualizar `specs/features/README.md`: 021 pasa de `draft (spec + plan)` a `done (deployed YYYY-MM-DD)` con una línea de resumen (rename cosmético UI + reporte alineado con planilla comercial + XLSX nuevo).
+- [x] **T4.1** — `specs/features/README.md` actualizado: 021 pasa a `code done — pending deploy + verificación visual`. El párrafo descriptivo ya existente debajo de la tabla se mantiene (describe el alcance de la feature, no su estado).
 - [ ] **T4.2** — Actualizar `CLAUDE.md`:
   - Estructura del repo: sumar `src/lib/reports/` (helper + dos serializers).
   - Estado de features: línea para 021 con el invariante clave ("rename cosmético UI; schema sigue en `project_activities`; export CSV + XLSX comparten pipeline").
   - **Nota en Convenciones** (sección a elegir — podría ir dentro de "Rutas y permisos" o una nueva "Reportes y vocabulario"): **"Tarea" en UI = `project_activities` en schema**. El próximo lector que vea `activity_id` o `ActivitiesPanel` necesita el puente — este es exactamente el patrón que justifica el ADR 0002.
-- [ ] **T4.3** — Si `docs/adr/0002-language-conventions.md` lista ejemplos del patrón schema-en-inglés / producto-en-español, sumar "Actividad (schema `project_activities`) → Tarea (UI)". Si no lista ejemplos, no se agrega.
+- [x] **T4.3** — Revisado: ADR 0002 no lista ejemplos específicos de pares schema/UI; solo tipos generales ("tablas en inglés", "copy en español") que ya cubren el caso 021 por composición. Sin cambios por la decisión del propio task ("Si no lista ejemplos, no se agrega").
 - [ ] **T4.4** — Verificación visual del usuario:
   - Workspace del proyecto → tab dice "Tareas", heading de la página dice "Tareas", CTA dice "+ Nueva tarea".
   - `<TimeEntryDialog>` abierto desde `/my-time` → dropdown dice "Tarea", placeholders dicen "Elegí una tarea" / "Sin tarea".

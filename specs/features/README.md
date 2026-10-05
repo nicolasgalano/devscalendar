@@ -30,7 +30,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 019 | Editor rich text para descripciones de tickets    | done (deployed 2026-09-18) | 015 | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | draft (spec)   | 015, 010     | fuera de spec original |
-| 021 | Tareas (rename) + reporte planilla con export XLSX | draft (spec)  | 016, 018     | fuera de spec original |
+| 021 | Tareas (rename) + reporte planilla con export XLSX | code done — pending deploy + verificación visual  | 016, 018     | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
