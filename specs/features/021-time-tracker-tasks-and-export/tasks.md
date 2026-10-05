@@ -38,8 +38,8 @@ Pass de reemplazos de strings sobre 8 archivos del frontend. Cero base, cero API
 
 Refactor del pipeline de export para producir las 11 columnas alineadas con la planilla de referencia. Dos serializers que comparten query y mapeo (plan §4.1). **El shape del CSV cambia** (breaking change confirmado — Q-3 del plan: sin consumidores externos automatizados conocidos).
 
-- [ ] **T2.1** — `pnpm add exceljs`. Sin `@types/exceljs` (trae sus propios types). Verificar `package.json` queda ordenado y `pnpm install` idempotente.
-- [ ] **T2.2** — Helper compartido `src/lib/reports/time-entries-report.ts`:
+- [x] **T2.1** — `pnpm add exceljs` 4.4.0. Trae sus propios types; `package.json` suma una sola dep.
+- [x] **T2.2** — Helper compartido `src/lib/reports/time-entries-report.ts`:
   - Type `ReportRow` con los 11 campos (plan §4.1): `cliente, proyecto, usuario, tarea, fechaInicio, fechaFin, zonaHoraria, duracion, horas, notas, ticketKey, ticketUrl`.
   - Constante `REPORT_COLUMNS` (key + header en español, orden del AC-2.3).
   - `queryTimeEntriesForReport(filters: ExportQueryInput): Promise<ReportRow[]>` — select con embeds (`project.client.name`, `project.key`, `user.full_name`, `activity.name`, `ticket.numero`), filtros por `clientId`/`projectId`/`userId`/rango, mapeo `entry → ReportRow`. **Cierra el TODO del `route.ts` actual** que arma el ticket key con un segundo query.
@@ -50,14 +50,14 @@ Refactor del pipeline de export para producir las 11 columnas alineadas con la p
   - `zonaHoraria`: fijo `"America/Argentina/Buenos_Aires"` (Q-5 del plan).
   - `ticketUrl`: `${process.env.NEXT_PUBLIC_SITE_URL}/tickets/<key>` si la var existe; `null` si no.
   - **El helper no filtra por permisos** — asume que el caller autorizó. La RLS de `time_entries` sigue vigente en el select.
-- [ ] **T2.3** — Serializer CSV `src/lib/reports/serialize-csv.ts`: `serializeReportToCsv(rows: ReportRow[]): string`. Headers en español desde `REPORT_COLUMNS`. Fechas como `dd/mm/yyyy HH:mm` (consistente con XLSX, R-4 del plan). `horas` con `.toFixed(2)`. `ticketKey` emitido como string plano (CSV no soporta hyperlink; `ticketUrl` no se emite). Reusar el helper `escapeCsv` del handler actual (comilla doble envolvente si contiene coma, comilla o salto; comillas internas se duplican).
-- [ ] **T2.4** — Serializer XLSX `src/lib/reports/serialize-xlsx.ts`: `serializeReportToXlsx(rows: ReportRow[]): Promise<Buffer>` con `exceljs`. Un solo sheet "Planilla". Anchos de columna del plan §4.3 (Cliente 20, Proyecto 20, Usuario 20, Tarea 20, Fecha inicio 18, Fecha fin 18, Zona horaria 22, Duración 10, Horas 8, Notas 40, Ticket 12). Celdas tipadas: `Date` con `numFmt = "dd/mm/yyyy hh:mm"` (locale-neutral — mitiga R-9 del plan: Excel no reinterpreta por locale del cliente), `horas` numérica con `numFmt = "0.00"`, `ticketKey` con URL como `{ text, hyperlink }`. Header row con `font = { bold: true }`.
-- [ ] **T2.5** — Refactor `src/app/api/time-entries/export.csv/route.ts`:
+- [x] **T2.3** — Serializer CSV `src/lib/reports/serialize-csv.ts`: `serializeReportToCsv(rows: ReportRow[]): string`. Headers en español desde `REPORT_COLUMNS`. Fechas como `dd/mm/yyyy HH:mm` (consistente con XLSX, R-4 del plan). `horas` con `.toFixed(2)`. `ticketKey` emitido como string plano (CSV no soporta hyperlink; `ticketUrl` no se emite). Reusar el helper `escapeCsv` del handler actual (comilla doble envolvente si contiene coma, comilla o salto; comillas internas se duplican).
+- [x] **T2.4** — Serializer XLSX `src/lib/reports/serialize-xlsx.ts`: `serializeReportToXlsx(rows: ReportRow[]): Promise<Buffer>` con `exceljs`. Un solo sheet "Planilla". Anchos de columna del plan §4.3 (Cliente 20, Proyecto 20, Usuario 20, Tarea 20, Fecha inicio 18, Fecha fin 18, Zona horaria 22, Duración 10, Horas 8, Notas 40, Ticket 12). Celdas tipadas: `Date` con `numFmt = "dd/mm/yyyy hh:mm"` (locale-neutral — mitiga R-9 del plan: Excel no reinterpreta por locale del cliente), `horas` numérica con `numFmt = "0.00"`, `ticketKey` con URL como `{ text, hyperlink }`. Header row con `font = { bold: true }`.
+- [x] **T2.5** — Refactor `src/app/api/time-entries/export.csv/route.ts`:
   - Handler delgado: `getCurrentProfile()` → guard admin/PM (403 si no) → `exportQuerySchema.safeParse()` → `queryTimeEntriesForReport()` → `serializeReportToCsv()` → `Response`.
   - **Breaking change de headers y nombre de archivo**: pasa de `time-entries-<from>-to-<to>.csv` a `planilla-<from>-a-<to>.csv`. Documentar en el commit.
   - `Content-Type: text/csv; charset=utf-8`.
-- [ ] **T2.6** — Nuevo endpoint `src/app/api/time-entries/export.xlsx/route.ts`. Mismo patrón que T2.5 pero con `serializeReportToXlsx`. **Import dinámico de `exceljs`** (`const ExcelJS = await import("exceljs")`) para no pagar cold start en el resto del bundle server. `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`. `Content-Disposition: attachment; filename="planilla-<from>-a-<to>.xlsx"`.
-- [ ] **T2.7** — Actualizar tests existentes de 016 que esperen el shape viejo del CSV (`fecha, user_email, user_nombre, …`) a los nuevos headers en español. Si no hay tests que lo validen contra expectations específicas, no se agrega — plan §6.2 decide explícitamente **no** sumar unit del serializer XLSX ni integration test del endpoint.
+- [x] **T2.6** — Nuevo endpoint `src/app/api/time-entries/export.xlsx/route.ts`. Mismo patrón que T2.5 pero con `serializeReportToXlsx`. **Import dinámico de `exceljs`** (`const ExcelJS = await import("exceljs")`) para no pagar cold start en el resto del bundle server. `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`. `Content-Disposition: attachment; filename="planilla-<from>-a-<to>.xlsx"`.
+- [x] **T2.7** — Cero tests existentes referenciaban el shape viejo del CSV (grep de `user_email|user_nombre|ticket_titulo|cargado_por|export\.csv` en `tests/` da vacío). El único call site del endpoint es `src/components/reports/report-filters-bar.tsx` que arma el href — se migra en Phase 3. 240/240 unit tests siguen verdes.
 
 ---
 
