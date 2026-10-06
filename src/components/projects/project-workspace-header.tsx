@@ -108,7 +108,7 @@ export function ProjectWorkspaceHeader({
             <TabLink
               href={`/projects/${project.key}/activities`}
               active={currentTab === "activities"}
-              label="Actividades"
+              label="Tareas"
             />
             <TabLink
               href={`/projects/${project.key}/members`}

@@ -1,6 +1,13 @@
 "use client";
 
-import { ImagePlusIcon, Loader2Icon, XIcon } from "lucide-react";
+import {
+  FileIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  Loader2Icon,
+  PaperclipIcon,
+  XIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -12,6 +19,10 @@ import {
   ATTACHMENT_ACCEPT_ATTR,
   MAX_ATTACHMENT_SIZE_BYTES,
   SOFT_TOTAL_PER_TICKET_BYTES,
+  iconForMime,
+  isImageMime,
+  type AttachmentIconKind,
+  type AttachmentMimeType,
 } from "@/lib/attachments/types";
 import {
   deleteTicketAttachment,
@@ -23,12 +34,18 @@ import type { TicketAttachmentSummary } from "@/lib/tickets/query";
 import { cn } from "@/lib/utils";
 
 /**
- * Panel de adjuntos del detalle de un ticket (feature 020).
+ * Panel de adjuntos del detalle de un ticket.
  *
- * - Grid responsivo de thumbnails, cada uno pide su URL firmada al montar.
- * - Click en thumb → lightbox con la imagen original (URL firmada aparte).
- * - Upload de uno o varios archivos: valida client, genera thumb, POST
- *   multipart. Cada archivo tiene su propio placeholder mientras sube.
+ * - **Imágenes** (feature 020): thumbnail con aspect-ratio dinámico, click
+ *   → lightbox con preview inline. Cada thumb pide su URL firmada al
+ *   montar.
+ * - **Documentos** (feature 025 — PDF, Word, Excel): card con ícono por
+ *   tipo + nombre + tamaño; click → descarga via signed URL con `?download=1`
+ *   que fuerza Content-Disposition attachment (el browser nunca ejecuta
+ *   inline, incluso un PDF se descarga).
+ * - Upload de uno o varios archivos: valida client (MIME + tamaño),
+ *   genera thumb solo para imágenes, POST multipart. Cada archivo tiene
+ *   su propio placeholder mientras sube.
  * - Contador visible al pie con el total usado. Sin bloqueo cuando pasa
  *   50 MB (soft limit).
  * - Borrar disponible solo para el autor + PM primario + admin.
@@ -174,11 +191,11 @@ export function TicketAttachmentsPanel({
             onChange={(e) => handleFiles(e.target.files)}
           />
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-            <ImagePlusIcon aria-hidden="true" />
-            Subir imagen
+            <PaperclipIcon aria-hidden="true" />
+            Subir archivo
           </Button>
           <span className="text-caption text-muted-foreground ml-3">
-            Hasta {formatBytes(MAX_ATTACHMENT_SIZE_BYTES)} por archivo · PNG, JPEG, WebP, GIF
+            Hasta {formatBytes(MAX_ATTACHMENT_SIZE_BYTES)} por archivo · imágenes, PDF, Word, Excel
           </span>
         </div>
       )}
@@ -187,23 +204,30 @@ export function TicketAttachmentsPanel({
         <p className="text-ui text-muted-foreground italic">Sin adjuntos.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {initialAttachments.map((attachment, index) => (
-            <ThumbnailCard
-              key={attachment.id}
-              ticketId={ticketId}
-              attachment={attachment}
-              onOpen={() => openLightbox(index)}
-              onDelete={
-                canDeleteAttachment(
-                  { uploaded_by: attachment.uploadedById },
-                  viewer,
-                  project,
-                )
-                  ? () => handleDelete(attachment)
-                  : undefined
-              }
-            />
-          ))}
+          {initialAttachments.map((attachment, index) => {
+            const canDelete = canDeleteAttachment(
+              { uploaded_by: attachment.uploadedById },
+              viewer,
+              project,
+            );
+            const onDelete = canDelete ? () => handleDelete(attachment) : undefined;
+            return isImageMime(attachment.mimeType) ? (
+              <ThumbnailCard
+                key={attachment.id}
+                ticketId={ticketId}
+                attachment={attachment}
+                onOpen={() => openLightbox(index)}
+                onDelete={onDelete}
+              />
+            ) : (
+              <DocumentCard
+                key={attachment.id}
+                ticketId={ticketId}
+                attachment={attachment}
+                onDelete={onDelete}
+              />
+            );
+          })}
           {pending.map((placeholder) => (
             <PendingCard
               key={placeholder.clientId}
@@ -303,6 +327,101 @@ function ThumbnailCard({
       </div>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DocumentCard (025 — adjuntos no-imagen: PDF, Word, Excel)
+// ─────────────────────────────────────────────────────────────
+
+function DocumentCard({
+  ticketId,
+  attachment,
+  onDelete,
+}: {
+  ticketId: string;
+  attachment: TicketAttachmentSummary;
+  onDelete?: () => void;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const { kind, tone } = iconForMime(attachment.mimeType as AttachmentMimeType);
+  const Icon = iconComponentForKind(kind);
+
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const url = await fetchAttachmentSignedUrl(ticketId, attachment.id, "original", {
+        download: true,
+      });
+      if (!url) {
+        alert("No se pudo generar el link de descarga");
+        return;
+      }
+      // Click programático sobre un `<a download>` oculto. Más predecible
+      // cross-browser que `window.location.assign` para disparar la
+      // descarga nativa sin reemplazar la navegación de la página actual.
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.originalFilename;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="group border-border bg-surface relative overflow-hidden rounded-md border">
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={downloading}
+        className="focus-visible:outline-ring block w-full outline-none focus-visible:outline-2 aspect-[3/2] flex items-center justify-center disabled:opacity-60"
+        aria-label={`Descargar ${attachment.originalFilename}`}
+      >
+        {downloading ? (
+          <Loader2Icon className="text-muted-foreground size-6 animate-spin" aria-hidden="true" />
+        ) : (
+          <Icon className={cn("size-12", tone)} aria-hidden="true" />
+        )}
+      </button>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Borrar ${attachment.originalFilename}`}
+          className="bg-background/80 text-muted-foreground hover:bg-background hover:text-danger absolute top-1 right-1 hidden size-6 items-center justify-center rounded-md backdrop-blur-sm group-hover:flex focus-visible:flex"
+        >
+          <XIcon className="size-3.5" />
+        </button>
+      )}
+
+      <div className="border-border border-t px-2 py-1.5">
+        <p className="text-caption truncate" title={attachment.originalFilename}>
+          {attachment.originalFilename}
+        </p>
+        <p className="text-caption text-muted-foreground">
+          {formatBytes(attachment.sizeBytes)}
+          {attachment.uploadedByName && ` · ${attachment.uploadedByName}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function iconComponentForKind(kind: AttachmentIconKind) {
+  switch (kind) {
+    case "pdf":
+    case "word":
+      return FileTextIcon;
+    case "excel":
+      return FileSpreadsheetIcon;
+    default:
+      return FileIcon;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

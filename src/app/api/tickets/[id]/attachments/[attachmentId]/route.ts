@@ -82,9 +82,14 @@ export async function DELETE(
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Para no-imagen (025) el thumb_object_key es null — solo hay un objeto
+  // que borrar.
+  const pathsToRemove = attachment.thumb_object_key
+    ? [attachment.object_key, attachment.thumb_object_key]
+    : [attachment.object_key];
   const removeResult = await admin.storage
     .from(ATTACHMENT_BUCKET)
-    .remove([attachment.object_key, attachment.thumb_object_key]);
+    .remove(pathsToRemove);
 
   if (removeResult.error) {
     // Fila queda. El user reintenta.

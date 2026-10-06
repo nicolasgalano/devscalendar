@@ -3,6 +3,7 @@ import {
   ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_SIZE_BYTES,
   isAttachmentMimeType,
+  isImageMime,
 } from "./types";
 import type { Database } from "@/types/database";
 
@@ -21,16 +22,18 @@ export type UploadResult = { ok: true; attachment: AttachmentDTO } | {
 /**
  * Sube un adjunto al ticket:
  *   1. Valida MIME + tamaño client-side (rebota antes de meter tráfico).
- *   2. Genera el thumb con Canvas.
- *   3. Arma un multipart con original + thumb + width + height.
- *   4. POST al endpoint del ticket.
+ *   2. **Solo si es imagen** (020): genera el thumb WebP con Canvas y lo
+ *      agrega al multipart junto con las dimensiones. Para no-imagen (PDF,
+ *      Word, Excel — 025) saltea `generateThumb` — el panel renderiza
+ *      ícono por tipo en vez de thumbnail.
+ *   3. POST al endpoint del ticket.
  *
  * Devuelve un resultado tagged en vez de tirar para que el llamador maneje
  * el estado por archivo sin `try/catch` — típico en batches de uploads en
  * paralelo (cada uno tiene su placeholder).
  *
  * **No hay progreso porcentual** — `fetch` no expone `progress` para
- * uploads. Si aparece la necesidad, se cambia a XHR (F1 de tasks.md).
+ * uploads. Si aparece la necesidad, se cambia a XHR (F1 del plan de 020).
  */
 export async function uploadTicketAttachment(
   ticketId: string,
@@ -53,24 +56,27 @@ export async function uploadTicketAttachment(
     return { ok: false, error: "El archivo está vacío" };
   }
 
-  // Thumb.
-  let thumb;
-  try {
-    thumb = await generateThumb(file);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo generar el thumbnail";
-    return { ok: false, error: message };
-  }
-
-  // Multipart. `FormData` acepta File y Blob; el segundo argumento es el
-  // filename que llega al server. Le damos al thumb un nombre derivado del
-  // original con extensión `.webp` para que el `original_filename` del
-  // original no se pise si un cliente confunde los fields.
   const form = new FormData();
   form.append("original", file, file.name);
-  form.append("thumb", thumb.blob, `${file.name}.webp`);
-  form.append("width", String(thumb.width));
-  form.append("height", String(thumb.height));
+
+  // Thumb solo para imágenes. Las docs/PDFs del 025 no tienen thumb — el
+  // panel renderiza ícono por tipo.
+  if (isImageMime(file.type)) {
+    let thumb;
+    try {
+      thumb = await generateThumb(file);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo generar el thumbnail";
+      return { ok: false, error: message };
+    }
+    // El segundo argumento del append es el filename que llega al server.
+    // Al thumb le damos un nombre derivado del original con extensión
+    // `.webp` para que el `original_filename` del original no se pise si
+    // un cliente confunde los fields.
+    form.append("thumb", thumb.blob, `${file.name}.webp`);
+    form.append("width", String(thumb.width));
+    form.append("height", String(thumb.height));
+  }
 
   let response: Response;
   try {
@@ -102,18 +108,29 @@ export async function uploadTicketAttachment(
 }
 
 /**
- * Pide una signed URL al server para un adjunto. Se usa desde el
- * `<ThumbnailCard>` on mount para pintar el thumb, y desde el `<Lightbox>`
- * para cargar el original.
+ * Pide una signed URL al server para un adjunto. Se usa desde:
+ *   - `<ThumbnailCard>` on mount → thumb (default).
+ *   - `<Lightbox>` → variant=original para preview inline.
+ *   - `<DocumentCard>` (025) → variant=original + download=true para
+ *     disparar la descarga nativa del browser.
+ *
+ * El flag `options.download` agrega `?download=1` al query, que hace que
+ * el server pida a Supabase Storage firmar la URL con el flag `download:
+ * originalFilename` — Supabase devuelve el archivo con
+ * `Content-Disposition: attachment` y el browser lo descarga sin renderizar
+ * inline (crítico para PDFs y docs).
  */
 export async function fetchAttachmentSignedUrl(
   ticketId: string,
   attachmentId: string,
   variant: "thumb" | "original" = "thumb",
+  options?: { download?: boolean },
 ): Promise<string | null> {
   try {
+    const params = new URLSearchParams({ variant });
+    if (options?.download) params.set("download", "1");
     const response = await fetch(
-      `/api/tickets/${ticketId}/attachments/${attachmentId}/signed-url?variant=${variant}`,
+      `/api/tickets/${ticketId}/attachments/${attachmentId}/signed-url?${params.toString()}`,
     );
     if (!response.ok) return null;
     const body = (await response.json()) as { url?: string };
