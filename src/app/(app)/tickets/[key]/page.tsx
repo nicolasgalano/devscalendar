@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { TicketDetail } from "@/components/tickets/ticket-detail";
+import { getDocAttachments } from "@/lib/attachments/signed-urls";
 import { isAdmin } from "@/lib/auth/roles";
+import { extractAttachmentIds } from "@/lib/editor/extract-attachment-ids";
 import { getActivitiesForProject } from "@/lib/project-activities/query";
 import { getOpenSprints } from "@/lib/sprints/query";
 import { getTimeEntriesForTicket } from "@/lib/time-entries/query";
@@ -47,6 +49,22 @@ export default async function TicketPage({
     getCommentsForTicket(ticket.id),
   ]);
 
+  // 026: resolver attachments referenciados por nodos `image` en la
+  // descripción y en cada comentario. La query de `getDocAttachments`
+  // filtra por `ticket_id = ticket.id` (defensa cross-tenant R-3 del spec)
+  // y firma los thumbs en paralelo. Si el doc no tiene imágenes, no hay
+  // query (early return del helper).
+  const attachmentIds = [
+    ...extractAttachmentIds(ticket.descriptionDoc),
+    ...comments.flatMap((c) => extractAttachmentIds(c.bodyDoc)),
+  ];
+  const supabaseForAttachments = await createClient();
+  const docAttachments = await getDocAttachments(
+    supabaseForAttachments,
+    ticket.id,
+    attachmentIds,
+  );
+
   // 016 US-1/US-2: contributor+ del proyecto puede cargar horas. Admin y PM
   // primario también. La verdad la tiene la RLS; esto es UX.
   const canLogTime = Boolean(
@@ -72,6 +90,7 @@ export default async function TicketPage({
       }))}
       canLogTime={canLogTime}
       comments={comments}
+      docAttachments={docAttachments}
     />
   );
 }
