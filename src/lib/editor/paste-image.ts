@@ -29,7 +29,7 @@
 
 import type { EditorView } from "@tiptap/pm/view";
 
-import { isImageMime } from "@/lib/attachments/types";
+import { isAttachmentMimeType, isImageMime } from "@/lib/attachments/types";
 import { uploadTicketAttachment } from "@/lib/attachments/upload";
 
 import type { ProseMirrorNode } from "./validate";
@@ -67,6 +67,43 @@ export function docHasPendingUploads(doc: unknown): boolean {
   return false;
 }
 
+// Al cargar un doc existente en el editor (edit mode), los nodos `image`
+// guardados en la DB vienen sin `src` (el server no lo persiste — ver §3
+// del plan). Para que el editor los muestre, hay que hidratar el `src`
+// desde el map de attachments ya resuelto por la page. Esta función
+// recorre el doc y setea `attrs.src = signedThumbnailUrl` para cada nodo
+// `image` cuyo `attachment_id` esté en el map. Los que no, quedan sin
+// src — el editor los muestra como broken image (edge case: adjunto
+// borrado + alguien editando el doc).
+export function hydrateImageSrcs(
+  doc: unknown,
+  attachments: Map<string, { signedThumbnailUrl: string | null }>,
+): unknown {
+  if (!doc || typeof doc !== "object") return doc;
+  const node = doc as ProseMirrorNode & { src?: unknown };
+
+  const cloned: ProseMirrorNode & { src?: unknown } = { ...node };
+
+  if (
+    cloned.type === "image" &&
+    cloned.attrs &&
+    typeof cloned.attrs.attachment_id === "string" &&
+    !isPendingAttachmentId(cloned.attrs.attachment_id)
+  ) {
+    const att = attachments.get(cloned.attrs.attachment_id);
+    if (att?.signedThumbnailUrl) {
+      cloned.attrs = { ...cloned.attrs, src: att.signedThumbnailUrl };
+    }
+  }
+
+  if (Array.isArray(cloned.content)) {
+    cloned.content = cloned.content.map((c) =>
+      hydrateImageSrcs(c, attachments),
+    ) as ProseMirrorNode[];
+  }
+  return cloned;
+}
+
 // Antes de mandar el doc al server, el `src` transitorio (`blob:` para
 // recién pegados o signed URL hidratada para los ya guardados) se saca.
 // El server solo acepta attrs declarados en el schema (attachment_id,
@@ -93,13 +130,19 @@ export function stripTransientImageAttrs(doc: unknown): unknown {
   return cleaned;
 }
 
-type PasteHandlerContext = {
+type NotifyKind = "error" | "info";
+
+type HandlerContext = {
   ticketKey: string;
-  onError?: (message: string) => void;
+  onNotify?: (message: string, kind: NotifyKind) => void;
+  // Signal usado por el drop handler cuando sube un adjunto solo-panel
+  // (PDF/Word/Excel). El panel escucha este callback para refrescar sin
+  // recargar la página.
+  onPanelAttachmentAdded?: () => void;
 };
 
 export function createImagePasteHandler(
-  ctx: PasteHandlerContext,
+  ctx: HandlerContext,
 ): (view: EditorView, event: ClipboardEvent) => boolean {
   return (view, event) => {
     const items = event.clipboardData?.items;
@@ -129,10 +172,71 @@ export function createImagePasteHandler(
   };
 }
 
+// AC-1.4 / AC-1.5: drag-and-drop externo (archivos arrastrados desde el
+// Finder, no reorder de bloques internos del editor).
+//
+//   - Imagen (whitelist 020): mismo flujo que paste — nodo pending inline +
+//     subida con source='paste'.
+//   - No-imagen permitido por 025 (PDF/Word/Excel): sube con source='panel'
+//     (NO entra al doc; no hay representación inline para docs). Notifica
+//     con onNotify('Adjuntado al ticket', 'info').
+//   - Fuera de la whitelist (video, audio, etc.): no-op; cae al handler
+//     default de Tiptap (que generalmente no hace nada con files).
+//
+// `event.dataTransfer.files.length === 0` cae a Tiptap default (reorder
+// interno de nodos usa dataTransfer con tipo "application/x-pm-slice", no
+// `files`).
+export function createImageDropHandler(
+  ctx: HandlerContext,
+): (view: EditorView, event: DragEvent) => boolean {
+  return (view, event) => {
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return false;
+
+    const images: File[] = [];
+    const docsOnly: File[] = [];
+
+    for (const file of Array.from(files)) {
+      if (isImageMime(file.type)) {
+        images.push(file);
+      } else if (isAttachmentMimeType(file.type)) {
+        docsOnly.push(file);
+      }
+      // otros MIME se ignoran
+    }
+
+    if (images.length === 0 && docsOnly.length === 0) return false;
+
+    event.preventDefault();
+
+    for (const file of images) {
+      void uploadAndFinalize(view, file, ctx);
+    }
+
+    for (const file of docsOnly) {
+      void uploadDocToPanel(file, ctx);
+    }
+
+    return true;
+  };
+}
+
+async function uploadDocToPanel(file: File, ctx: HandlerContext): Promise<void> {
+  const result = await uploadTicketAttachment(ctx.ticketKey, file, {
+    source: "panel",
+  });
+  if (result.ok) {
+    ctx.onNotify?.("Adjuntado al ticket", "info");
+    ctx.onPanelAttachmentAdded?.();
+  } else {
+    ctx.onNotify?.(result.error, "error");
+  }
+}
+
 async function uploadAndFinalize(
   view: EditorView,
   file: File,
-  ctx: PasteHandlerContext,
+  ctx: HandlerContext,
 ): Promise<void> {
   const pendingId = makePendingAttachmentId();
   const localUrl = URL.createObjectURL(file);
@@ -188,7 +292,7 @@ async function uploadAndFinalize(
   } else {
     view.dispatch(view.state.tr.delete(nodePos, nodePos + 1));
     URL.revokeObjectURL(localUrl);
-    ctx.onError?.(result.error);
+    ctx.onNotify?.(result.error, "error");
   }
 }
 

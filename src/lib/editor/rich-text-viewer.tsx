@@ -1,4 +1,5 @@
 import type { DocAttachment } from "@/lib/attachments/signed-urls";
+import { InlineImageLightboxHydrator } from "@/components/tickets/inline-image-lightbox-hydrator";
 import { cn } from "@/lib/utils";
 
 import { renderDocToHtml } from "./render";
@@ -94,6 +95,7 @@ export function RichTextViewer({
           expectedUpdatedAt={expectedUpdatedAt}
         />
       )}
+      {attachments && attachments.size > 0 && <InlineImageLightboxHydrator />}
     </div>
   );
 }

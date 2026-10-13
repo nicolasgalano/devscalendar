@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { LinkPopover } from "./link-popover";
 import { createMentionSuggestion } from "./mention-suggestion";
 import { sanitizePastedHtml } from "./paste";
-import { createImagePasteHandler } from "./paste-image";
+import { createImageDropHandler, createImagePasteHandler } from "./paste-image";
 import { buildRichTextExtensions } from "./tiptap-extensions";
 
 // El único cliente del editor rich text de 019. El `<TicketFormDialog>` lo
@@ -59,14 +59,22 @@ type RichTextEditorProps = {
   // queda montada pero sin sugerencias — sirve para mostrar mentions existentes
   // en modo lectura o en un futuro editor descontextualizado.
   projectId?: string;
-  // 026. Si se pasa, el editor cablea `handlePaste` para subir imágenes del
-  // clipboard al ticket y insertarlas como nodos `image` con `attachment_id`.
-  // Sin `ticketKey` el paste de imagen cae a los defaults de Tiptap (que no
-  // soporta imágenes binarias — se ignoran). Edit mode del TicketFormDialog
-  // lo pasa; create mode no (el ticket todavía no existe).
+  // 026. Si se pasa, el editor cablea `handlePaste` + `handleDrop` para
+  // subir imágenes del clipboard o archivos arrastrados al ticket. Sin
+  // `ticketKey` ambos handlers quedan apagados y los defaults de Tiptap
+  // toman control (que generalmente no hacen nada útil con binarios).
+  // Edit mode del TicketFormDialog lo pasa; create mode no (el ticket
+  // todavía no existe).
   ticketKey?: string;
-  // 026. Callback para errores de upload — toast "No se pudo subir la imagen".
-  onImageUploadError?: (message: string) => void;
+  // 026. Canal de feedback hacia el formulario padre. `kind: 'error'` para
+  // fallos de upload ("La imagen pesa más de 10 MB"); `kind: 'info'` para
+  // éxito que no se refleja inline en el doc ("Adjuntado al ticket" de un
+  // PDF que fue dropeado — vive solo en el panel).
+  onNotify?: (message: string, kind: "error" | "info") => void;
+  // 026. Signal de que una subida solo-panel terminó. El padre lo usa
+  // típicamente para `router.refresh()` y que el panel de adjuntos
+  // muestre el archivo nuevo.
+  onPanelAttachmentAdded?: () => void;
 };
 
 export function RichTextEditor({
@@ -78,18 +86,22 @@ export function RichTextEditor({
   disabled = false,
   projectId,
   ticketKey,
-  onImageUploadError,
+  onNotify,
+  onPanelAttachmentAdded,
 }: RichTextEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [plainTextLength, setPlainTextLength] = useState(0);
 
-  // Capturar el callback en un ref para que el handler creado una sola vez
-  // vea siempre la última versión. Si no, un closure estable + prop que
-  // cambia dejaría el handler con la primera versión y las toasts fallarían.
-  const onImageUploadErrorRef = useRef(onImageUploadError);
+  // Capturar los callbacks en refs para que los handlers creados una sola vez
+  // vean siempre la última versión. Si no, un closure estable + props que
+  // cambian dejarían los handlers con la primera versión y las toasts
+  // fallarían después de un re-render del padre.
+  const onNotifyRef = useRef(onNotify);
+  const onPanelAttachmentAddedRef = useRef(onPanelAttachmentAdded);
   useEffect(() => {
-    onImageUploadErrorRef.current = onImageUploadError;
-  }, [onImageUploadError]);
+    onNotifyRef.current = onNotify;
+    onPanelAttachmentAddedRef.current = onPanelAttachmentAdded;
+  }, [onNotify, onPanelAttachmentAdded]);
 
   const extensions = useMemo(
     () =>
@@ -123,7 +135,15 @@ export function RichTextEditor({
         ? {
             handlePaste: createImagePasteHandler({
               ticketKey,
-              onError: (msg) => onImageUploadErrorRef.current?.(msg),
+              onNotify: (msg, kind) => onNotifyRef.current?.(msg, kind),
+              onPanelAttachmentAdded: () =>
+                onPanelAttachmentAddedRef.current?.(),
+            }),
+            handleDrop: createImageDropHandler({
+              ticketKey,
+              onNotify: (msg, kind) => onNotifyRef.current?.(msg, kind),
+              onPanelAttachmentAdded: () =>
+                onPanelAttachmentAddedRef.current?.(),
             }),
           }
         : {}),
@@ -212,6 +232,11 @@ export function RichTextEditor({
 
   const counterTone = counterColor(plainTextLength, maxPlainTextLength);
 
+  // 026: hint cuando el editor está vacío + paste activo. Muy sutil, al pie,
+  // al lado del contador. Solo se muestra si no hay texto y ticketKey está
+  // seteado (edit mode); desaparece apenas el usuario empieza a escribir.
+  const showPasteHint = ticketKey !== undefined && plainTextLength === 0;
+
   return (
     <div
       className={cn(
@@ -221,7 +246,15 @@ export function RichTextEditor({
     >
       <Toolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} disabled={disabled} />
       <EditorContent editor={editor} />
-      <div className="border-border text-muted-foreground flex items-center justify-end border-t px-3 py-1.5 text-xs">
+      <div className="border-border text-muted-foreground flex items-center justify-between gap-2 border-t px-3 py-1.5 text-xs">
+        {showPasteHint ? (
+          <span className="text-muted-foreground">
+            Tip: <kbd className="rounded border border-border bg-surface px-1 font-mono">Cmd+V</kbd>{" "}
+            para pegar screenshots
+          </span>
+        ) : (
+          <span />
+        )}
         <span className={counterTone}>
           {plainTextLength.toLocaleString("es-AR")} / {maxPlainTextLength.toLocaleString("es-AR")}
         </span>

@@ -22,8 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
 import {
   docHasPendingUploads,
+  hydrateImageSrcs,
   stripTransientImageAttrs,
 } from "@/lib/editor/paste-image";
 import { EditorSkeleton } from "@/lib/editor/rich-text-editor";
@@ -96,6 +98,7 @@ export function TicketFormDialog({
   canEditFields = true,
   canReassign = true,
   canSprintPlan = false,
+  attachments,
 }: {
   mode: "create" | "edit";
   open: boolean;
@@ -115,6 +118,13 @@ export function TicketFormDialog({
   canReassign?: boolean;
   /** 018: si el viewer puede tocar sprint_id / estimated_hours (admin/PM/lead). */
   canSprintPlan?: boolean;
+  /**
+   * 026: attachments del ticket con signed URLs del thumbnail pre-firmadas
+   * por la page server-side. Se usa para hidratar el `src` de los nodos
+   * `image` del doc inicial antes de pasarlo al editor — sin esto las
+   * imágenes guardadas aparecen broken al re-editar.
+   */
+  attachments?: Map<string, DocAttachment>;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -126,13 +136,23 @@ export function TicketFormDialog({
   // Cuando el dialog se abre (o `initial` cambia), reflejar el estado del
   // padre. Sin esto, abrir "Editar" dos veces sobre tickets distintos muestra
   // el primero.
+  //
+  // 026: al abrir en edit mode, hidrato el `src` de los nodos image del doc
+  // inicial desde el map de attachments. El server guardó solo el
+  // `attachment_id`; sin esto el editor los renderiza como `<img src>`
+  // vacío (broken image). Al confirmar los cambios, `stripTransientImageAttrs`
+  // vuelve a sacar el `src` antes del PATCH.
   useEffect(() => {
     if (open) {
-      setForm(initial);
+      const hydratedDoc =
+        attachments && initial.descriptionDoc
+          ? (hydrateImageSrcs(initial.descriptionDoc, attachments) as JSONContent)
+          : initial.descriptionDoc;
+      setForm({ ...initial, descriptionDoc: hydratedDoc });
       setError(null);
       setDirty(false);
     }
-  }, [open, initial]);
+  }, [open, initial, attachments]);
 
   const availableMembers: Person[] = useMemo(() => {
     if (mode === "edit") return members ?? [];
@@ -454,12 +474,17 @@ export function TicketFormDialog({
               placeholder="Describí el ticket. Podés usar formato."
               disabled={!canEditFields}
               projectId={form.projectId ?? undefined}
-              // 026: solo encendemos el paste en edit mode. En create el
-              // ticket todavía no existe (no hay id para asociar el adjunto)
-              // así que el handler queda apagado y el paste de imagen no
-              // hace nada visible. Q-5 del spec.
+              // 026: solo encendemos el paste/drop en edit mode. En create
+              // el ticket todavía no existe (no hay id para asociar el
+              // adjunto) así que los handlers quedan apagados. Q-5 del spec.
               ticketKey={mode === "edit" ? initial.id : undefined}
-              onImageUploadError={(msg) => setError(msg)}
+              onNotify={(msg, kind) => {
+                if (kind === "error") setError(msg);
+                // 'info' notifications se descartan por ahora — el padre
+                // puede sumar un toast real si quiere más adelante. El
+                // panel se refresca por onPanelAttachmentAdded abajo.
+              }}
+              onPanelAttachmentAdded={() => router.refresh()}
             />
           </div>
         </div>
