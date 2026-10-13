@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
 import { renderDocToHtml } from "@/lib/editor/render";
 import type { ProseMirrorNode } from "@/lib/editor/validate";
 import { formatAbsoluteFull, formatRelativeShort } from "@/lib/tickets/relative-time";
@@ -44,6 +45,10 @@ type CommentItemProps = {
   projectId: string;
   projectPmId: string;
   viewer: CommentItemViewer;
+  // 026: mismo map que recibe el `<RichTextViewer>` de la descripción. Los
+  // comentarios comparten el panel de adjuntos del ticket, así que una sola
+  // resolución de signed URLs alcanza para todo el detalle.
+  attachments?: Map<string, DocAttachment>;
 };
 
 export function CommentItem({
@@ -52,6 +57,7 @@ export function CommentItem({
   projectId,
   projectPmId,
   viewer,
+  attachments,
 }: CommentItemProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -63,7 +69,9 @@ export function CommentItem({
     comment.authorId === viewer.id || viewer.isAdmin || projectPmId === viewer.id;
 
   const isEdited = comment.updatedAt !== comment.createdAt;
-  const html = comment.bodyDoc ? renderDocToHtml(comment.bodyDoc) : "";
+  const html = comment.bodyDoc
+    ? renderDocToHtml(comment.bodyDoc, { attachments, ticketId })
+    : "";
 
   async function submitEdit(doc: JSONContent) {
     setError(null);

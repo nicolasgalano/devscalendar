@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
 import type { TicketComment } from "@/lib/tickets/comments";
 
 import { CommentItem } from "./comment-item";
@@ -31,6 +32,8 @@ type TicketCommentsProps = {
     id: string;
     isAdmin: boolean;
   } | null;
+  // 026: ver `comment-item.tsx` — map pre-firmado en la page.
+  attachments?: Map<string, DocAttachment>;
 };
 
 export function TicketComments({
@@ -39,6 +42,7 @@ export function TicketComments({
   projectPmId,
   comments,
   viewer,
+  attachments,
 }: TicketCommentsProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -93,6 +97,7 @@ export function TicketComments({
                   projectId={projectId}
                   projectPmId={projectPmId}
                   viewer={viewer}
+                  attachments={attachments}
                 />
               ) : (
                 <CommentItem
@@ -101,6 +106,7 @@ export function TicketComments({
                   projectId={projectId}
                   projectPmId={projectPmId}
                   viewer={{ id: "", isAdmin: false }}
+                  attachments={attachments}
                 />
               )}
             </li>

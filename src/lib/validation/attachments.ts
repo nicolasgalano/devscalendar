@@ -21,6 +21,7 @@ import {
  *                MIME image/webp, size ≤ 100 KB).
  *   - `width`    (opcional — requerido solo si `original` es imagen, int positivo ≤ 20000).
  *   - `height`   (opcional — requerido solo si `original` es imagen, int positivo ≤ 20000).
+ *   - `source`   (opcional — `'panel'` o `'paste'`; default `'panel'`. 026).
  *
  * **Thumb/width/height solo para imágenes.** Las imágenes se renderizan como
  * thumbnail en el panel y necesitan dimensiones para calcular aspect-ratio
@@ -34,12 +35,17 @@ import {
  * handler traduce a 400.
  */
 
+export type AttachmentSource = "panel" | "paste";
+
 export type ParsedAttachmentUpload = {
   original: File;
   thumb?: File;
   width?: number;
   height?: number;
+  source: AttachmentSource;
 };
+
+const sourceSchema = z.enum(["panel", "paste"]).default("panel");
 
 export type ParseAttachmentUploadResult =
   | { ok: true; data: ParsedAttachmentUpload }
@@ -122,6 +128,21 @@ export async function parseAttachmentUploadForm(
     }
   }
 
+  // `source` siempre se parsea — tiene default 'panel' si falta. Un valor
+  // fuera del enum (ej. 'bogus') cae en issues y el handler responde 400,
+  // así se cumple AC-8.1 de 026 (solo 'panel' o 'paste' se persisten).
+  // `form.get("source")` devuelve `null` si no está — el `.default()` del
+  // schema recibe `null` como "faltante" sólo si lo normalizamos a undefined.
+  const rawSource = form.get("source");
+  const sourceInput = typeof rawSource === "string" ? rawSource : undefined;
+  const sourceResult = sourceSchema.safeParse(sourceInput);
+  let parsedSource: AttachmentSource = "panel";
+  if (!sourceResult.success) {
+    issues.source = sourceResult.error.issues.map((i) => i.message);
+  } else {
+    parsedSource = sourceResult.data;
+  }
+
   if (Object.keys(issues).length > 0) {
     return { ok: false, issues };
   }
@@ -133,6 +154,7 @@ export async function parseAttachmentUploadForm(
       ...(parsedThumb ? { thumb: parsedThumb } : {}),
       ...(parsedWidth !== undefined ? { width: parsedWidth } : {}),
       ...(parsedHeight !== undefined ? { height: parsedHeight } : {}),
+      source: parsedSource,
     },
   };
 }
