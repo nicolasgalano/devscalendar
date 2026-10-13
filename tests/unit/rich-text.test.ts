@@ -50,10 +50,50 @@ describe("019 rich text — schema, validator, renderer", () => {
     expect(parsed.success).toBe(true);
   });
 
-  it("rechaza doc con nodo image (reservado para 020)", () => {
+  it("acepta nodo image con attachment_id uuid válido (026)", () => {
     const doc = {
       type: "doc",
-      content: [{ type: "image", attrs: { src: "https://x.com/a.png" } }],
+      content: [
+        {
+          type: "image",
+          attrs: { attachment_id: "11111111-1111-1111-1111-111111111111" },
+        },
+      ],
+    };
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rechaza nodo image sin attachment_id (requerido por 026)", () => {
+    const doc = {
+      type: "doc",
+      content: [{ type: "image", attrs: {} }],
+    };
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rechaza nodo image con attachment_id no-uuid", () => {
+    const doc = {
+      type: "doc",
+      content: [{ type: "image", attrs: { attachment_id: "not-a-uuid" } }],
+    };
+    const parsed = richTextDocSchema.safeParse(doc);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rechaza nodo image con src crudo (vector XSS legacy; 019 lo aceptaba antes de 026)", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "image",
+          attrs: {
+            attachment_id: "11111111-1111-1111-1111-111111111111",
+            src: "https://x.com/a.png",
+          },
+        },
+      ],
     };
     const parsed = richTextDocSchema.safeParse(doc);
     expect(parsed.success).toBe(false);
