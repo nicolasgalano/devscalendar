@@ -161,3 +161,9 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ claimed: claimed?.length ?? 0, sent, failed, skipped });
 }
+
+// Vercel invoca los crons con GET (Hobby no permite cambiar el método), y el
+// drenaje no depende del verbo: la autorización es por bearer y el trabajo
+// está acá adentro. Alias explícito para que el cron entre al mismo handler
+// sin duplicar código.
+export const GET = POST;
