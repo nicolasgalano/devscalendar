@@ -99,7 +99,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  const { original, thumb, width, height } = parsed.data;
+  const { original, thumb, width, height, source } = parsed.data;
 
   // El MIME ya vino validado por `parseAttachmentUploadForm` contra la
   // whitelist. Repetimos el narrowing acá para tipar `originalMime` como
@@ -195,6 +195,7 @@ export async function POST(
     width: isImage ? width ?? null : null,
     height: isImage ? height ?? null : null,
     uploaded_by: viewer.id,
+    source,
   };
 
   const { data: inserted, error: insertError } = await supabase

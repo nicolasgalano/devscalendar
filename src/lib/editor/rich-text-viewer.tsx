@@ -1,3 +1,4 @@
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
 import { cn } from "@/lib/utils";
 
 import { renderDocToHtml } from "./render";
@@ -28,6 +29,11 @@ type RichTextViewerProps = {
   ticketId?: string;
   canEditChecklist?: boolean;
   expectedUpdatedAt?: string;
+  // 026: map de attachments del ticket actual, pre-firmados en la page
+  // server-side. Ausente → los nodos `image` renderizan placeholder "imagen
+  // eliminada". Mismo map alcanza para descripción y para cada comentario
+  // (todos los nodos `image` del ticket viven en el mismo panel).
+  attachments?: Map<string, DocAttachment>;
 };
 
 export function RichTextViewer({
@@ -36,6 +42,7 @@ export function RichTextViewer({
   ticketId,
   canEditChecklist,
   expectedUpdatedAt,
+  attachments,
 }: RichTextViewerProps) {
   if (!doc || isEmptyDoc(doc)) {
     return (
@@ -45,7 +52,7 @@ export function RichTextViewer({
     );
   }
 
-  const html = renderDocToHtml(doc);
+  const html = renderDocToHtml(doc, { attachments, ticketId });
   const canHydrateChecklist = Boolean(canEditChecklist && ticketId && expectedUpdatedAt);
 
   return (

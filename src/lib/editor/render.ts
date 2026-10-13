@@ -1,6 +1,8 @@
 import { toHtml } from "hast-util-to-html";
 import { common, createLowlight } from "lowlight";
 
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
+
 import {
   CODE_BLOCK_LANGUAGES,
   LINK_PROTOCOLS,
@@ -32,13 +34,30 @@ const lowlight = createLowlight(common);
 
 type RenderContext = {
   taskItemCount: number;
+  attachments: Map<string, DocAttachment> | null;
+  ticketId: string | null;
 };
 
-export function renderDocToHtml(doc: ProseMirrorNode): string {
+export type RenderOptions = {
+  // Map de attachments del ticket actual (pre-firmados por la page server-side).
+  // Ausente → cualquier nodo `image` renderiza placeholder "no disponible".
+  attachments?: Map<string, DocAttachment>;
+  // Id del ticket que se está renderizando. Si el map trae un attachment cuyo
+  // `ticketId` no coincide, se renderiza placeholder (defensa cross-tenant
+  // R-3 del spec de 026; el `getDocAttachments` también filtra por ticket_id
+  // en la query, esto es defense-in-depth).
+  ticketId?: string;
+};
+
+export function renderDocToHtml(doc: ProseMirrorNode, opts?: RenderOptions): string {
   if (doc.type !== "doc") {
     return "";
   }
-  const ctx: RenderContext = { taskItemCount: 0 };
+  const ctx: RenderContext = {
+    taskItemCount: 0,
+    attachments: opts?.attachments ?? null,
+    ticketId: opts?.ticketId ?? null,
+  };
   return renderChildren(doc.content, ctx);
 }
 
@@ -107,11 +126,41 @@ function renderNode(node: ProseMirrorNode, ctx: RenderContext): string {
     case "text":
       return renderText(node);
 
-    // El validador rechaza docs con `image` en 019; si por alguna razón llega
-    // acá, se omite en silencio en vez de emitir un `<img>` sin políticas de
-    // sanitización aún definidas.
-    case "image":
-      return "";
+    // 026: nodo activo. `attrs.attachment_id` referencia a una fila de
+    // `ticket_attachments`; el `<img>` toma `src` de la signed URL del
+    // thumbnail que la page server-side pre-firmó. Casos:
+    //
+    //   - Sin map (viewer sin contexto de attachments): placeholder.
+    //   - id no está en el map: adjunto borrado o cross-tenant → placeholder.
+    //   - ticket mismatch (defense-in-depth, la query ya filtra): placeholder.
+    //   - signedThumbnailUrl null (firma falló): placeholder.
+    //   - OK: `<img>` con `data-attachment-id` para que el hidratador del
+    //     lightbox lo detecte y abra el modal del panel al click (Phase 4).
+    case "image": {
+      const attachmentId =
+        typeof node.attrs?.attachment_id === "string" ? node.attrs.attachment_id : "";
+      if (!attachmentId) return renderMissingImagePlaceholder();
+
+      const att = ctx.attachments?.get(attachmentId);
+      if (!att) return renderMissingImagePlaceholder();
+      if (ctx.ticketId && att.ticketId !== ctx.ticketId) {
+        return renderMissingImagePlaceholder();
+      }
+      if (!att.signedThumbnailUrl) return renderMissingImagePlaceholder();
+
+      const alt =
+        typeof node.attrs?.alt === "string" && node.attrs.alt.length > 0
+          ? node.attrs.alt
+          : att.originalFilename;
+
+      return (
+        `<img src="${escapeAttr(att.signedThumbnailUrl)}" ` +
+        `alt="${escapeAttr(alt)}" ` +
+        `data-attachment-id="${escapeAttr(att.id)}" ` +
+        `class="ticket-image-inline" ` +
+        `loading="lazy" />`
+      );
+    }
 
     // 022: chip inline "@Nombre" sin link clickeable en el MVP.
     // data-mention-user-id queda por si una fase futura lo consume (tooltip
@@ -201,6 +250,10 @@ function highlightCode(code: string, language: CodeBlockLanguage | null): string
     // No queremos que un code block roto tire toda la renderización del ticket.
     return escapeText(code);
   }
+}
+
+function renderMissingImagePlaceholder(): string {
+  return `<span class="ticket-image-missing">Imagen eliminada</span>`;
 }
 
 function escapeText(value: string): string {

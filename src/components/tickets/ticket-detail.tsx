@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { DocAttachment } from "@/lib/attachments/signed-urls";
 import { markdownToProseMirrorDoc } from "@/lib/editor/convert";
 import { RichTextViewer } from "@/lib/editor/rich-text-viewer";
 import type { ProseMirrorNode } from "@/lib/editor/validate";
@@ -87,6 +88,7 @@ export function TicketDetail({
   projectActivities,
   canLogTime,
   comments,
+  docAttachments,
 }: {
   ticket: TicketDetailData;
   viewer: { id: string; roles: UserRole[] } | null;
@@ -102,6 +104,14 @@ export function TicketDetail({
   canLogTime: boolean;
   /** 022: feed de comentarios del ticket, cronológico ascendente. */
   comments: TicketComment[];
+  /**
+   * 026: attachments referenciados por nodos `image` en la descripción o
+   * en algún comentario, con signed URL del thumbnail ya resuelta. La page
+   * extrae los ids del doc + de cada comment, los trae y los firma en batch,
+   * y acá se usan en el render del viewer y de cada comentario sin más
+   * queries.
+   */
+  docAttachments?: Map<string, DocAttachment>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -456,6 +466,7 @@ export function TicketDetail({
           ticketId={ticket.id}
           canEditChecklist={mayEditFields}
           expectedUpdatedAt={optimistic.updatedAt}
+          attachments={docAttachments}
         />
       </section>
 
@@ -493,6 +504,7 @@ export function TicketDetail({
         projectPmId={ticket.project.pmId}
         comments={comments}
         viewer={viewer ? { id: viewer.id, isAdmin: viewer.roles.includes("admin") } : null}
+        attachments={docAttachments}
       />
 
       {!ticket.project.active && (
@@ -537,12 +549,14 @@ function TicketDescription({
   ticketId,
   canEditChecklist,
   expectedUpdatedAt,
+  attachments,
 }: {
   descriptionDoc: ProseMirrorNode | null;
   description: string | null;
   ticketId: string;
   canEditChecklist: boolean;
   expectedUpdatedAt: string;
+  attachments?: Map<string, DocAttachment>;
 }) {
   if (descriptionDoc) {
     return (
@@ -551,6 +565,7 @@ function TicketDescription({
         ticketId={ticketId}
         canEditChecklist={canEditChecklist}
         expectedUpdatedAt={expectedUpdatedAt}
+        attachments={attachments}
       />
     );
   }
