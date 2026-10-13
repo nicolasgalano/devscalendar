@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { LinkPopover } from "./link-popover";
 import { createMentionSuggestion } from "./mention-suggestion";
 import { sanitizePastedHtml } from "./paste";
+import { createImageDropHandler, createImagePasteHandler } from "./paste-image";
 import { buildRichTextExtensions } from "./tiptap-extensions";
 
 // El único cliente del editor rich text de 019. El `<TicketFormDialog>` lo
@@ -58,6 +59,22 @@ type RichTextEditorProps = {
   // queda montada pero sin sugerencias — sirve para mostrar mentions existentes
   // en modo lectura o en un futuro editor descontextualizado.
   projectId?: string;
+  // 026. Si se pasa, el editor cablea `handlePaste` + `handleDrop` para
+  // subir imágenes del clipboard o archivos arrastrados al ticket. Sin
+  // `ticketKey` ambos handlers quedan apagados y los defaults de Tiptap
+  // toman control (que generalmente no hacen nada útil con binarios).
+  // Edit mode del TicketFormDialog lo pasa; create mode no (el ticket
+  // todavía no existe).
+  ticketKey?: string;
+  // 026. Canal de feedback hacia el formulario padre. `kind: 'error'` para
+  // fallos de upload ("La imagen pesa más de 10 MB"); `kind: 'info'` para
+  // éxito que no se refleja inline en el doc ("Adjuntado al ticket" de un
+  // PDF que fue dropeado — vive solo en el panel).
+  onNotify?: (message: string, kind: "error" | "info") => void;
+  // 026. Signal de que una subida solo-panel terminó. El padre lo usa
+  // típicamente para `router.refresh()` y que el panel de adjuntos
+  // muestre el archivo nuevo.
+  onPanelAttachmentAdded?: () => void;
 };
 
 export function RichTextEditor({
@@ -68,9 +85,23 @@ export function RichTextEditor({
   maxPlainTextLength = DEFAULT_MAX_PLAIN_TEXT_LENGTH,
   disabled = false,
   projectId,
+  ticketKey,
+  onNotify,
+  onPanelAttachmentAdded,
 }: RichTextEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [plainTextLength, setPlainTextLength] = useState(0);
+
+  // Capturar los callbacks en refs para que los handlers creados una sola vez
+  // vean siempre la última versión. Si no, un closure estable + props que
+  // cambian dejarían los handlers con la primera versión y las toasts
+  // fallarían después de un re-render del padre.
+  const onNotifyRef = useRef(onNotify);
+  const onPanelAttachmentAddedRef = useRef(onPanelAttachmentAdded);
+  useEffect(() => {
+    onNotifyRef.current = onNotify;
+    onPanelAttachmentAddedRef.current = onPanelAttachmentAdded;
+  }, [onNotify, onPanelAttachmentAdded]);
 
   const extensions = useMemo(
     () =>
@@ -100,6 +131,22 @@ export function RichTextEditor({
     immediatelyRender: false,
     editorProps: {
       transformPastedHTML: (html) => sanitizePastedHtml(html),
+      ...(ticketKey
+        ? {
+            handlePaste: createImagePasteHandler({
+              ticketKey,
+              onNotify: (msg, kind) => onNotifyRef.current?.(msg, kind),
+              onPanelAttachmentAdded: () =>
+                onPanelAttachmentAddedRef.current?.(),
+            }),
+            handleDrop: createImageDropHandler({
+              ticketKey,
+              onNotify: (msg, kind) => onNotifyRef.current?.(msg, kind),
+              onPanelAttachmentAdded: () =>
+                onPanelAttachmentAddedRef.current?.(),
+            }),
+          }
+        : {}),
       attributes: {
         // Mismos modifiers `prose-*` que `<RichTextViewer>` para que el usuario
         // vea idéntico lo que edita y lo que después lee (mitigación de R-4).
@@ -118,6 +165,13 @@ export function RichTextEditor({
           "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-2 [&_ul[data-type='taskList']_li]:my-1",
           "[&_ul[data-type='taskList']_li>label]:mt-1 [&_ul[data-type='taskList']_li>label]:flex-none",
           "[&_ul[data-type='taskList']_li>div]:min-w-0 [&_ul[data-type='taskList']_li>div>p]:my-0",
+          // 026: estilo del nodo image en edición. Max 300px de alto para no
+          // romper el flujo del texto; border radius para la estética. Un
+          // nodo con `attachment_id` pending-* se oscurece y recibe spinner
+          // vía CSS pseudo (sin node view custom — más simple y suficiente
+          // para el MVP).
+          "[&_img]:my-2 [&_img]:max-h-[300px] [&_img]:rounded-md [&_img]:border [&_img]:border-border",
+          "[&_img[data-attachment-id^='pending-']]:opacity-50 [&_img[data-attachment-id^='pending-']]:animate-pulse",
         ].join(" "),
       },
     },
@@ -178,6 +232,11 @@ export function RichTextEditor({
 
   const counterTone = counterColor(plainTextLength, maxPlainTextLength);
 
+  // 026: hint cuando el editor está vacío + paste activo. Muy sutil, al pie,
+  // al lado del contador. Solo se muestra si no hay texto y ticketKey está
+  // seteado (edit mode); desaparece apenas el usuario empieza a escribir.
+  const showPasteHint = ticketKey !== undefined && plainTextLength === 0;
+
   return (
     <div
       className={cn(
@@ -187,7 +246,15 @@ export function RichTextEditor({
     >
       <Toolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} disabled={disabled} />
       <EditorContent editor={editor} />
-      <div className="border-border text-muted-foreground flex items-center justify-end border-t px-3 py-1.5 text-xs">
+      <div className="border-border text-muted-foreground flex items-center justify-between gap-2 border-t px-3 py-1.5 text-xs">
+        {showPasteHint ? (
+          <span className="text-muted-foreground">
+            Tip: <kbd className="rounded border border-border bg-surface px-1 font-mono">Cmd+V</kbd>{" "}
+            para pegar screenshots
+          </span>
+        ) : (
+          <span />
+        )}
         <span className={counterTone}>
           {plainTextLength.toLocaleString("es-AR")} / {maxPlainTextLength.toLocaleString("es-AR")}
         </span>

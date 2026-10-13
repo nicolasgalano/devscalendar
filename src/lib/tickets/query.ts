@@ -75,6 +75,9 @@ export type TicketAttachmentSummary = {
   uploadedById: string | null;
   uploadedByName: string | null;
   createdAt: string;
+  // 026: 'panel' (upload desde el botón) o 'paste' (pegado/dropeado al
+  // editor rich text). Informativo; se usa para el badge del panel.
+  source: "panel" | "paste";
 };
 
 const TICKET_DETAIL_SELECT = `
@@ -103,6 +106,7 @@ const TICKET_DETAIL_SELECT = `
     height,
     uploaded_by,
     created_at,
+    source,
     uploader:profiles!ticket_attachments_uploaded_by_fkey ( full_name )
   ),
   comment_count:ticket_comments ( count )
@@ -306,6 +310,7 @@ export const getTicketByKey = cache(async (rawKey: string): Promise<TicketDetail
         uploadedById: row.uploaded_by,
         uploadedByName: row.uploader?.full_name ?? null,
         createdAt: row.created_at,
+        source: (row.source === "paste" ? "paste" : "panel") as "panel" | "paste",
       }))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     commentCount: Array.isArray(ticket.comment_count)

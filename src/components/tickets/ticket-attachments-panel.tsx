@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ClipboardIcon,
   FileIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
@@ -32,6 +33,11 @@ import {
 import type { UserRole } from "@/lib/auth/roles";
 import type { TicketAttachmentSummary } from "@/lib/tickets/query";
 import { cn } from "@/lib/utils";
+
+import {
+  OPEN_LIGHTBOX_EVENT,
+  type OpenLightboxDetail,
+} from "./inline-image-lightbox-bridge";
 
 /**
  * Panel de adjuntos del detalle de un ticket.
@@ -102,6 +108,21 @@ export function TicketAttachmentsPanel({
       current === null ? null : Math.min(initialAttachments.length - 1, current + 1),
     );
   }, [initialAttachments.length]);
+
+  // 026: click en una imagen inline del viewer rich text (otro componente)
+  // dispatcha un CustomEvent con el attachment_id. Lo escuchamos acá y
+  // mapeamos id → índice del listado para abrir el lightbox.
+  useEffect(() => {
+    function handler(event: Event) {
+      const custom = event as CustomEvent<OpenLightboxDetail>;
+      const id = custom.detail?.attachmentId;
+      if (!id) return;
+      const index = initialAttachments.findIndex((a) => a.id === id);
+      if (index !== -1) setLightboxIndex(index);
+    }
+    window.addEventListener(OPEN_LIGHTBOX_EVENT, handler);
+    return () => window.removeEventListener(OPEN_LIGHTBOX_EVENT, handler);
+  }, [initialAttachments]);
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
@@ -316,6 +337,17 @@ function ThumbnailCard({
         </button>
       )}
 
+      {/* 026: badge sutil para adjuntos que entraron por paste al editor. */}
+      {attachment.source === "paste" && (
+        <div
+          className="bg-background/80 text-muted-foreground absolute top-1 left-1 hidden items-center justify-center rounded-md p-1 backdrop-blur-sm group-hover:flex"
+          title="Pegado desde el portapapeles"
+          aria-label="Pegado desde el portapapeles"
+        >
+          <ClipboardIcon className="size-3" aria-hidden="true" />
+        </div>
+      )}
+
       <div className="border-border border-t px-2 py-1.5">
         <p className="text-caption truncate" title={attachment.originalFilename}>
           {attachment.originalFilename}
@@ -397,6 +429,17 @@ function DocumentCard({
         >
           <XIcon className="size-3.5" />
         </button>
+      )}
+
+      {/* 026: badge sutil para adjuntos que entraron por paste al editor. */}
+      {attachment.source === "paste" && (
+        <div
+          className="bg-background/80 text-muted-foreground absolute top-1 left-1 hidden items-center justify-center rounded-md p-1 backdrop-blur-sm group-hover:flex"
+          title="Pegado desde el portapapeles"
+          aria-label="Pegado desde el portapapeles"
+        >
+          <ClipboardIcon className="size-3" aria-hidden="true" />
+        </div>
       )}
 
       <div className="border-border border-t px-2 py-1.5">
