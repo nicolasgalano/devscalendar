@@ -58,12 +58,10 @@ export type CodeBlockLanguage = (typeof CODE_BLOCK_LANGUAGES)[number];
 // por el sanitizer de paste antes de llegar al editor.
 export const LINK_PROTOCOLS = ["http", "https", "mailto"] as const;
 
-// Protocolos que un `image.src` puede tener. El nodo `image` está declarado en
-// el schema pero no se activa en la toolbar ni en el paste handler hasta
-// `020-images-and-attachments`; el validador rechaza docs con `image` mientras
-// tanto (ver `validate.ts`). La lista queda por consistencia con el diseño
-// futuro.
-export const IMAGE_PROTOCOLS = ["http", "https"] as const;
+// (La constante `IMAGE_PROTOCOLS` existía mientras el nodo `image` llevaba un
+// attr `src` tipo url; `026` reemplazó ese modelo por `attachment_id` apuntando
+// a `ticket_attachments.id`, así que el chequeo de protocolo deja de aplicar
+// — las URLs las arma el renderer server-side con signed URLs del bucket).
 
 export const RICH_TEXT_SCHEMA = {
   nodes: {
@@ -100,13 +98,19 @@ export const RICH_TEXT_SCHEMA = {
     },
     horizontalRule: {},
     hardBreak: {},
-    // Reservado para 020. El validador rechaza docs con este nodo mientras
-    // tanto — es defensivo por si un cliente arma un doc a mano contra la API.
+    // 026. Nodo activo: se inserta por `handlePaste` / `handleDrop` del editor
+    // (ver `src/lib/editor/paste-image.ts`). El attr `attachment_id` apunta a
+    // una fila de `ticket_attachments` del mismo ticket — el validador remata
+    // el formato uuid acá (igual que `mention.user_id`), y el renderer
+    // server-side chequea cross-tenant (`attachment.ticket_id === ticketId`)
+    // antes de emitir el `<img>`. `src` NO vive en el schema: el nodo no
+    // acarrea URL, el renderer la arma firmando el `object_key` del attachment.
     image: {
       attrs: {
-        src: { type: "url", protocols: IMAGE_PROTOCOLS },
+        attachment_id: { type: "primitive", kind: "string" },
         alt: { type: "primitive", kind: "string", optional: true },
-        title: { type: "primitive", kind: "string", optional: true },
+        width: { type: "primitive", kind: "number", optional: true },
+        height: { type: "primitive", kind: "number", optional: true },
       },
     },
     // 022. Habilitado tanto en comentarios como en descripciones. El validador
@@ -147,9 +151,11 @@ export const RICH_TEXT_SCHEMA = {
 export type RichTextNodeType = keyof typeof RICH_TEXT_SCHEMA.nodes;
 export type RichTextMarkType = keyof typeof RICH_TEXT_SCHEMA.marks;
 
-// Nodos que no pueden aparecer en un doc válido de 019, aunque estén
-// declarados en el schema para futuro (§3.3 del plan). Se exporta para que
-// el validador chequee la exclusión en un solo lugar.
-export const NODES_DISABLED_IN_019 = ["image"] as const;
+// Nodos declarados en el schema pero inhabilitados en runtime. `019` tenía
+// aquí `image` (reservado para 020/026); `026` lo encendió, así que la lista
+// quedó vacía. Se preserva como punto de extensión: cuando aparezca un nodo
+// reservado nuevo (ej. `table`, `embed`), se suma acá y el validador lo
+// rechaza en un solo lugar sin tocar la whitelist principal.
+export const DISABLED_NODES_IN_SCHEMA = [] as const;
 
-export type NodeDisabledIn019 = (typeof NODES_DISABLED_IN_019)[number];
+export type DisabledNodeInSchema = (typeof DISABLED_NODES_IN_SCHEMA)[number];

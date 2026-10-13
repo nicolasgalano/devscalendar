@@ -1,5 +1,5 @@
 import {
-  NODES_DISABLED_IN_019,
+  DISABLED_NODES_IN_SCHEMA,
   type RichTextAttrSpec,
   type RichTextSchema,
 } from "./schema";
@@ -59,7 +59,7 @@ const BLOCK_NODES_JOINING_NEWLINE = new Set([
   "horizontalRule",
 ]);
 
-const DISABLED_NODES = new Set<string>(NODES_DISABLED_IN_019);
+const DISABLED_NODES = new Set<string>(DISABLED_NODES_IN_SCHEMA);
 
 export function validateProseMirrorDoc(
   input: unknown,
@@ -137,6 +137,21 @@ function visitNode(
     const userId = node.attrs.user_id;
     if (typeof userId === "string" && !UUID_REGEX.test(userId)) {
       errors.push(`${label}.attrs.user_id: "${userId}" no es un uuid válido`);
+    }
+  }
+
+  // 026: mismo chequeo para `image.attrs.attachment_id`. El validador no
+  // consulta la base — un attachment_id puede apuntar a una fila que no existe
+  // (adjunto borrado, atacante armando el JSON) y el doc igual se acepta; el
+  // renderer server-side es quien remata contra la lista de attachments del
+  // ticket y emite placeholder "imagen eliminada" si no coincide (ver R-3 del
+  // spec de 026). Acá solo nos aseguramos del formato.
+  if (node.type === "image" && node.attrs) {
+    const attachmentId = node.attrs.attachment_id;
+    if (typeof attachmentId === "string" && !UUID_REGEX.test(attachmentId)) {
+      errors.push(
+        `${label}.attrs.attachment_id: "${attachmentId}" no es un uuid válido`,
+      );
     }
   }
 
