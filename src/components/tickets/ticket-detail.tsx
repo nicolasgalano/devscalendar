@@ -531,6 +531,7 @@ export function TicketDetail({
         canEditFields={mayEditFields}
         canReassign={mayReassign}
         canSprintPlan={maySprintPlan}
+        attachments={docAttachments}
       />
     </>
   );
