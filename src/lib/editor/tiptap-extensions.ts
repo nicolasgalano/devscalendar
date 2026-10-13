@@ -88,12 +88,59 @@ export function buildRichTextExtensions({ placeholder, mentionSuggestion }: Buil
       nested: false,
     }),
 
-    // Declarado sin toolbar ni paste handler — el `<RichTextEditor>` de 019
-    // no expone un botón "insertar imagen". El paste sanitizer descarta las
-    // imágenes pegadas. `020` va a activar todo esto. Se lo mantiene en la
-    // lista para que `Tiptap.generateHTML(doc, extensions)` en tests futuros
-    // no rompa si aparece un nodo `image` en algún fixture.
-    Image,
+    // 026. Image activo: `handlePaste` del `<RichTextEditor>` inserta nodos
+    // de este tipo con `attachment_id` apuntando a la fila que crea el POST
+    // de upload. Durante la subida en vuelo, `attachment_id` tiene prefijo
+    // `pending-<token>` que el validador Zod del server rechaza; el submit
+    // del formulario espera que todos resuelvan antes de hacer PATCH (T3.7).
+    // Attrs override espeja al Mention de 022 — Tiptap exige addAttributes
+    // para que el nodo persistido en el JSON matchee la whitelist del
+    // RICH_TEXT_SCHEMA (attachment_id + alt + width + height).
+    Image.extend({
+      addAttributes() {
+        return {
+          attachment_id: {
+            default: null,
+            parseHTML: (el) => el.getAttribute("data-attachment-id"),
+            renderHTML: (attrs) =>
+              attrs.attachment_id ? { "data-attachment-id": attrs.attachment_id } : {},
+          },
+          alt: {
+            default: null,
+            parseHTML: (el) => el.getAttribute("alt"),
+            renderHTML: (attrs) => (attrs.alt ? { alt: attrs.alt } : {}),
+          },
+          width: {
+            default: null,
+            parseHTML: (el) => {
+              const v = el.getAttribute("width");
+              return v ? Number(v) : null;
+            },
+            renderHTML: (attrs) => (attrs.width ? { width: String(attrs.width) } : {}),
+          },
+          height: {
+            default: null,
+            parseHTML: (el) => {
+              const v = el.getAttribute("height");
+              return v ? Number(v) : null;
+            },
+            renderHTML: (attrs) => (attrs.height ? { height: String(attrs.height) } : {}),
+          },
+          // `src` NO está declarado en el schema del server (RICH_TEXT_SCHEMA
+          // no lo incluye y el validador Zod rechaza attrs desconocidos con
+          // valor real). Vive solo en el editor runtime como attr transitorio
+          // — durante paste es `blob:` del clipboard; al cargar un doc
+          // existente podría ser una signed URL que la page resolvió. Antes
+          // de PATCH, `stripTransientImageAttrs` del paste-image.ts lo saca
+          // del JSON para que el server reciba un doc válido.
+          src: {
+            default: null,
+            parseHTML: (el) => el.getAttribute("src"),
+            renderHTML: (attrs) => (attrs.src ? { src: attrs.src } : {}),
+          },
+        };
+      },
+    }),
 
     // 022. HTMLAttributes espeja el renderer server-side (`render.ts` case
     // mention). renderHTML define el JSON emitido a Prosemirror → base para

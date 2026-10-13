@@ -2,7 +2,7 @@
 
 import type { JSONContent } from "@tiptap/react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  docHasPendingUploads,
+  stripTransientImageAttrs,
+} from "@/lib/editor/paste-image";
 import { EditorSkeleton } from "@/lib/editor/rich-text-editor";
 import type { SprintListItem } from "@/lib/sprints/query";
 import { formatSprintDisplayName } from "@/lib/sprints/status";
@@ -164,18 +168,47 @@ export function TicketFormDialog({
 
   const canSubmit = form.title.trim().length > 0 && form.projectId && !submitting;
 
+  // 026: polling necesita el doc current (no el cerrado al momento del submit).
+  // El `form.descriptionDoc` se actualiza por el onChange del editor cuando una
+  // subida en vuelo termina y reemplaza el nodo pending.
+  const descriptionDocRef = useRef(form.descriptionDoc);
+  useEffect(() => {
+    descriptionDocRef.current = form.descriptionDoc;
+  }, [form.descriptionDoc]);
+
   async function submit() {
     if (!form.projectId) return;
     setError(null);
     setSubmitting(true);
     try {
+      // 026: si hay imágenes pegadas que todavía están subiendo, esperamos
+      // hasta 15 s a que terminen. El validador Zod del server rechaza nodos
+      // image con attachment_id no-uuid (los pending-*), así que mandar
+      // ahora significaría un 400. T3.7 del plan.
+      if (docHasPendingUploads(descriptionDocRef.current)) {
+        const ok = await waitForPendingUploads(descriptionDocRef, 15_000);
+        if (!ok) {
+          setError(
+            "Algunas imágenes todavía están subiendo. Esperá unos segundos más e intentá de nuevo.",
+          );
+          return;
+        }
+      }
+
+      const cleanDoc = isEmptyDoc(form.descriptionDoc)
+        ? null
+        : stripTransientImageAttrs(form.descriptionDoc);
+
       const body: Record<string, unknown> = {
         title: form.title.trim(),
         // 019: un doc "vacío" (solo un párrafo sin contenido) se manda como
         // null. El plainText del editor cae a 0, así que la señal "sin
         // descripción" no depende de mirar la estructura del doc — pero acá
         // en el submit no tenemos plainText a mano, así que revisamos el doc.
-        description_doc: isEmptyDoc(form.descriptionDoc) ? null : form.descriptionDoc,
+        // 026: `stripTransientImageAttrs` saca el `src` blob local del doc
+        // antes de mandarlo al server; el renderer SSR lo resuelve desde
+        // la signed URL del thumbnail en lectura.
+        description_doc: cleanDoc,
         priority: form.priority,
         assignee_id: form.assigneeId,
       };
@@ -421,6 +454,12 @@ export function TicketFormDialog({
               placeholder="Describí el ticket. Podés usar formato."
               disabled={!canEditFields}
               projectId={form.projectId ?? undefined}
+              // 026: solo encendemos el paste en edit mode. En create el
+              // ticket todavía no existe (no hay id para asociar el adjunto)
+              // así que el handler queda apagado y el paste de imagen no
+              // hace nada visible. Q-5 del spec.
+              ticketKey={mode === "edit" ? initial.id : undefined}
+              onImageUploadError={(msg) => setError(msg)}
             />
           </div>
         </div>
@@ -465,4 +504,21 @@ function isEmptyDoc(doc: JSONContent | null): boolean {
   if (only.type !== "paragraph") return false;
   const inner = only.content ?? [];
   return inner.length === 0;
+}
+
+// 026: polling cada 100 ms sobre un ref al descriptionDoc. Devuelve true si
+// las subidas terminaron dentro del timeout, false si no. El ref lo mantiene
+// el componente actualizado — cuando una subida finaliza y el editor dispara
+// onChange, el doc nuevo sin pending llega al ref, y el próximo tick del
+// loop ve `docHasPendingUploads = false`.
+async function waitForPendingUploads(
+  docRef: { current: JSONContent | null },
+  timeoutMs: number,
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!docHasPendingUploads(docRef.current)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return !docHasPendingUploads(docRef.current);
 }

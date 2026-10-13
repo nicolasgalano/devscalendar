@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { LinkPopover } from "./link-popover";
 import { createMentionSuggestion } from "./mention-suggestion";
 import { sanitizePastedHtml } from "./paste";
+import { createImagePasteHandler } from "./paste-image";
 import { buildRichTextExtensions } from "./tiptap-extensions";
 
 // El único cliente del editor rich text de 019. El `<TicketFormDialog>` lo
@@ -58,6 +59,14 @@ type RichTextEditorProps = {
   // queda montada pero sin sugerencias — sirve para mostrar mentions existentes
   // en modo lectura o en un futuro editor descontextualizado.
   projectId?: string;
+  // 026. Si se pasa, el editor cablea `handlePaste` para subir imágenes del
+  // clipboard al ticket y insertarlas como nodos `image` con `attachment_id`.
+  // Sin `ticketKey` el paste de imagen cae a los defaults de Tiptap (que no
+  // soporta imágenes binarias — se ignoran). Edit mode del TicketFormDialog
+  // lo pasa; create mode no (el ticket todavía no existe).
+  ticketKey?: string;
+  // 026. Callback para errores de upload — toast "No se pudo subir la imagen".
+  onImageUploadError?: (message: string) => void;
 };
 
 export function RichTextEditor({
@@ -68,9 +77,19 @@ export function RichTextEditor({
   maxPlainTextLength = DEFAULT_MAX_PLAIN_TEXT_LENGTH,
   disabled = false,
   projectId,
+  ticketKey,
+  onImageUploadError,
 }: RichTextEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [plainTextLength, setPlainTextLength] = useState(0);
+
+  // Capturar el callback en un ref para que el handler creado una sola vez
+  // vea siempre la última versión. Si no, un closure estable + prop que
+  // cambia dejaría el handler con la primera versión y las toasts fallarían.
+  const onImageUploadErrorRef = useRef(onImageUploadError);
+  useEffect(() => {
+    onImageUploadErrorRef.current = onImageUploadError;
+  }, [onImageUploadError]);
 
   const extensions = useMemo(
     () =>
@@ -100,6 +119,14 @@ export function RichTextEditor({
     immediatelyRender: false,
     editorProps: {
       transformPastedHTML: (html) => sanitizePastedHtml(html),
+      ...(ticketKey
+        ? {
+            handlePaste: createImagePasteHandler({
+              ticketKey,
+              onError: (msg) => onImageUploadErrorRef.current?.(msg),
+            }),
+          }
+        : {}),
       attributes: {
         // Mismos modifiers `prose-*` que `<RichTextViewer>` para que el usuario
         // vea idéntico lo que edita y lo que después lee (mitigación de R-4).
@@ -118,6 +145,13 @@ export function RichTextEditor({
           "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-2 [&_ul[data-type='taskList']_li]:my-1",
           "[&_ul[data-type='taskList']_li>label]:mt-1 [&_ul[data-type='taskList']_li>label]:flex-none",
           "[&_ul[data-type='taskList']_li>div]:min-w-0 [&_ul[data-type='taskList']_li>div>p]:my-0",
+          // 026: estilo del nodo image en edición. Max 300px de alto para no
+          // romper el flujo del texto; border radius para la estética. Un
+          // nodo con `attachment_id` pending-* se oscurece y recibe spinner
+          // vía CSS pseudo (sin node view custom — más simple y suficiente
+          // para el MVP).
+          "[&_img]:my-2 [&_img]:max-h-[300px] [&_img]:rounded-md [&_img]:border [&_img]:border-border",
+          "[&_img[data-attachment-id^='pending-']]:opacity-50 [&_img[data-attachment-id^='pending-']]:animate-pulse",
         ].join(" "),
       },
     },

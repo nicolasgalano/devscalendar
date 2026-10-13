@@ -35,9 +35,12 @@ export type UploadResult = { ok: true; attachment: AttachmentDTO } | {
  * **No hay progreso porcentual** — `fetch` no expone `progress` para
  * uploads. Si aparece la necesidad, se cambia a XHR (F1 del plan de 020).
  */
+export type UploadSource = "panel" | "paste";
+
 export async function uploadTicketAttachment(
   ticketId: string,
   file: File,
+  options: { source?: UploadSource } = {},
 ): Promise<UploadResult> {
   // Validación client-side.
   if (!isAttachmentMimeType(file.type)) {
@@ -58,6 +61,11 @@ export async function uploadTicketAttachment(
 
   const form = new FormData();
   form.append("original", file, file.name);
+
+  // 026: `source` distingue si el adjunto entró por el botón del panel o por
+  // paste en el editor. Default `panel` (preserva comportamiento del panel
+  // existente). El server valida contra el enum y persiste tal cual.
+  form.append("source", options.source ?? "panel");
 
   // Thumb solo para imágenes. Las docs/PDFs del 025 no tienen thumb — el
   // panel renderiza ícono por tipo.

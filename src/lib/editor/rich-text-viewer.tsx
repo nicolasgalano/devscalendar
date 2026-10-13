@@ -79,6 +79,10 @@ export function RichTextViewer({
           "[&_[data-checked='true']_[data-task-item-marker]:not(:has(*))]:bg-primary [&_[data-checked='true']_[data-task-item-marker]:not(:has(*))]:border-primary",
           "[&_[data-checked='true']_[data-task-item-content]]:text-muted-foreground [&_[data-checked='true']_[data-task-item-content]]:line-through",
           "[&_[data-task-item-content]]:min-w-0 [&_[data-task-item-content]_p]:my-0",
+          // 026: imágenes inline del rich text (renderer emite `.ticket-image-inline`).
+          // Estilo coherente con el editor en edición.
+          "[&_.ticket-image-inline]:my-2 [&_.ticket-image-inline]:max-h-[400px] [&_.ticket-image-inline]:rounded-md [&_.ticket-image-inline]:border [&_.ticket-image-inline]:border-border [&_.ticket-image-inline]:cursor-pointer",
+          "[&_.ticket-image-missing]:my-2 [&_.ticket-image-missing]:inline-block [&_.ticket-image-missing]:rounded-md [&_.ticket-image-missing]:border [&_.ticket-image-missing]:border-dashed [&_.ticket-image-missing]:border-muted-foreground [&_.ticket-image-missing]:px-3 [&_.ticket-image-missing]:py-2 [&_.ticket-image-missing]:text-caption [&_.ticket-image-missing]:text-muted-foreground",
           className,
         )}
         dangerouslySetInnerHTML={{ __html: html }}
