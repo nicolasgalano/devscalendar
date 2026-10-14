@@ -28,6 +28,7 @@ import {
   type TimeEntryProject,
   type TimeEntryTicket,
 } from "./time-entry-dialog";
+import { TimerStartDialog } from "./timer-start-dialog";
 
 /**
  * Grilla semanal "Mi Tiempo" (016 T4.3). Columnas por día (Lun-Dom), cards
@@ -68,6 +69,9 @@ export function WeeklyGridView({
     | { open: true; mode: "create"; loggedAt: string }
     | { open: true; mode: "edit"; entry: TimeEntryListItem }
   >({ open: false });
+  // 027: dialog aparte para "Iniciar cronómetro". El del `<TimeEntryDialog>`
+  // sigue siendo para carga manual con horario; este arranca un timer en vivo.
+  const [timerStartOpen, setTimerStartOpen] = useState(false);
 
   const days = getWeekDays(weekStart);
   const isCurrentWeek = weekStart === currentWeekStart();
@@ -233,9 +237,17 @@ export function WeeklyGridView({
             <PlusIcon aria-hidden="true" />
             Cargar tiempo
           </Button>
-          {/* El start del cronómetro también podría vivir acá, pero por ahora
-              el user arranca desde el ticket o desde un botón futuro. */}
-          <Button variant="outline" size="sm" disabled title="Próximamente">
+          {/* 027: botón habilitado (antes `disabled title="Próximamente"`).
+              Abre `<TimerStartDialog>` que arranca un timer vía
+              `/api/time-entries/timer/start`. Sigue `disabled` cuando se
+              mira la planilla de otro usuario — nadie inicia timers por otro
+              (misma regla que "Cargar tiempo"). */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTimerStartOpen(true)}
+            disabled={isViewingOther}
+          >
             <PlayIcon aria-hidden="true" />
             Iniciar cronómetro
           </Button>
@@ -337,6 +349,14 @@ export function WeeklyGridView({
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
         userLabel={viewingUserName}
+      />
+
+      <TimerStartDialog
+        open={timerStartOpen}
+        onOpenChange={setTimerStartOpen}
+        projects={projects}
+        activitiesByProject={activitiesByProject}
+        ticketsByProject={ticketsByProject}
       />
     </>
   );
