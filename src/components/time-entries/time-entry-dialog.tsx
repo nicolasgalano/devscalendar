@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarIcon, ClockIcon, PlusIcon, TimerIcon, XIcon } from "lucide-react";
+import { CalendarIcon, ClockIcon, PlusIcon, TimerIcon } from "lucide-react";
 
 import { useSyncIndicator } from "@/components/sync-indicator";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-const NO_TICKET = "__none__";
+import { SearchableSelector } from "./searchable-selector";
+
+// 027: el `<SearchableSelector>` del ticket (que reemplazó al `<SelectorRow>`
+// viejo) usa null directo para "sin ticket" y no necesita este sentinel.
+// `NO_ACTIVITY` sigue vigente porque el selector de tarea sigue siendo un
+// `<SelectorRow>` plano (listas chicas, no se buscan).
 const NO_ACTIVITY = "__none__";
 
 export type TimeEntryProject = {
@@ -224,14 +229,9 @@ export function TimeEntryDialog({
               <span className="text-ui text-secondary-foreground">{userLabel}</span>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            aria-label="Cerrar"
-            className="text-muted-foreground hover:text-foreground rounded-md p-1"
-          >
-            <XIcon aria-hidden="true" className="size-4" />
-          </button>
+          {/* 027: el `<DialogContent>` de shadcn ya renderiza su propio X con
+              `showCloseButton=true` default. El botón manual que vivía acá
+              causaba dos X superpuestas (reportado por el equipo). */}
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -284,27 +284,23 @@ export function TimeEntryDialog({
             <Label className="text-caption text-muted-foreground font-medium">
               Proyecto y tarea
             </Label>
-            <SelectorRow
+            {/* 027: project selector es `<SearchableSelector>` para que
+                equipos con muchos proyectos activos puedan filtrar por nombre
+                o cliente. La lista chica (1-5 proyectos) sigue funcionando
+                igual — el filtro vacío devuelve todo. */}
+            <SearchableSelector
               placeholder="Elegí un proyecto"
-              value={form.projectId ?? ""}
+              searchPlaceholder="Buscar proyecto…"
+              emptyMessage="No se encontraron proyectos"
+              value={form.projectId}
               disabled={mode === "edit" || projects.length === 0}
-              onChange={(value) =>
-                setForm({ ...form, projectId: (value as string) || null })
-              }
-              display={projects.find((p) => p.id === form.projectId)?.name}
-              iconTone={form.projectId ? "muted" : "primary"}
-            >
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.clientName ? (
-                    <span className="text-muted-foreground">
-                      {project.clientName} ·{" "}
-                    </span>
-                  ) : null}
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectorRow>
+              onChange={(value) => setForm({ ...form, projectId: value })}
+              items={projects.map((p) => ({
+                id: p.id,
+                label: p.name,
+                meta: p.clientName ?? undefined,
+              }))}
+            />
 
             {form.projectId && availableActivities.length > 0 && (
               <SelectorRow
@@ -338,29 +334,19 @@ export function TimeEntryDialog({
             )}
 
             {form.projectId && availableTickets.length > 0 && (
-              <SelectorRow
-                placeholder="Elegí un ticket (opcional)"
-                value={form.ticketId ?? NO_TICKET}
-                onChange={(value) =>
-                  setForm({
-                    ...form,
-                    ticketId: value === NO_TICKET ? null : (value as string),
-                  })
-                }
-                display={(() => {
-                  const t = availableTickets.find((x) => x.id === form.ticketId);
-                  return t ? `${t.key} · ${t.title}` : undefined;
-                })()}
-                iconTone={form.ticketId ? "muted" : "primary"}
-              >
-                <SelectItem value={NO_TICKET}>Sin ticket</SelectItem>
-                {availableTickets.map((ticket) => (
-                  <SelectItem key={ticket.id} value={ticket.id}>
-                    <span className="font-data text-muted-foreground">{ticket.key}</span>{" "}
-                    {ticket.title}
-                  </SelectItem>
-                ))}
-              </SelectorRow>
+              <SearchableSelector
+                placeholder="Sin ticket"
+                searchPlaceholder="Buscar ticket…"
+                emptyMessage="No se encontraron tickets"
+                value={form.ticketId}
+                onChange={(value) => setForm({ ...form, ticketId: value })}
+                items={availableTickets.map((t) => ({
+                  id: t.id,
+                  label: t.title,
+                  meta: t.key,
+                }))}
+                clearable
+              />
             )}
           </div>
 
