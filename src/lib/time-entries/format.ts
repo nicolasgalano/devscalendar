@@ -28,3 +28,21 @@ export function formatMinutesDecimal(minutes: number): string {
   const rounded = Math.round(decimal * 100) / 100;
   return Number.isInteger(rounded) ? `${rounded}h` : `${rounded}h`;
 }
+
+/**
+ * Formato "cronómetro corriendo": `H:MM:SS`. Para el pill del timer activo,
+ * donde el usuario necesita ver cambiar el valor cada segundo o la pantalla
+ * se siente congelada (reportado por el equipo). El contador del timer vive
+ * en segundos para que el display tenga a qué actualizarse — las time_entries
+ * finales siguen en minutos redondeados a múltiplos de 15.
+ *
+ * Horas sin pad (sin "00:" delante) para que el ancho sea estable y no
+ * agrande la pill: `0:00:45`, `0:12:34`, `1:23:45`, `12:34:56`.
+ */
+export function formatSecondsClock(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(safeSeconds / 3600);
+  const m = Math.floor((safeSeconds % 3600) / 60);
+  const s = safeSeconds % 60;
+  return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}

@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatMinutesCompact } from "@/lib/time-entries/format";
+import { formatSecondsClock } from "@/lib/time-entries/format";
 import type { ActiveTimer } from "@/lib/time-entries/query";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,13 @@ import { cn } from "@/lib/utils";
  * Pill flotante del cronómetro (016 T4.6). Renderizado en el header del
  * `AppShell`, visible SIEMPRE que hay un timer corriendo, desde cualquier
  * ruta. El estado inicial viene del server (getMyActiveTimer); un
- * setInterval de 1min actualiza el tiempo mostrado (más frecuente sería
- * inútil — cargamos horas en múltiplos de 15).
+ * `setInterval` de 1 s actualiza el display para que el usuario vea el
+ * contador avanzar (se cambió desde el minuto que era antes — reportado
+ * por el equipo como "no se ve correr").
+ *
+ * El valor interno es segundos y se formatea como `H:MM:SS` (patrón Toggl).
+ * Las `time_entries` que graba el stop siguen siendo múltiplos de 15 min —
+ * esto es solo UX del contador en vivo.
  *
  * Cuando `activeTimer` es null pero podría existir (page transitioned pero
  * seguimos en el mismo request), el pill no aparece. `router.refresh()`
@@ -46,21 +51,21 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
 
   useEffect(() => {
     if (!activeTimer) return;
-    // Recalcular cada minuto — múltiplos de 15 se ven cuando corresponde.
-    const interval = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    // Tick cada segundo para que el `H:MM:SS` del display avance a la vista.
+    const interval = window.setInterval(() => setTick((n) => n + 1), 1_000);
     return () => window.clearInterval(interval);
   }, [activeTimer]);
 
-  const elapsedMinutes = useMemo(() => {
+  const elapsedSeconds = useMemo(() => {
     if (!activeTimer) return 0;
-    // `tick` en el dep para forzar recompute cada minuto.
+    // `tick` en el dep para forzar recompute cada segundo.
     void tick;
     const now = Date.now();
     const started = new Date(activeTimer.startedAt).getTime();
-    return Math.max(0, Math.floor((now - started) / 60_000));
+    return Math.max(0, Math.floor((now - started) / 1_000));
   }, [activeTimer, tick]);
 
-  const isWarning = elapsedMinutes >= WARN_HOURS * 60;
+  const isWarning = elapsedSeconds >= WARN_HOURS * 3600;
 
   async function stopTimer() {
     if (!activeTimer) return;
@@ -117,7 +122,7 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
             <PlayIcon aria-hidden="true" className="size-3.5" />
           )}
           <span className="max-w-40 truncate">{label}</span>
-          <span className="font-data">{formatMinutesCompact(elapsedMinutes)}</span>
+          <span className="font-data tabular-nums">{formatSecondsClock(elapsedSeconds)}</span>
           <ChevronDownIcon aria-hidden="true" className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
