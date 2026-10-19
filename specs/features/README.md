@@ -30,11 +30,11 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 018 | Sprints por proyecto y reporte de fin de sprint   | done   | 015, 017           | fuera de spec original |
 | 019 | Editor rich text para descripciones de tickets    | done (deployed 2026-09-18) | 015 | fuera de spec original |
 | 020 | Adjuntos (imágenes) en tickets                    | done (deployed 2026-09-21) | 015 | fuera de spec original |
-| 021 | Tareas (rename) + reporte planilla con export XLSX | code done — pending deploy + verificación visual | 016, 018     | fuera de spec original |
+| 021 | Tareas (rename) + reporte planilla con export XLSX | done (deployed 2026-10-06) | 016, 018     | fuera de spec original |
 | 022 | Comentarios de tickets con @menciones             | code done (deployed 2026-09-22) | 015, 019, 010 | fuera de spec original |
 | 023 | Notif de status change al PM primario             | done (deployed 2026-09-22) | 015, 010     | fuera de spec original |
 | 024 | Planning: hoy en la última semana visible         | done (deployed 2026-09-21) | 011          | fuera de spec original |
-| 025 | Documentos (PDF, Word, Excel) en adjuntos         | code done — pending deploy + verificación visual | 020          | fuera de spec original |
+| 025 | Documentos (PDF, Word, Excel) en adjuntos         | done (deployed 2026-10-06) | 020          | fuera de spec original |
 | 026 | Pegar imágenes en el editor rich text             | code done (deployed 2026-10-14) | 019, 020, 022, 025 | fuera de spec original |
 | 027 | Time tracker: polish + start del cronómetro       | code done (deployed 2026-10-14) | 016, 021           | fuera de spec original |
 
