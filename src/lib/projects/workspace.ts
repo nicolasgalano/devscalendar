@@ -3,7 +3,6 @@ import { cache } from "react";
 import { isAdmin } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/session";
-import { TICKET_STATUS_OPEN } from "@/lib/tickets/status";
 import type { Database } from "@/types/database";
 
 export type ProjectListRow = {
@@ -13,7 +12,6 @@ export type ProjectListRow = {
   active: boolean;
   client: { id: string; name: string } | null;
   pm: { id: string; name: string } | null;
-  openTicketCount: number;
 };
 
 /**
@@ -29,13 +27,13 @@ export type ProjectListRow = {
  *   - No-admin ve: los que tiene como PM primario + los que tiene fila activa
  *     en `project_members`. La unión se dedupe.
  *
- * `openTicketCount` viene de una segunda query agregada (`count` por
- * `project_id`) sobre los estados de `TICKET_STATUS_OPEN` — la RLS de tickets
- * filtra por membresía, así que si el usuario no puede ver los tickets de un
- * proyecto, el count queda en 0 (edge case improbable con las policies
- * actuales, pero anotado en `plan.md` R-5).
- *
  * Cacheada por request.
+ *
+ * **Feature 028**: la columna "Tickets abiertos" vivía acá con una segunda
+ * query agregada contra `tickets` filtrando por `TICKET_STATUS_OPEN`. Se fue
+ * con la columna: el contador real vive en el workspace del proyecto (tablero
+ * kanban + backlog), y mantenerlo en la lista obligaba a una query extra que
+ * escalaba con `visible.length` por un número crudo que no decidía nada.
  */
 export const getVisibleProjects = cache(async (): Promise<ProjectListRow[]> => {
   const supabase = await createClient();
@@ -72,22 +70,6 @@ export const getVisibleProjects = cache(async (): Promise<ProjectListRow[]> => {
 
   if (visible.length === 0) return [];
 
-  // Segunda query para el count de tickets abiertos. Se agrupa por project_id
-  // pidiendo `id.count()` — PostgREST devuelve un array con `{project_id, count}`.
-  const { data: countRows } = await supabase
-    .from("tickets")
-    .select("project_id, id.count()")
-    .in("project_id", visible.map((project) => project.id))
-    .in("status", TICKET_STATUS_OPEN as unknown as Database["public"]["Enums"]["ticket_status"][]);
-
-  const countMap = new Map<string, number>();
-  for (const row of (countRows ?? []) as unknown as Array<{
-    project_id: string;
-    count: number;
-  }>) {
-    countMap.set(row.project_id, row.count);
-  }
-
   return visible.map((project): ProjectListRow => ({
     id: project.id,
     key: project.key,
@@ -97,7 +79,6 @@ export const getVisibleProjects = cache(async (): Promise<ProjectListRow[]> => {
     pm: project.pm
       ? { id: project.pm.id, name: project.pm.full_name ?? project.pm.email }
       : null,
-    openTicketCount: countMap.get(project.id) ?? 0,
   }));
 });
 

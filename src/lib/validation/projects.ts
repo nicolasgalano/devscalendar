@@ -28,3 +28,14 @@ export const updateProjectSchema = z
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+// Feature 028: body del endpoint POST /api/projects/[id]/active, que invoca la
+// RPC set_project_active. Mantener el toggle en un schema aparte (en vez de
+// reusar updateProjectSchema con `active`) deja claro que esta ruta tiene su
+// propio guard (admin O PM primario) y no debería crecer para aceptar nombres
+// u otras columnas que requieren admin-only.
+export const setProjectActiveSchema = z.object({
+  active: z.boolean(),
+});
+
+export type SetProjectActiveInput = z.infer<typeof setProjectActiveSchema>;
