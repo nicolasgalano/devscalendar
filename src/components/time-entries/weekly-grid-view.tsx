@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { UserRole } from "@/lib/auth/roles";
-import { formatMinutesDecimal } from "@/lib/time-entries/format";
+import { formatMinutesCompact, formatMinutesDecimal } from "@/lib/time-entries/format";
 import type { TimeEntryListItem } from "@/lib/time-entries/query";
 import { currentWeekStart, formatDayHeader, getWeekDays, shiftWeek } from "@/lib/time-entries/week";
 import { cn } from "@/lib/utils";
@@ -296,7 +296,7 @@ export function WeeklyGridView({
                       : "bg-primary/10 text-primary font-medium",
                   )}
                 >
-                  {total === 0 ? "0" : formatMinutesDecimal(total)}
+                  {total === 0 ? "0" : formatMinutesCompact(total)}
                 </span>
               </div>
 
