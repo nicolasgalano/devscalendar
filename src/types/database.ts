@@ -888,6 +888,10 @@ export type Database = {
         Args: { p_project_id: string; p_user_id?: string }
         Returns: Database["public"]["Enums"]["project_member_role"]
       }
+      set_project_active: {
+        Args: { p_active: boolean; p_project_id: string }
+        Returns: boolean
+      }
       stop_and_start_timer: {
         Args: {
           p_activity_id: string
