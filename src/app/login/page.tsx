@@ -26,7 +26,7 @@ export default async function LoginPage({
   return (
     <main className="mx-auto flex min-h-full max-w-80 flex-col justify-center gap-6 p-6">
       <div>
-        <h1 className="text-title font-medium">DevsCalendar</h1>
+        <h1 className="text-title font-medium">WeDoWeb Workflow</h1>
         <p className="mt-0.5 text-ui text-muted-foreground">
           Iniciá sesión con tu cuenta de Google.
         </p>

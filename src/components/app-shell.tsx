@@ -261,7 +261,7 @@ export function AppShell({
             href="/"
             className="text-emphasis focus-visible:outline-ring truncate rounded-md font-medium outline-none focus-visible:outline-2"
           >
-            {collapsed ? "DC" : "DevsCalendar"}
+            {collapsed ? "WW" : "WeDoWeb Workflow"}
           </Link>
         </div>
 
@@ -337,7 +337,7 @@ export function AppShell({
 
           <nav aria-label="Ubicación" className="min-w-0 flex-1">
             <p className="text-ui text-muted-foreground truncate">
-              {currentLabel ?? "DevsCalendar"}
+              {currentLabel ?? "WeDoWeb Workflow"}
             </p>
           </nav>
 
