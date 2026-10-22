@@ -48,6 +48,18 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
   const { start: startSync } = useSyncIndicator();
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // Dismiss local: cuando el server confirma que no hay timer (404 `no_timer`
+  // en el stop, o un discard explícito) escondemos la pill inmediatamente
+  // sin esperar al `router.refresh()`. Es el fallback para el caso en que
+  // el refresh no re-fetchea el layout (reporte 2026-10-22). Se resetea
+  // automáticamente cuando llega un `activeTimer` nuevo del server.
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    // Un activeTimer con otro id (otro timer arrancado después) resetea el
+    // dismiss. También cuando pasa a null por re-fetch del layout.
+    setDismissed(false);
+  }, [activeTimer?.startedAt]);
 
   useEffect(() => {
     if (!activeTimer) return;
@@ -84,6 +96,10 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
         // resincronizamos silenciosamente y la pill desaparece sola al
         // volver `activeTimer` como null desde el server.
         if (body.reason === "no_timer") {
+          // Server no tiene nada: ocultamos la pill localmente ya mismo
+          // (independiente de que el `router.refresh()` propague o no al
+          // layout).
+          setDismissed(true);
           router.refresh();
           return;
         }
@@ -91,6 +107,9 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
         return;
       }
       const payload = (await res.json()) as { entry_id: string };
+      // Hide local también en el happy path: si el server component del
+      // layout no se refetchea, al menos la pill desaparece.
+      setDismissed(true);
       // Redirect al edit del entry para que el user complete la descripción.
       router.push(`/my-time?edit=${payload.entry_id}`);
       router.refresh();
@@ -101,7 +120,7 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
     }
   }
 
-  if (!activeTimer) return null;
+  if (!activeTimer || dismissed) return null;
 
   const label = activeTimer.ticketKey
     ? `${activeTimer.ticketKey} · ${activeTimer.activityName ?? activeTimer.projectName}`
