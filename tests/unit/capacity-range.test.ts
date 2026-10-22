@@ -7,9 +7,10 @@ import {
 } from "@/lib/planning/range";
 
 /**
- * Feature 029 — T2.9. Hoy ancla en la cuarta fila (patrón 024). El cómputo
- * no debería depender del `new Date()` local, por eso recibe `today` como
- * parámetro — un test determinista.
+ * Feature 029 — T2.9. Hoy ancla en la PRIMERA fila (capacity planning es
+ * forward-looking, a diferencia del planning del calendar que mira
+ * contexto histórico). El cómputo no depende del `new Date()` local, por
+ * eso recibe `today` como parámetro — test determinista.
  */
 describe("getCapacityWeekBounds", () => {
   // 2026-10-21 es un miércoles. Monday-of-week es 2026-10-19.
@@ -20,14 +21,15 @@ describe("getCapacityWeekBounds", () => {
     expect(days).toHaveLength(PLANNING_VISIBLE_DAYS);
   });
 
-  it("anchors today in the fourth row (weekStart = mondayOf(today) - 21)", () => {
+  it("anchors today in the first row (weekStart = mondayOf(today))", () => {
     const { weekStart, days } = getCapacityWeekBounds(today);
-    expect(weekStart).toBe("2026-09-28");
-    // La cuarta fila arranca en el día 21 (3 semanas × 7 = 21). El lunes
-    // de hoy debe caer ahí.
-    expect(days[21]).toBe("2026-10-19");
-    // Y la propia fecha "hoy" (miércoles) cae dos días después.
-    expect(days[23]).toBe("2026-10-21");
+    expect(weekStart).toBe("2026-10-19");
+    // El lunes de hoy es el día 0 de la grilla.
+    expect(days[0]).toBe("2026-10-19");
+    // La propia fecha "hoy" (miércoles) cae dos días después.
+    expect(days[2]).toBe("2026-10-21");
+    // La cuarta fila (días 21-27) cae tres semanas adelante.
+    expect(days[21]).toBe("2026-11-09");
   });
 
   it("offsetWeeks=1 advances one week", () => {
