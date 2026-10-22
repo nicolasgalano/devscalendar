@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
@@ -125,11 +124,19 @@ export function CapacityPlanningView({
             <Button variant="outline" size="icon-sm" onClick={() => navWeek(-1)}>
               <ChevronLeftIcon aria-hidden="true" />
             </Button>
-            <Link href={planningHref(urlState, { w: null })} prefetch={false}>
-              <Button variant="outline" size="sm">
-                Hoy
-              </Button>
-            </Link>
+            {/* `onClick` + router.push en vez de <Link> envolviendo al botón:
+                `<Button>` adentro de `<Link>` es anti-pattern HTML (nested
+                interactive elements) y el handler del botón puede ganarle
+                a la navegación del Link, dejando el click sin efecto o,
+                peor, aplicando otra navegación. Mismo patrón que las
+                flechas de arriba. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(planningHref(urlState, { w: null }))}
+            >
+              Hoy
+            </Button>
             <Button variant="outline" size="icon-sm" onClick={() => navWeek(1)}>
               <ChevronRightIcon aria-hidden="true" />
             </Button>
