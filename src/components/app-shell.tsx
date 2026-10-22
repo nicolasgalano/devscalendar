@@ -7,6 +7,7 @@ import {
   BarChart3Icon,
   Building2Icon,
   CalendarDaysIcon,
+  CalendarRangeIcon,
   FolderKanbanIcon,
   InboxIcon,
   ListChecksIcon,
@@ -55,6 +56,12 @@ const BASE_NAV: NavGroup[] = [
     label: null,
     items: [
       { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon },
+      // `029` T3.1 — pantalla nueva de planificación de capacidad por
+      // proyecto. Vive adentro del nav principal, al lado del calendario
+      // (que resuelve el otro eje: reservas con horario). Dos ejes
+      // distintos, no colisionan: una estimación es intención por día; una
+      // reserva es compromiso con hora.
+      { href: "/planning", label: "Planificación", Icon: CalendarRangeIcon },
       // `017` T1.4 — reemplazo del ítem "Tickets" de `015` T7.1. Ahora la
       // entrada al sistema de tareas es por proyecto: `/projects` lista los
       // proyectos visibles, y adentro de cada uno vive el tablero y el
