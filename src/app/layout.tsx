@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DevsCalendar",
+  title: "WeDoWeb Workflow",
   description: "Planificación de recursos para equipos de desarrollo.",
 };
 
