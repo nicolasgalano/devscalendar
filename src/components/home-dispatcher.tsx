@@ -36,7 +36,7 @@ export function HomeDispatcher({ roles }: { roles: UserRole[] }) {
   const cards: Card[] = [
     {
       href: "/calendar",
-      label: "DevCalendar",
+      label: "WeDoWeb Workflow",
       description: "Ver la agenda del equipo y reservar tiempo de desarrollo.",
       Icon: CalendarDaysIcon,
     },

@@ -55,7 +55,7 @@ export function emailBody(
   const detail = notificationDetail(type, payload);
   if (detail) lines.push(detail);
 
-  lines.push("", `Ver en DevsCalendar: ${href}`);
+  lines.push("", `Ver en WeDoWeb Workflow: ${href}`);
   return lines.join("\n");
 }
 
