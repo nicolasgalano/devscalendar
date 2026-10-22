@@ -8,6 +8,7 @@ import {
   CircleAlertIcon,
   PlayIcon,
   StopCircleIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 import { useSyncIndicator } from "@/components/sync-indicator";
@@ -120,6 +121,27 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
     }
   }
 
+  async function discardTimer() {
+    setError(null);
+    const stop = startSync("Descartando cronómetro");
+    try {
+      const res = await fetch("/api/time-entries/timer/discard", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "No se pudo descartar el cronómetro.");
+        return;
+      }
+      setDismissed(true);
+      router.refresh();
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      stop();
+    }
+  }
+
   if (!activeTimer || dismissed) return null;
 
   const label = activeTimer.ticketKey
@@ -157,6 +179,10 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
           <DropdownMenuItem onClick={stopTimer}>
             <StopCircleIcon aria-hidden="true" className="size-3.5" />
             Parar y guardar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={discardTimer} className="text-destructive">
+            <Trash2Icon aria-hidden="true" className="size-3.5" />
+            Descartar sin guardar
           </DropdownMenuItem>
           {activeTimer.ticketKey && (
             <DropdownMenuItem
