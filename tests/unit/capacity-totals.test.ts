@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { sumByDay, sumByDevWeek, type Estimate } from "@/lib/planning/totals";
+import {
+  sumByDay,
+  sumByDevWeek,
+  sumByProjectDay,
+  type Estimate,
+} from "@/lib/planning/totals";
 
 /**
  * Feature 029 — T2.9. Las sumas viven en cliente para no bajar más queries;
@@ -14,23 +19,25 @@ describe("sumByDay", () => {
   });
 
   it("counts a single estimate", () => {
-    const totals = sumByDay([{ devId: "d1", date: "2026-10-21", hours: 4 }]);
+    const totals = sumByDay([
+      { projectId: "p", devId: "d1", date: "2026-10-21", hours: 4 },
+    ]);
     expect(totals.get("2026-10-21")).toBe(4);
   });
 
   it("sums multiple estimates on the same day across devs", () => {
     const totals = sumByDay([
-      { devId: "d1", date: "2026-10-21", hours: 4 },
-      { devId: "d2", date: "2026-10-21", hours: 2 },
-      { devId: "d3", date: "2026-10-21", hours: 1.5 },
+      { projectId: "p", devId: "d1", date: "2026-10-21", hours: 4 },
+      { projectId: "p", devId: "d2", date: "2026-10-21", hours: 2 },
+      { projectId: "p", devId: "d3", date: "2026-10-21", hours: 1.5 },
     ]);
     expect(totals.get("2026-10-21")).toBe(7.5);
   });
 
   it("keeps days separate", () => {
     const totals = sumByDay([
-      { devId: "d1", date: "2026-10-21", hours: 4 },
-      { devId: "d1", date: "2026-10-22", hours: 3 },
+      { projectId: "p", devId: "d1", date: "2026-10-21", hours: 4 },
+      { projectId: "p", devId: "d1", date: "2026-10-22", hours: 3 },
     ]);
     expect(totals.get("2026-10-21")).toBe(4);
     expect(totals.get("2026-10-22")).toBe(3);
@@ -46,36 +53,62 @@ describe("sumByDevWeek", () => {
 
   it("buckets by week index counting from days[0]", () => {
     const estimates: Estimate[] = [
-      { devId: "d1", date: "2026-10-19", hours: 4 }, // week 0 (lunes 1ra fila)
-      { devId: "d1", date: "2026-10-25", hours: 2 }, // week 0 (domingo 1ra fila)
-      { devId: "d1", date: "2026-10-26", hours: 3 }, // week 1 (lunes 2da fila)
+      { projectId: "p", devId: "d1", date: "2026-10-19", hours: 4 }, // week 0
+      { projectId: "p", devId: "d1", date: "2026-10-25", hours: 2 }, // week 0
+      { projectId: "p", devId: "d1", date: "2026-10-26", hours: 3 }, // week 1
     ];
     const result = sumByDevWeek(estimates, days);
-    const d1 = result.get("d1")!;
+    const d1 = result.get("p:d1")!;
     expect(d1.get(0)).toBe(6);
     expect(d1.get(1)).toBe(3);
   });
 
-  it("separates devs", () => {
+  it("separates devs within the same project", () => {
     const estimates: Estimate[] = [
-      { devId: "d1", date: "2026-10-19", hours: 4 },
-      { devId: "d2", date: "2026-10-19", hours: 2 },
+      { projectId: "p", devId: "d1", date: "2026-10-19", hours: 4 },
+      { projectId: "p", devId: "d2", date: "2026-10-19", hours: 2 },
     ];
     const result = sumByDevWeek(estimates, days);
-    expect(result.get("d1")!.get(0)).toBe(4);
-    expect(result.get("d2")!.get(0)).toBe(2);
+    expect(result.get("p:d1")!.get(0)).toBe(4);
+    expect(result.get("p:d2")!.get(0)).toBe(2);
+  });
+
+  it("separates the same dev across projects (key = projectId:devId)", () => {
+    const estimates: Estimate[] = [
+      { projectId: "p1", devId: "d1", date: "2026-10-19", hours: 4 },
+      { projectId: "p2", devId: "d1", date: "2026-10-19", hours: 3 },
+    ];
+    const result = sumByDevWeek(estimates, days);
+    expect(result.get("p1:d1")!.get(0)).toBe(4);
+    expect(result.get("p2:d1")!.get(0)).toBe(3);
   });
 
   it("ignores estimates outside the visible range", () => {
     const estimates: Estimate[] = [
-      { devId: "d1", date: "2026-10-19", hours: 4 },  // visible
-      { devId: "d1", date: "2025-01-01", hours: 10 }, // fuera
-      { devId: "d1", date: "2027-06-01", hours: 10 }, // fuera
+      { projectId: "p", devId: "d1", date: "2026-10-19", hours: 4 },  // visible
+      { projectId: "p", devId: "d1", date: "2025-01-01", hours: 10 }, // fuera
+      { projectId: "p", devId: "d1", date: "2027-06-01", hours: 10 }, // fuera
     ];
     const result = sumByDevWeek(estimates, days);
-    const d1 = result.get("d1")!;
+    const d1 = result.get("p:d1")!;
     expect(d1.size).toBe(1);
     expect(d1.get(0)).toBe(4);
+  });
+});
+
+describe("sumByProjectDay", () => {
+  it("returns an empty map for no estimates", () => {
+    expect(sumByProjectDay([]).size).toBe(0);
+  });
+
+  it("sums per project per day", () => {
+    const result = sumByProjectDay([
+      { projectId: "p1", devId: "d1", date: "2026-10-21", hours: 4 },
+      { projectId: "p1", devId: "d2", date: "2026-10-21", hours: 2 },
+      { projectId: "p2", devId: "d1", date: "2026-10-21", hours: 3 },
+    ]);
+    expect(result.get("p1")!.get("2026-10-21")).toBe(6);
+    expect(result.get("p2")!.get("2026-10-21")).toBe(3);
   });
 });
 

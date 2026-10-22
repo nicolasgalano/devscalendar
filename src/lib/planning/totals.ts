@@ -9,6 +9,7 @@
 import { PLANNING_WEEK_SIZE } from "./constants";
 
 export type Estimate = {
+  projectId: string;
   devId: string;
   date: string; // yyyy-MM-dd
   hours: number;
@@ -29,13 +30,13 @@ export function sumByDay(estimates: Estimate[]): Map<string, number> {
 }
 
 /**
- * Horas por dev y por semana visible. La "semana" se cuenta desde el primer
- * día de `days` en buckets de 7 — no mira el día de la semana, confía en
- * que `days[0]` ya es un lunes (el helper `getCapacityWeekBounds` lo
- * garantiza).
+ * Horas por (project, dev, semana). Keyed por `${projectId}:${devId}`
+ * porque el mismo dev puede estar en varios proyectos en el modo
+ * todos-los-proyectos.
  *
- * Devuelve `Map<devId, Map<weekIndex, hours>>`. Un dev sin estimaciones en
- * una semana no aparece en el map interno; el consumidor cae a 0.
+ * La "semana" se cuenta desde el primer día de `days` en buckets de 7 —
+ * no mira el día de la semana, confía en que `days[0]` ya es un lunes
+ * (`getCapacityWeekBounds` lo garantiza).
  */
 export function sumByDevWeek(
   estimates: Estimate[],
@@ -51,12 +52,32 @@ export function sumByDevWeek(
     const weekIndex = dateToWeek.get(estimate.date);
     if (weekIndex === undefined) continue; // estimación fuera del rango visible
 
-    let perWeek = result.get(estimate.devId);
+    const key = `${estimate.projectId}:${estimate.devId}`;
+    let perWeek = result.get(key);
     if (!perWeek) {
       perWeek = new Map();
-      result.set(estimate.devId, perWeek);
+      result.set(key, perWeek);
     }
     perWeek.set(weekIndex, (perWeek.get(weekIndex) ?? 0) + estimate.hours);
+  }
+  return result;
+}
+
+/**
+ * Horas por proyecto y por día. Para el subtotal "Total proyecto X" que
+ * se renderiza al cierre de cada bloque en el modo todos-los-proyectos.
+ */
+export function sumByProjectDay(
+  estimates: Estimate[],
+): Map<string, Map<string, number>> {
+  const result = new Map<string, Map<string, number>>();
+  for (const estimate of estimates) {
+    let perDay = result.get(estimate.projectId);
+    if (!perDay) {
+      perDay = new Map();
+      result.set(estimate.projectId, perDay);
+    }
+    perDay.set(estimate.date, (perDay.get(estimate.date) ?? 0) + estimate.hours);
   }
   return result;
 }
