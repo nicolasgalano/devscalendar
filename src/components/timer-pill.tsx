@@ -78,6 +78,15 @@ export function TimerPill({ activeTimer }: { activeTimer: ActiveTimer | null }) 
           error?: string;
           reason?: string;
         };
+        // 404 `no_timer`: el server no tiene nada corriendo pero la pill
+        // sí lo mostraba — nuestra copia local está stale (otro tab lo
+        // paró, se limpió la fila, etc). No es un error del usuario:
+        // resincronizamos silenciosamente y la pill desaparece sola al
+        // volver `activeTimer` como null desde el server.
+        if (body.reason === "no_timer") {
+          router.refresh();
+          return;
+        }
         setError(body.error ?? "No se pudo parar el cronómetro.");
         return;
       }
