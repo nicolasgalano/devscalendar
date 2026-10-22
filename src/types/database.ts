@@ -175,6 +175,61 @@ export type Database = {
           },
         ]
       }
+      capacity_estimates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          dev_id: string
+          hours: number
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          dev_id: string
+          hours: number
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          dev_id?: string
+          hours?: number
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capacity_estimates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capacity_estimates_dev_id_fkey"
+            columns: ["dev_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capacity_estimates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean
@@ -829,6 +884,7 @@ export type Database = {
         Args: { p_next_sprint_id: string; p_sprint_id: string }
         Returns: Json
       }
+      delete_capacity_estimate: { Args: { p_id: string }; Returns: boolean }
       extract_mention_user_ids: { Args: { doc: Json }; Returns: string[] }
       has_any_role: { Args: never; Returns: boolean }
       has_role: {
@@ -902,6 +958,30 @@ export type Database = {
         Returns: Json
       }
       stop_timer: { Args: { p_user_id: string }; Returns: string }
+      upsert_capacity_estimate: {
+        Args: {
+          p_date: string
+          p_dev_id: string
+          p_hours: number
+          p_project_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          date: string
+          dev_id: string
+          hours: number
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "capacity_estimates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       project_member_role: "viewer" | "contributor" | "lead"

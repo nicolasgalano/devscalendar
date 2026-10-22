@@ -4,13 +4,13 @@ import { isOverloaded, overloadContributions, type PlanningRow } from "@/lib/cal
 import type { CalendarBooking, DevDayLoadRow } from "@/lib/calendar/query";
 import { calendarHref } from "@/lib/calendar/url";
 import { isWorkday } from "@/lib/calendar/workdays";
+import {
+  PLANNING_CELL_WIDTH as CELL_WIDTH,
+  PLANNING_LABEL_WIDTH as LABEL_WIDTH,
+  PLANNING_ROW_HEIGHT as ROW_HEIGHT,
+} from "@/lib/planning/constants";
 import { cn } from "@/lib/utils";
 import type { CalendarParams } from "@/lib/validation/calendar";
-
-/** DESIGN.md §5 + plan §7.1: compact cell that fits four weeks on 1280px. */
-const CELL_WIDTH = 40;
-const LABEL_WIDTH = 240;
-const ROW_HEIGHT = 36;
 
 /**
  * Planning grid: `client > project > dev` rows, 28 day columns.
