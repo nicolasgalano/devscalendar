@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarIcon, ClockIcon, PlusIcon, TimerIcon } from "lucide-react";
 
@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  clearDraft,
+  readDraft,
+  writeDraft,
+} from "@/lib/time-entries/draft-storage";
 import { cn } from "@/lib/utils";
 
 import { SearchableSelector } from "./searchable-selector";
@@ -87,6 +92,7 @@ export function TimeEntryDialog({
   activitiesByProject,
   ticketsByProject,
   userLabel,
+  viewerId,
 }: {
   mode: "create" | "edit";
   open: boolean;
@@ -97,9 +103,26 @@ export function TimeEntryDialog({
   ticketsByProject?: Record<string, TimeEntryTicket[]>;
   /** Nombre a mostrar en el chip del header (solo visual). */
   userLabel?: string;
+  /**
+   * ID del viewer — scope del draft en localStorage para que una máquina
+   * compartida (una compu del team usada por dos personas) no revele
+   * borradores entre cuentas (feature 030). Si no viene, los drafts
+   * quedan desactivados (compat con callers viejos).
+   */
+  viewerId?: string;
 }) {
   const router = useRouter();
   const { start: startSync } = useSyncIndicator();
+
+  // Key del draft en localStorage. Create usa una sola key compartida; edit
+  // usa `entry_id` para que dos entries en edición simultánea no se pisen.
+  // Si no hay viewerId, los helpers son no-op y el comportamiento regresa
+  // al anterior (sin draft).
+  const draftKey =
+    mode === "edit" && initial.id
+      ? `time-entry-draft-edit-${initial.id}`
+      : "time-entry-draft-create";
+
   const [form, setForm] = useState<TimeEntryDialogInitial>(initial);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -109,15 +132,33 @@ export function TimeEntryDialog({
     computeEnd(initial.startTime ?? "09:00", initial.minutes),
   );
 
+  // Guardo el project_id original para armar el PATCH comparando contra lo
+  // que viene en el initial — en edit, mandamos project_id solo si cambió.
+  const originalProjectId = useRef<string | null>(initial.projectId);
+
   useEffect(() => {
     if (open) {
-      setForm(initial);
+      // Feature 030: antes de usar `initial`, intento recuperar el draft
+      // persistido. Si hay y no venció, gana sobre `initial` — el usuario
+      // vuelve justo donde se quedó.
+      const draft = viewerId ? readDraft<TimeEntryDialogInitial>(draftKey, viewerId) : null;
+      const effective = draft ?? initial;
+      setForm(effective);
       setError(null);
-      const start = initial.startTime ?? "09:00";
+      const start = effective.startTime ?? "09:00";
       setStartInput(start);
-      setEndInput(computeEnd(start, initial.minutes));
+      setEndInput(computeEnd(start, effective.minutes));
+      originalProjectId.current = initial.projectId;
     }
-  }, [open, initial]);
+  }, [open, initial, viewerId, draftKey]);
+
+  // Persistir el draft a cada cambio del form (localStorage es cheap, no hay
+  // debounce). Solo cuando el dialog está abierto para no reescribir después
+  // del submit.
+  useEffect(() => {
+    if (!open || !viewerId) return;
+    writeDraft(draftKey, viewerId, form);
+  }, [open, viewerId, draftKey, form]);
 
   const availableActivities: TimeEntryActivity[] = useMemo(() => {
     if (!form.projectId) return [];
@@ -176,7 +217,13 @@ export function TimeEntryDialog({
         ticket_id: form.ticketId ?? null,
         activity_id: form.activityId ?? null,
       };
-      if (mode === "create") body.project_id = form.projectId;
+      if (mode === "create") {
+        body.project_id = form.projectId;
+      } else if (form.projectId && form.projectId !== originalProjectId.current) {
+        // 030: en edit, mandamos project_id solo si cambió. El handler
+        // re-chequea membership del nuevo proyecto.
+        body.project_id = form.projectId;
+      }
 
       const res = await fetch(url, {
         method: mode === "create" ? "POST" : "PATCH",
@@ -191,6 +238,8 @@ export function TimeEntryDialog({
         setError(payload.error ?? payload.reason ?? "No se pudo guardar la carga.");
         return;
       }
+      // 030: éxito → borrar draft para que el próximo open arranque vacío.
+      if (viewerId) clearDraft(draftKey, viewerId);
       onOpenChange(false);
       router.refresh();
     } catch {
@@ -288,13 +337,18 @@ export function TimeEntryDialog({
                 equipos con muchos proyectos activos puedan filtrar por nombre
                 o cliente. La lista chica (1-5 proyectos) sigue funcionando
                 igual — el filtro vacío devuelve todo. */}
+            {/* 030: project editable también en modo edit. Al cambiar se
+                limpian activity y ticket (son por-proyecto); el server
+                re-valida membership del nuevo proyecto. */}
             <SearchableSelector
               placeholder="Elegí un proyecto"
               searchPlaceholder="Buscar proyecto…"
               emptyMessage="No se encontraron proyectos"
               value={form.projectId}
-              disabled={mode === "edit" || projects.length === 0}
-              onChange={(value) => setForm({ ...form, projectId: value })}
+              disabled={projects.length === 0}
+              onChange={(value) =>
+                setForm({ ...form, projectId: value, activityId: null, ticketId: null })
+              }
               items={projects.map((p) => ({
                 id: p.id,
                 label: p.name,
