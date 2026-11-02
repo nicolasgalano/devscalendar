@@ -8,6 +8,7 @@ import { hasPmScope } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/session";
 import {
+  getMyActiveTimer,
   getMyLoggableProjects,
   getTimeEntriesForWeek,
 } from "@/lib/time-entries/query";
@@ -48,27 +49,32 @@ export default async function MyTimePage({
 
   const supabase = await createClient();
 
-  // Fetch entries + projects loggeables + assignees (si aplica).
-  const [entries, projects, assignees, viewingUserProfile] = await Promise.all([
-    getTimeEntriesForWeek(viewingUserId, weekStart, weekEnd),
-    getMyLoggableProjects(),
-    canViewOthers
-      ? supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .eq("active", true)
-          .order("full_name", { ascending: true })
-          .then((res) => res.data ?? [])
-      : Promise.resolve([]),
-    viewingUserId === profile.id
-      ? Promise.resolve({ id: profile.id, full_name: profile.full_name, email: profile.email })
-      : supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .eq("id", viewingUserId)
-          .maybeSingle()
-          .then((res) => res.data),
-  ]);
+  // Fetch entries + projects loggeables + assignees (si aplica) + timer activo.
+  // 030: el `activeTimer` entra a `/my-time` para renderizar la running card
+  // en la grilla del día del `started_at`. Solo del viewer propio — un PM/
+  // admin viendo la planilla de otro no ve su timer.
+  const [entries, projects, assignees, viewingUserProfile, activeTimer] =
+    await Promise.all([
+      getTimeEntriesForWeek(viewingUserId, weekStart, weekEnd),
+      getMyLoggableProjects(),
+      canViewOthers
+        ? supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .eq("active", true)
+            .order("full_name", { ascending: true })
+            .then((res) => res.data ?? [])
+        : Promise.resolve([]),
+      viewingUserId === profile.id
+        ? Promise.resolve({ id: profile.id, full_name: profile.full_name, email: profile.email })
+        : supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .eq("id", viewingUserId)
+            .maybeSingle()
+            .then((res) => res.data),
+      viewingUserId === profile.id ? getMyActiveTimer() : Promise.resolve(null),
+    ]);
 
   const viewingUserName =
     viewingUserProfile?.full_name ?? viewingUserProfile?.email ?? viewingUserId;
@@ -136,6 +142,7 @@ export default async function MyTimePage({
         projects={projects}
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
+        activeTimer={activeTimer}
       />
     </>
   );
