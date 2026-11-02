@@ -17,6 +17,7 @@ export type Database = {
       active_timers: {
         Row: {
           activity_id: string | null
+          description: string | null
           project_id: string
           started_at: string
           ticket_id: string | null
@@ -24,6 +25,7 @@ export type Database = {
         }
         Insert: {
           activity_id?: string | null
+          description?: string | null
           project_id: string
           started_at?: string
           ticket_id?: string | null
@@ -31,6 +33,7 @@ export type Database = {
         }
         Update: {
           activity_id?: string | null
+          description?: string | null
           project_id?: string
           started_at?: string
           ticket_id?: string | null

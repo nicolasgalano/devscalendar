@@ -63,14 +63,38 @@ export const createTimeEntrySchema = z.object({
  * PATCH de entry. Todos los campos opcionales, al menos uno tiene que viajar.
  * `user_id` NO se puede cambiar por API — mover una entry a otra persona
  * requeriría re-chequear permisos y no hay caso de uso concreto.
+ *
+ * `project_id` sí se puede cambiar (feature 030) — el handler re-valida
+ * contributor+ del nuevo proyecto. El cliente debería mandar `ticket_id`
+ * y `activity_id` como `null` cuando cambia project; el handler igual los
+ * valida contra el proyecto final como defensa en profundidad.
  */
 export const updateTimeEntrySchema = z
   .object({
+    project_id: z.string().uuid().optional(),
     ticket_id: z.string().uuid().nullable().optional(),
     activity_id: z.string().uuid().nullable().optional(),
     minutes: minutesSchema.optional(),
     logged_at: dateSchema.optional(),
     start_time: timeSchema,
+    description: descriptionSchema,
+  })
+  .refine((body) => Object.values(body).some((v) => v !== undefined), {
+    message: "Nada para actualizar",
+  });
+
+/**
+ * PATCH de active_timer (feature 030). Los mismos campos que un time entry
+ * sin fecha ni minutos, más `started_at` editable (el usuario puede corregir
+ * la hora de inicio del timer corriendo). `started_at` como ISO 8601
+ * datetime — el handler verifica que no sea futuro.
+ */
+export const updateActiveTimerSchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    ticket_id: z.string().uuid().nullable().optional(),
+    activity_id: z.string().uuid().nullable().optional(),
+    started_at: z.string().datetime().optional(),
     description: descriptionSchema,
   })
   .refine((body) => Object.values(body).some((v) => v !== undefined), {
@@ -102,4 +126,5 @@ export const exportQuerySchema = z.object({
 export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
 export type UpdateTimeEntryInput = z.infer<typeof updateTimeEntrySchema>;
 export type StartTimerInput = z.infer<typeof startTimerSchema>;
+export type UpdateActiveTimerInput = z.infer<typeof updateActiveTimerSchema>;
 export type ExportQueryInput = z.infer<typeof exportQuerySchema>;
