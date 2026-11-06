@@ -29,8 +29,12 @@ function isWithinEditWindow(loggedAt: string): boolean {
  *   2. Ownership: si el actor no es admin y no es el user_id → 403.
  *   3. Ventana de edición: si el actor no es admin y logged_at es > 7 días →
  *      403 con `reason: 'edit_window_expired'`.
- *   4. Chequeos cross-table (ticket, actividad) si cambian.
- *   5. Update; trigger de audit registra el diff.
+ *   4. Si cambia `project_id` (feature 030): re-chequear contributor+ del
+ *      proyecto nuevo. Si cambia project y vienen ticket/activity no-null,
+ *      se validan contra el proyecto nuevo (el cliente debería mandarlos
+ *      como null al cambiar project, pero defensa en profundidad).
+ *   5. Chequeos cross-table (ticket, actividad) contra el proyecto final.
+ *   6. Update; trigger de audit registra el diff.
  */
 export async function PATCH(
   request: Request,
@@ -82,14 +86,32 @@ export async function PATCH(
     );
   }
 
-  // Cross-checks si cambia ticket o actividad — mismo criterio del POST.
+  // Feature 030: project_id editable. Si cambió, membership del nuevo
+  // proyecto; usamos `can_view_project` como gate (mismo criterio que el
+  // start del timer en 027).
+  const finalProjectId =
+    parsed.data.project_id !== undefined ? parsed.data.project_id : entry.project_id;
+  if (parsed.data.project_id && parsed.data.project_id !== entry.project_id) {
+    const { data: canView } = await supabase.rpc("can_view_project", {
+      p_project_id: parsed.data.project_id,
+      p_user_id: profile.id,
+    });
+    if (!canView) {
+      return NextResponse.json(
+        { error: "No sos miembro del proyecto destino", reason: "not_member" },
+        { status: 403 },
+      );
+    }
+  }
+
+  // Cross-checks contra el proyecto final (nuevo si cambió, viejo si no).
   if (parsed.data.ticket_id) {
     const { data: ticket } = await supabase
       .from("tickets")
       .select("project_id")
       .eq("id", parsed.data.ticket_id)
       .maybeSingle();
-    if (!ticket || ticket.project_id !== entry.project_id) {
+    if (!ticket || ticket.project_id !== finalProjectId) {
       return NextResponse.json(
         { error: "El ticket no pertenece a este proyecto" },
         { status: 400 },
@@ -102,7 +124,7 @@ export async function PATCH(
       .select("project_id, active")
       .eq("id", parsed.data.activity_id)
       .maybeSingle();
-    if (!activity || activity.project_id !== entry.project_id) {
+    if (!activity || activity.project_id !== finalProjectId) {
       return NextResponse.json(
         { error: "La actividad no pertenece a este proyecto" },
         { status: 400 },
@@ -119,6 +141,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("time_entries")
     .update({
+      ...(parsed.data.project_id !== undefined && { project_id: parsed.data.project_id }),
       ...(parsed.data.ticket_id !== undefined && { ticket_id: parsed.data.ticket_id }),
       ...(parsed.data.activity_id !== undefined && {
         activity_id: parsed.data.activity_id,

@@ -94,7 +94,17 @@ export function SearchableSelector({
             hasSelection ? "text-muted-foreground" : "text-primary",
           )}
         />
-        <span className={cn("truncate text-left", !hasSelection && "text-muted-foreground")}>
+        {/* 030: `min-w-0 flex-1` para que `truncate` funcione adentro del
+            flex container. Sin esto los flex items tienen min-width:auto y
+            el span se expande, rompiendo el popover con tickets de título
+            largo tipo "IP Advisory - TA 05 - IP Sales, Licencing and
+            Acquisitions". */}
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-left",
+            !hasSelection && "text-muted-foreground",
+          )}
+        >
           {display}
         </span>
         {clearable && hasSelection && !disabled && (
