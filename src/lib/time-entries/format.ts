@@ -46,3 +46,29 @@ export function formatSecondsClock(seconds: number): string {
   const s = safeSeconds % 60;
   return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Formato "tiempo transcurrido" para el bloque de aviso de un timer olvidado
+ * (feature 030). Se busca una lectura humana corta sin tanta precisión:
+ *   - 59s o menos → "menos de 1 min"
+ *   - 1-59 min → "N min"
+ *   - 1-23 h → "N h" o "N h M min" si M > 0
+ *   - ≥ 24 h → "N d" o "N d H h" si H > 0
+ *
+ * Se evitan segundos para timers de más de 1 min — el objetivo es que el
+ * usuario entienda "cuánto rato", no una duración exacta.
+ */
+export function humanizeElapsed(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  if (safe < 60) return "menos de 1 min";
+  const minutes = Math.floor(safe / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) {
+    return remMinutes === 0 ? `${hours} h` : `${hours} h ${remMinutes} min`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours === 0 ? `${days} d` : `${days} d ${remHours} h`;
+}

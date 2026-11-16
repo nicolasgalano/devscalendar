@@ -1,6 +1,6 @@
 "use client";
 
-import { PlayIcon, PlusIcon } from "lucide-react";
+import { AlertTriangleIcon, PlayIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -19,6 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  clearDraft,
+  readDraft,
+  writeDraft,
+} from "@/lib/time-entries/draft-storage";
+import { humanizeElapsed } from "@/lib/time-entries/format";
+import type { ActiveTimer } from "@/lib/time-entries/query";
 import { cn } from "@/lib/utils";
 
 import { SearchableSelector } from "./searchable-selector";
@@ -28,6 +35,8 @@ import type {
   TimeEntryTicket,
 } from "./time-entry-dialog";
 import { buildStartPayload, type TimerStartFormState } from "./timer-start-payload";
+
+const DRAFT_KEY = "timer-start-draft";
 
 /**
  * 027. Dialog para arrancar un cronómetro desde `/my-time`. Reusa los
@@ -48,31 +57,75 @@ export function TimerStartDialog({
   projects,
   activitiesByProject,
   ticketsByProject,
+  initialValues,
+  viewerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projects: TimeEntryProject[];
   activitiesByProject: Record<string, TimeEntryActivity[]>;
   ticketsByProject: Record<string, TimeEntryTicket[]>;
+  /**
+   * 030: pre-rellenar el form con estos valores al abrir — se usa desde el
+   * botón "play" de una card para repetir una tarea sin volver a elegir
+   * project/activity/ticket.
+   */
+  initialValues?: TimerStartFormState;
+  /** 030: scope del draft en localStorage. Si no viene, no persiste. */
+  viewerId?: string;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<TimerStartFormState>({
-    projectId: null,
-    activityId: null,
-    ticketId: null,
-  });
+  const [state, setState] = useState<TimerStartFormState>(
+    initialValues ?? { projectId: null, activityId: null, ticketId: null },
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 030: si el server devuelve 409 timer_active, mostramos un bloque con
+  // dos acciones (guardar/descartar) antes de reintentar el start.
+  const [activeTimerWarning, setActiveTimerWarning] = useState<ActiveTimer | null>(
+    null,
+  );
+  const [tick, setTick] = useState(0); // para el "corriendo desde X" vivo
 
   // Reset al abrir — no queremos arrastrar la selección de un intento previo
-  // que se canceló.
+  // que se canceló. Prioridades: initialValues (flujo play) > draft persistido
+  // > vacío.
   useEffect(() => {
     if (open) {
-      setState({ projectId: null, activityId: null, ticketId: null });
+      if (initialValues) {
+        setState(initialValues);
+      } else {
+        const draft = viewerId ? readDraft<TimerStartFormState>(DRAFT_KEY, viewerId) : null;
+        setState(draft ?? { projectId: null, activityId: null, ticketId: null });
+      }
       setError(null);
       setSubmitting(false);
+      setActiveTimerWarning(null);
     }
-  }, [open]);
+  }, [open, initialValues, viewerId]);
+
+  // Persistir el draft a cada cambio del form.
+  useEffect(() => {
+    if (!open || !viewerId) return;
+    writeDraft(DRAFT_KEY, viewerId, state);
+  }, [open, viewerId, state]);
+
+  // Tick para que el "corriendo desde X" avance mientras el bloque está arriba.
+  useEffect(() => {
+    if (!activeTimerWarning) return;
+    const interval = window.setInterval(() => setTick((n) => n + 1), 1_000);
+    return () => window.clearInterval(interval);
+  }, [activeTimerWarning]);
+
+  const warningElapsedLabel = useMemo(() => {
+    if (!activeTimerWarning) return "";
+    void tick;
+    const seconds = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(activeTimerWarning.startedAt).getTime()) / 1_000),
+    );
+    return humanizeElapsed(seconds);
+  }, [activeTimerWarning, tick]);
 
   const availableActivities: TimeEntryActivity[] = useMemo(() => {
     if (!state.projectId) return [];
@@ -100,6 +153,37 @@ export function TimerStartDialog({
   const canSubmit =
     state.projectId !== null && (!activityRequired || state.activityId !== null) && !submitting;
 
+  async function doStart(payload: ReturnType<typeof buildStartPayload>): Promise<boolean> {
+    if (!payload) return false;
+    const res = await fetch("/api/time-entries/timer/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reason?: string;
+        timer?: ActiveTimer;
+      };
+      // 030: timer activo preexistente — mostramos las dos acciones al
+      // usuario, no cerramos el dialog.
+      if (res.status === 409 && body.reason === "timer_active" && body.timer) {
+        setActiveTimerWarning(body.timer);
+        return false;
+      }
+      if (res.status === 403) {
+        setError(body.error ?? "No tenés permiso para iniciar un cronómetro en este proyecto.");
+      } else if (body.reason === "activity_required") {
+        setError("Este proyecto exige elegir una tarea antes de arrancar.");
+      } else {
+        setError(body.error ?? "No se pudo iniciar el cronómetro.");
+      }
+      return false;
+    }
+    return true;
+  }
+
   async function submit() {
     const payload = buildStartPayload(state);
     if (!payload) return;
@@ -107,27 +191,38 @@ export function TimerStartDialog({
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch("/api/time-entries/timer/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const started = await doStart(payload);
+      if (!started) return;
+      if (viewerId) clearDraft(DRAFT_KEY, viewerId);
+      onOpenChange(false);
+      router.refresh();
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          reason?: string;
-        };
-        if (res.status === 403) {
-          setError(body.error ?? "No tenés permiso para iniciar un cronómetro en este proyecto.");
-        } else if (body.reason === "activity_required") {
-          setError("Este proyecto exige elegir una tarea antes de arrancar.");
-        } else {
-          setError(body.error ?? "No se pudo iniciar el cronómetro.");
-        }
+  // 030: "Guardar y arrancar" → para el timer viejo (crea un entry capeado a
+  // 960 min por el stop_timer RPC) → re-POST start con los campos actuales.
+  // "Descartar y arrancar" → delete del timer viejo → re-POST start.
+  async function resolveActiveTimerAndStart(mode: "stop" | "discard") {
+    const payload = buildStartPayload(state);
+    if (!payload) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const endpoint = mode === "stop" ? "/api/time-entries/timer/stop" : "/api/time-entries/timer/discard";
+      const resolve = await fetch(endpoint, { method: "POST" });
+      if (!resolve.ok) {
+        const body = (await resolve.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "No se pudo resolver el cronómetro anterior.");
         return;
       }
-
+      setActiveTimerWarning(null);
+      const started = await doStart(payload);
+      if (!started) return;
+      if (viewerId) clearDraft(DRAFT_KEY, viewerId);
       onOpenChange(false);
       router.refresh();
     } catch {
@@ -151,6 +246,54 @@ export function TimerStartDialog({
             <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
+          )}
+
+          {/* 030: aviso de timer activo preexistente. Dos acciones:
+              guardarlo (crea un entry capeado a 960 min) o descartarlo. El
+              usuario decide antes de arrancar el nuevo. */}
+          {activeTimerWarning && (
+            <div
+              role="alert"
+              className="border-attention bg-attention-bg flex flex-col gap-2 rounded-md border p-3"
+            >
+              <div className="text-ui text-foreground flex items-start gap-2">
+                <AlertTriangleIcon
+                  aria-hidden="true"
+                  className="text-attention mt-0.5 size-4 shrink-0"
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">
+                    Ya hay un cronómetro corriendo
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    {activeTimerWarning.ticketKey
+                      ? `${activeTimerWarning.ticketKey} · ${activeTimerWarning.activityName ?? activeTimerWarning.projectName}`
+                      : `${activeTimerWarning.projectName} · ${activeTimerWarning.activityName ?? "Sin tarea"}`}
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    corriendo hace {warningElapsedLabel}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => resolveActiveTimerAndStart("discard")}
+                  disabled={submitting}
+                  className="text-destructive"
+                >
+                  Descartar y arrancar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => resolveActiveTimerAndStart("stop")}
+                  disabled={submitting}
+                >
+                  Guardar y arrancar
+                </Button>
+              </div>
+            </div>
           )}
 
           <div className="flex flex-col gap-1.5">

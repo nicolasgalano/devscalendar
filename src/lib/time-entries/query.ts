@@ -134,9 +134,16 @@ export type ActiveTimer = {
   activityId: string | null;
   activityName: string | null;
   startedAt: string;
+  /** Feature 030: descripción editable in-flight desde la running card. */
+  description: string | null;
 };
 
 type ActiveTimerEmbed = ActiveTimerRow & {
+  /** Feature 030: columna agregada en migration 27. Mientras no se regeneren
+   *  `src/types/database.ts` con `pnpm db:types` después del push, el campo
+   *  vive solo acá. Al regenerar queda redundante pero el `&` lo mantiene
+   *  compatible. */
+  description: string | null;
   project: { name: string; key: string } | null;
   ticket: { numero: number; title: string } | null;
   activity: { name: string } | null;
@@ -148,7 +155,7 @@ export const getMyActiveTimer = cache(async (): Promise<ActiveTimer | null> => {
     .from("active_timers")
     .select(
       `
-        user_id, project_id, ticket_id, activity_id, started_at,
+        user_id, project_id, ticket_id, activity_id, started_at, description,
         project:projects!inner ( name, key ),
         ticket:tickets ( numero, title ),
         activity:project_activities ( name )
@@ -169,6 +176,7 @@ export const getMyActiveTimer = cache(async (): Promise<ActiveTimer | null> => {
     activityId: row.activity_id,
     activityName: row.activity?.name ?? null,
     startedAt: row.started_at,
+    description: row.description,
   };
 });
 

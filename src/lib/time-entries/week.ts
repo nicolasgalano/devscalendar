@@ -64,6 +64,28 @@ export function parseWeekParam(raw: string | string[] | undefined): string {
 }
 
 /**
+ * Fecha local Buenos Aires de un timestamptz en formato YYYY-MM-DD. Es la
+ * misma lógica que usa `stop_timer` en la base para derivar `logged_at` de
+ * un timer parado — un timer que arranca a las 22:00 UTC-3 y se para a las
+ * 01:00 del día siguiente queda en el día siguiente (en zona local).
+ *
+ * Se usa en la running card de `/my-time` para decidir en qué columna del
+ * día cae el timer activo (feature 030). Usar `Intl.DateTimeFormat` con
+ * `en-CA` da el ISO date directo sin armar strings a mano.
+ */
+export function getLocalDayISO(startedAt: string): string {
+  const d = new Date(startedAt);
+  if (Number.isNaN(d.getTime())) return "";
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(d);
+}
+
+/**
  * Etiqueta corta para el header de una columna del día: "lun 15" / "sab 20"
  * en `es-AR`, sin zona horaria (todo en UTC para consistencia).
  */

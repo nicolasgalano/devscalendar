@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PencilIcon, Trash2Icon, UserIcon } from "lucide-react";
+import { PencilIcon, PlayIcon, Trash2Icon, UserIcon } from "lucide-react";
 
 import { useSyncIndicator } from "@/components/sync-indicator";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,13 @@ export function TimeEntryCard({
   entry,
   viewer,
   onEdit,
+  onStartTimer,
 }: {
   entry: TimeEntryListItem;
   viewer: { id: string; roles: UserRole[] } | null;
   onEdit?: (entry: TimeEntryListItem) => void;
+  /** 030: botón "play" para repetir la tarea con un cronómetro nuevo. */
+  onStartTimer?: (entry: TimeEntryListItem) => void;
 }) {
   const router = useRouter();
   const { start: startSync } = useSyncIndicator();
@@ -100,12 +103,18 @@ export function TimeEntryCard({
           </span>
         </div>
 
+        {/* 030: siempre mostrar activity (o "Sin tarea") + project debajo. El
+            comportamiento anterior priorizaba uno u otro con fallback,
+            ocultando el project cuando había activity y viceversa; eso dejaba
+            a los usuarios sin pista de a qué proyecto correspondía la carga.
+            Para entries sin ticket se perdía el proyecto por completo. */}
         <p className="text-ui text-foreground leading-tight">
           {entry.activity?.name ?? (
-            <span className="text-muted-foreground italic">
-              {entry.project.name}
-            </span>
+            <span className="text-muted-foreground italic">Sin tarea</span>
           )}
+        </p>
+        <p className="text-caption text-muted-foreground truncate">
+          {entry.project.name}
         </p>
 
         {entry.description && (
@@ -121,19 +130,33 @@ export function TimeEntryCard({
               por {entry.createdByName ?? "otro"}
             </span>
           )}
-          {canEdit && (
-            <div className="ml-auto flex opacity-0 transition-opacity group-hover:opacity-100">
-              {onEdit && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => onEdit(entry)}
-                  aria-label="Editar"
-                  title="Editar"
-                >
-                  <PencilIcon aria-hidden="true" className="size-3.5" />
-                </Button>
-              )}
+          <div className="ml-auto flex opacity-0 transition-opacity group-hover:opacity-100">
+            {/* 030: "play" visible siempre (no condicionado a canEdit): iniciar
+                un timer con estos datos es acción del viewer, no edición del
+                entry. */}
+            {onStartTimer && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onStartTimer(entry)}
+                aria-label="Iniciar cronómetro con estos datos"
+                title="Iniciar cronómetro con estos datos"
+              >
+                <PlayIcon aria-hidden="true" className="size-3.5" />
+              </Button>
+            )}
+            {canEdit && onEdit && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onEdit(entry)}
+                aria-label="Editar"
+                title="Editar"
+              >
+                <PencilIcon aria-hidden="true" className="size-3.5" />
+              </Button>
+            )}
+            {canEdit && (
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -144,8 +167,8 @@ export function TimeEntryCard({
               >
                 <Trash2Icon aria-hidden="true" className="size-3.5" />
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

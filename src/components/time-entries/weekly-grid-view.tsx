@@ -16,10 +16,17 @@ import {
 } from "@/components/ui/select";
 import type { UserRole } from "@/lib/auth/roles";
 import { formatMinutesCompact, formatMinutesDecimal } from "@/lib/time-entries/format";
-import type { TimeEntryListItem } from "@/lib/time-entries/query";
-import { currentWeekStart, formatDayHeader, getWeekDays, shiftWeek } from "@/lib/time-entries/week";
+import type { ActiveTimer, TimeEntryListItem } from "@/lib/time-entries/query";
+import {
+  currentWeekStart,
+  formatDayHeader,
+  getLocalDayISO,
+  getWeekDays,
+  shiftWeek,
+} from "@/lib/time-entries/week";
 import { cn } from "@/lib/utils";
 
+import { RunningTimerCard } from "./running-timer-card";
 import { TimeEntryCard } from "./time-entry-card";
 import {
   TimeEntryDialog,
@@ -49,6 +56,7 @@ export function WeeklyGridView({
   projects,
   activitiesByProject,
   ticketsByProject,
+  activeTimer,
 }: {
   weekStart: string;
   entries: TimeEntryListItem[];
@@ -61,6 +69,10 @@ export function WeeklyGridView({
   projects: TimeEntryProject[];
   activitiesByProject: Record<string, TimeEntryActivity[]>;
   ticketsByProject: Record<string, TimeEntryTicket[]>;
+  /** 030: cronómetro corriendo del viewer, si hay. Se renderiza como una
+   *  running card en la columna del día local del started_at. Null cuando
+   *  se mira la planilla de otro usuario (no se expone el timer ajeno). */
+  activeTimer: ActiveTimer | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,6 +84,14 @@ export function WeeklyGridView({
   // 027: dialog aparte para "Iniciar cronómetro". El del `<TimeEntryDialog>`
   // sigue siendo para carga manual con horario; este arranca un timer en vivo.
   const [timerStartOpen, setTimerStartOpen] = useState(false);
+  // 030: cuando el usuario cliquea play en una card cargada, pre-rellenamos
+  // el dialog con los campos de esa card. Null = dialog arranca vacío (botón
+  // del toolbar).
+  const [timerStartInitialValues, setTimerStartInitialValues] = useState<{
+    projectId: string | null;
+    activityId: string | null;
+    ticketId: string | null;
+  } | null>(null);
 
   const days = getWeekDays(weekStart);
   const isCurrentWeek = weekStart === currentWeekStart();
@@ -120,6 +140,17 @@ export function WeeklyGridView({
 
   function openEdit(entry: TimeEntryListItem) {
     setDialogState({ open: true, mode: "edit", entry });
+  }
+
+  // 030: "play" en una card → abre el TimerStartDialog pre-rellenado con los
+  // mismos project/activity/ticket de esa entry.
+  function openStartFromEntry(entry: TimeEntryListItem) {
+    setTimerStartInitialValues({
+      projectId: entry.project.id,
+      activityId: entry.activity?.id ?? null,
+      ticketId: entry.ticket?.id ?? null,
+    });
+    setTimerStartOpen(true);
   }
 
   const isViewingOther = viewingUserId !== viewer.id;
@@ -301,12 +332,22 @@ export function WeeklyGridView({
               </div>
 
               <div className="flex min-h-24 flex-col gap-1.5">
+                {activeTimer &&
+                  getLocalDayISO(activeTimer.startedAt) === day && (
+                    <RunningTimerCard
+                      activeTimer={activeTimer}
+                      projects={projects}
+                      activitiesByProject={activitiesByProject}
+                      ticketsByProject={ticketsByProject}
+                    />
+                  )}
                 {dayEntries.map((entry) => (
                   <TimeEntryCard
                     key={entry.id}
                     entry={entry}
                     viewer={viewer}
                     onEdit={openEdit}
+                    onStartTimer={!isViewingOther ? openStartFromEntry : undefined}
                   />
                 ))}
                 {!isViewingOther && (
@@ -338,6 +379,7 @@ export function WeeklyGridView({
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
         userLabel={viewingUserName}
+        viewerId={viewer.id}
       />
 
       <TimeEntryDialog
@@ -349,14 +391,20 @@ export function WeeklyGridView({
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
         userLabel={viewingUserName}
+        viewerId={viewer.id}
       />
 
       <TimerStartDialog
         open={timerStartOpen}
-        onOpenChange={setTimerStartOpen}
+        onOpenChange={(next) => {
+          setTimerStartOpen(next);
+          if (!next) setTimerStartInitialValues(null);
+        }}
         projects={projects}
         activitiesByProject={activitiesByProject}
         ticketsByProject={ticketsByProject}
+        initialValues={timerStartInitialValues ?? undefined}
+        viewerId={viewer.id}
       />
     </>
   );
