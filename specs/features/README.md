@@ -39,7 +39,7 @@ Una feature pasa a `done` cuando sus tasks están cerradas y sus tests pasan. Si
 | 027 | Time tracker: polish + start del cronómetro       | code done (deployed 2026-10-14) | 016, 021           | fuera de spec original |
 | 028 | Pantalla proyectos: orden, buscador, filtro activos y acciones | draft | 017, 002, 012      | fuera de spec original |
 | 029 | Planificación de capacidad por proyecto (nueva pantalla + tabla) | draft | 011, 015, 024, 028 | fuera de spec original |
-| 030 | Time tracker: correcciones post-launch                           | draft | 016, 027           | fuera de spec original |
+| 030 | Time tracker: correcciones post-launch                           | code done (deployed 2026-11-16) | 016, 027           | fuera de spec original |
 
 **`019` — nota:** deployed a producción el 2026-09-18. Migración de datos ejecutada (2/2 tickets convertidos). Feature `019.5` (drop de la columna `description` + borrado de `src/lib/markdown/*` y sus deps) queda como fase 2 aparte (D-11 en `docs/deuda-tecnica.md`), después de verificar en producción que 100% de los tickets tienen `description_doc` no nulo durante ≥ 1 semana.
 
