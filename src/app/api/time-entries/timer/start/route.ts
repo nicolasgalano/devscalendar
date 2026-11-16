@@ -14,8 +14,18 @@ import { startTimerSchema } from "@/lib/validation/time-entries";
  * (POST `/timer/stop` + re-POST acá), descartarlo (POST `/timer/discard` +
  * re-POST acá), o cancelar. Esto resuelve el bug reportado por Emiliano
  * (bloques random o errores `23514` cuando quedó un timer olvidado hace
- * días). El RPC `stop_and_start_timer` sigue vigente para el caso feliz
- * (sin timer previo) por atomicidad.
+ * días).
+ *
+ * Fix post-030 (2026-11-16): el insert del timer nuevo es un `INSERT` directo
+ * a `active_timers`, no la RPC `stop_and_start_timer`. Esa RPC tiene adentro
+ * un `stop_timer()` que crea un entry de 15 min si encuentra un stale — útil
+ * antes del guard, pero peligroso ahora: si el guard falla por cualquier
+ * motivo (p. ej., carrera entre deploy y cliente cacheado) el stale se
+ * convierte silenciosamente en un bloque ficticio en la planilla. Reportado
+ * por Emiliano el 2026-11-16 justo después del deploy de 030, con un entry
+ * de 15 min aparecido sin que él pasara por el dialog de warn. La RPC
+ * `stop_and_start_timer` queda en la base sin consumidores (fase 2 si no
+ * reaparece).
  *
  * Chequeos:
  *   - Ticket ↔ project match (defensivo, la UI ya lo hace).
@@ -160,16 +170,29 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data, error } = await supabase.rpc("stop_and_start_timer", {
-    p_user_id: profile.id,
-    p_project_id: project_id,
-    p_ticket_id: (ticket_id ?? null) as string,
-    p_activity_id: (activity_id ?? null) as string,
-  });
+  // INSERT directo — ver el header del archivo para el porqué de no usar la
+  // RPC. El PK de active_timers es user_id, así que si por algún motivo el
+  // guard de arriba no detectó un stale (deploy cache, bug), este insert
+  // rompería con `23505` unique_violation en vez de crear silenciosamente un
+  // entry de 15 min. Fallar ruidoso es preferible a stopear-y-arrancar sin
+  // avisar.
+  const { data, error } = await supabase
+    .from("active_timers")
+    .insert({
+      user_id: profile.id,
+      project_id,
+      ticket_id: ticket_id ?? null,
+      activity_id: activity_id ?? null,
+    })
+    .select("started_at")
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, result: data });
+  return NextResponse.json({
+    ok: true,
+    result: { stopped_entry_id: null, started_at: data.started_at },
+  });
 }
