@@ -59,28 +59,46 @@ export async function POST(request: Request) {
   // tiene que decidir qué hacer con él (stop o discard) antes de pedir uno
   // nuevo. La RLS filtra por auth.uid() y active_timers tiene PK = user_id,
   // así que `.maybeSingle()` devuelve a lo sumo la fila del propio user.
-  const { data: existing } = await supabase
+  //
+  // Fix post-030 (2026-11-17): el check de existencia va sin joins. Antes
+  // mezclaba "¿existe?" con "¿cómo lo muestro?" en una sola query embebida, y
+  // si cualquier error del select pasaba (RLS cross-table, parse, red) el
+  // handler no lo capturaba — `existing` quedaba undefined y caía al INSERT,
+  // que explotaba con 23505 contra active_timers_pkey. Reportado por Emiliano
+  // (screenshot "duplicate key value violates unique constraint
+  // 'active_timers_pkey'"). Ahora: dos queries separadas + errores capturados.
+  const existenceCheck = await supabase
     .from("active_timers")
-    .select(
-      `
-        user_id, project_id, ticket_id, activity_id, started_at, description,
-        project:projects!inner ( name, key ),
-        ticket:tickets ( numero, title ),
-        activity:project_activities ( name )
-      `,
-    )
+    .select("user_id")
     .maybeSingle();
-  if (existing) {
-    const existingRow = existing as unknown as {
+  if (existenceCheck.error) {
+    return NextResponse.json(
+      { error: existenceCheck.error.message },
+      { status: 500 },
+    );
+  }
+  if (existenceCheck.data) {
+    const { data: display } = await supabase
+      .from("active_timers")
+      .select(
+        `
+          user_id, project_id, ticket_id, activity_id, started_at, description,
+          project:projects ( name, key ),
+          ticket:tickets ( numero, title ),
+          activity:project_activities ( name )
+        `,
+      )
+      .maybeSingle();
+    const existingRow = (display ?? existenceCheck.data) as unknown as {
       user_id: string;
-      project_id: string;
-      ticket_id: string | null;
-      activity_id: string | null;
-      started_at: string;
-      description: string | null;
-      project: { name: string; key: string } | null;
-      ticket: { numero: number; title: string } | null;
-      activity: { name: string } | null;
+      project_id?: string;
+      ticket_id?: string | null;
+      activity_id?: string | null;
+      started_at?: string;
+      description?: string | null;
+      project?: { name: string; key: string } | null;
+      ticket?: { numero: number; title: string } | null;
+      activity?: { name: string } | null;
     };
     const projectKey = existingRow.project?.key ?? "";
     return NextResponse.json(
@@ -89,17 +107,17 @@ export async function POST(request: Request) {
         reason: "timer_active",
         timer: {
           userId: existingRow.user_id,
-          projectId: existingRow.project_id,
+          projectId: existingRow.project_id ?? "",
           projectName: existingRow.project?.name ?? "",
-          ticketId: existingRow.ticket_id,
+          ticketId: existingRow.ticket_id ?? null,
           ticketKey: existingRow.ticket
             ? `${projectKey}-${existingRow.ticket.numero}`
             : null,
           ticketTitle: existingRow.ticket?.title ?? null,
-          activityId: existingRow.activity_id,
+          activityId: existingRow.activity_id ?? null,
           activityName: existingRow.activity?.name ?? null,
-          startedAt: existingRow.started_at,
-          description: existingRow.description,
+          startedAt: existingRow.started_at ?? new Date().toISOString(),
+          description: existingRow.description ?? null,
         },
       },
       { status: 409 },
@@ -188,6 +206,32 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    // Red final: si por una carrera (dos POSTs casi simultáneos del mismo
+    // user) el guard de arriba no vio la fila y el insert choca con la PK,
+    // traducilo a 409 timer_active con payload mínimo. El cliente ya sabe
+    // reaccionar — sin esto, el frontend muestra "duplicate key value..."
+    // en crudo.
+    if (error.code === "23505") {
+      return NextResponse.json(
+        {
+          error: "Ya hay un cronómetro corriendo",
+          reason: "timer_active",
+          timer: {
+            userId: profile.id,
+            projectId: "",
+            projectName: "",
+            ticketId: null,
+            ticketKey: null,
+            ticketTitle: null,
+            activityId: null,
+            activityName: null,
+            startedAt: new Date().toISOString(),
+            description: null,
+          },
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
